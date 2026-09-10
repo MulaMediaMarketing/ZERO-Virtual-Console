@@ -1,3 +1,4 @@
+#include "ZeroSdk.h"
 #include <windows.h>
 #include <filesystem>
 #include <fstream>
@@ -10,10 +11,32 @@ int wmain() {
         std::filesystem::path p(savePath);
         std::filesystem::create_directories(p);
         std::ofstream f(p / "test_save.txt", std::ios::app);
-        f << "ZERO runtime session launched successfully.\n";
+        f << "ZERO Runtime V3 session launched successfully.\n";
     }
+
+    zero::sdk::Client zero;
+    std::wstring error;
+    if (!zero.Initialize(error)) {
+        MessageBoxW(nullptr, error.c_str(), L"ZERO Runtime V3 SDK Error", MB_OK | MB_ICONERROR);
+        return 2;
+    }
+
+    if (!zero.ReportReady(error)) {
+        MessageBoxW(nullptr, error.c_str(), L"ZERO Runtime V3 READY Error", MB_OK | MB_ICONERROR);
+        return 3;
+    }
+
+    zero::sdk::ResumeContext resume;
+    resume.activityId = "runtime-v3-test";
+    resume.displayLabel = "Runtime V3 Validation";
+    resume.payload = "checkpoint=validated";
+    if (!zero.SetResumeActivity(resume, error)) {
+        MessageBoxW(nullptr, error.c_str(), L"ZERO Runtime V3 Resume Error", MB_OK | MB_ICONERROR);
+        return 4;
+    }
+
     MessageBoxW(nullptr,
-        L"This is the ZERO runtime validation test executable.\n\nClose this window to return to ZERO.",
+        L"ZERO Runtime V3 validation succeeded.\n\nAuthenticated SDK IPC: OK\nREADY handshake: OK\nResume metadata: OK\n\nClose this window to return to ZERO.",
         L"ZERO Test Game", MB_OK | MB_ICONINFORMATION);
     return 0;
 }
