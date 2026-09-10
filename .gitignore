@@ -1,0 +1,40 @@
+# CMake
+/build/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+x64/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+
+# VS Code local state
+.vscode/*.log
+
+# Compiled binaries
+*.exe
+*.dll
+*.pdb
+*.obj
+*.lib
+*.exp
+
+# Runtime/local data
+ZeroData/
+ZERO/
+*.tmp
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
