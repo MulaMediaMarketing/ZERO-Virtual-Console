@@ -1,0 +1,29 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Upload ZERO binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZERO-Virtual-Console-Windows-x64
+          path: |
+            build/Release/ZeroVirtualConsole.exe
+            build/Release/ZeroTestGame.exe
