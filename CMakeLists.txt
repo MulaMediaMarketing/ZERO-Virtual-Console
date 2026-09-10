@@ -21,7 +21,10 @@ add_executable(ZeroVirtualConsole WIN32
   src/RuntimeSession.cpp
   src/RuntimeIpcServer.cpp
   src/RuntimeV3.cpp
+  src/RuntimeV4.cpp
   src/ResumeStore.cpp
+  src/PlatformStateStore.cpp
+  src/AchievementStore.cpp
   src/Settings.cpp
   src/Input.cpp
 )
