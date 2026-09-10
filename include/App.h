@@ -1,6 +1,6 @@
 #pragma once
 #include "GameRegistry.h"
-#include "RuntimeSession.h"
+#include "RuntimeV3.h"
 #include "Settings.h"
 #include "Input.h"
 #include <windows.h>
@@ -29,7 +29,7 @@ private:
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brushCard_;
 
     GameRegistry registry_;
-    RuntimeSession runtime_;
+    RuntimeV3 runtime_;
     SettingsStore settingsStore_;
     UserSettings settings_;
     Input input_;
