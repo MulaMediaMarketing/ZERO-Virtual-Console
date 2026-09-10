@@ -1,0 +1,10 @@
+{
+  "cmake.configureOnOpen": true,
+  "cmake.generator": "Visual Studio 17 2022",
+  "cmake.configureArgs": [
+    "-A",
+    "x64"
+  ],
+  "C_Cpp.default.cppStandard": "c++20",
+  "C_Cpp.default.intelliSenseMode": "windows-msvc-x64"
+}
