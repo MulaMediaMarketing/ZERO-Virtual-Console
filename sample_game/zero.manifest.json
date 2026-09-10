@@ -1,0 +1,11 @@
+{
+  "package_id": "zero.dev.runtime_test",
+  "title": "ZERO Runtime Test",
+  "version": "0.1.0",
+  "executable": "ZeroTestGame.exe",
+  "hero_image": "",
+  "icon_image": "",
+  "zero_resume": false,
+  "zero_achievements": false,
+  "zero_input": true
+}
