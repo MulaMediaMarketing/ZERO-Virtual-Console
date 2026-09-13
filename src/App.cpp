@@ -562,3 +562,5 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
     }
     return DefWindowProcW(hwnd_,msg,wp,lp);
 }
+
+} // namespace zero
