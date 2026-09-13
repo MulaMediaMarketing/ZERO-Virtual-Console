@@ -19,6 +19,20 @@ std::filesystem::path localRoot() {
     }
     return std::filesystem::current_path() / "ZeroData";
 }
+
+std::wstring captureKindLabel(CaptureKind kind) {
+    return kind == CaptureKind::Screenshot ? L"Screenshot" : L"Video clip";
+}
+
+std::wstring fileSizeLabel(uint64_t bytes) {
+    if (bytes >= 1024ull * 1024ull * 1024ull)
+        return std::to_wstring(bytes / (1024ull * 1024ull * 1024ull)) + L" GB";
+    if (bytes >= 1024ull * 1024ull)
+        return std::to_wstring(bytes / (1024ull * 1024ull)) + L" MB";
+    if (bytes >= 1024ull)
+        return std::to_wstring(bytes / 1024ull) + L" KB";
+    return std::to_wstring(bytes) + L" B";
+}
 }
 
 App::App(HINSTANCE instance)
@@ -92,7 +106,8 @@ bool App::InitGraphics() {
 
 void App::CreateDeviceResources() {
     if (target_) return;
-    RECT rc{}; GetClientRect(hwnd_, &rc);
+    RECT rc{};
+    GetClientRect(hwnd_, &rc);
     auto size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
     d2dFactory_->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
         D2D1::HwndRenderTargetProperties(hwnd_, size), target_.GetAddressOf());
@@ -198,23 +213,104 @@ void App::DrawEmptyState(const std::wstring& title, const std::wstring& body, fl
     DrawTextLine(body, 102, 390, W-230, 88, false, brushMuted_.Get());
 }
 
+void App::ClampCaptureSelection() {
+    const auto count = captures_.Items().size();
+    if (count == 0) {
+        selectedCapture_ = 0;
+        captureScroll_ = 0;
+        return;
+    }
+    if (selectedCapture_ >= count) selectedCapture_ = count - 1;
+    constexpr size_t visible = 6;
+    if (selectedCapture_ < captureScroll_) captureScroll_ = selectedCapture_;
+    if (selectedCapture_ >= captureScroll_ + visible) captureScroll_ = selectedCapture_ - visible + 1;
+    const size_t maxStart = count > visible ? count - visible : 0;
+    captureScroll_ = std::min(captureScroll_, maxStart);
+}
+
 void App::DrawCaptures(float W, float H) {
     (void)H;
     const auto& items = captures_.Items();
     DrawTextLine(L"Captures", 62, 154, 500, 60, true);
-    DrawTextLine(std::to_wstring(items.size()) + L" local captures", 64, 204, 300, 30, false, brushMuted_.Get());
+    DrawTextLine(std::to_wstring(items.size()) + L" local captures   ·   A View/Open   ·   X Delete   ·   Right Reveal", 64, 204, W-128, 30, false, brushMuted_.Get());
     if (items.empty()) {
         DrawEmptyState(L"No captures yet", L"Screenshots and clips created through ZERO will appear here. No sample captures are injected.", W);
         return;
     }
 
-    float y = 280.0f;
-    const size_t count = std::min<size_t>(7, items.size());
-    for (size_t i = 0; i < count; ++i, y += 70.0f) {
-        DrawRoundedCard(D2D1::RectF(62,y,W-62,y+54), 16, brushCard_.Get());
-        DrawTextLine(items[i].path.filename().wstring(), 88, y+12, W-230, 30, false);
-        DrawTextLine(items[i].path.extension().wstring(), W-180, y+12, 90, 30, false, brushMuted_.Get());
+    const size_t end = std::min(items.size(), captureScroll_ + 6);
+    float y = 270.0f;
+    for (size_t i = captureScroll_; i < end; ++i, y += 78.0f) {
+        const auto& item = items[i];
+        if (i == selectedCapture_) {
+            DrawRoundedCard(D2D1::RectF(62,y,W-62,y+62), 18, brushAccent_.Get());
+            ComPtr<ID2D1SolidColorBrush> white;
+            target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
+            DrawTextLine(item.path.filename().wstring(), 92, y+10, W-430, 30, false, white.Get());
+            DrawTextLine(captureKindLabel(item.kind) + L"  ·  " + fileSizeLabel(item.sizeBytes), W-385, y+10, 300, 30, false, white.Get());
+        } else {
+            DrawRoundedCard(D2D1::RectF(62,y,W-62,y+62), 18, brushCard_.Get());
+            DrawTextLine(item.path.filename().wstring(), 92, y+10, W-430, 30, false);
+            DrawTextLine(captureKindLabel(item.kind) + L"  ·  " + fileSizeLabel(item.sizeBytes), W-385, y+10, 300, 30, false, brushMuted_.Get());
+        }
     }
+}
+
+void App::DrawCaptureViewer(float W, float H) {
+    if (!captureViewerVisible_) return;
+    const auto& items = captures_.Items();
+    if (items.empty() || selectedCapture_ >= items.size()) return;
+    const auto& item = items[selectedCapture_];
+
+    ComPtr<ID2D1SolidColorBrush> veil;
+    ComPtr<ID2D1SolidColorBrush> white;
+    target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.94f), veil.GetAddressOf());
+    target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
+    target_->FillRectangle(D2D1::RectF(0,0,W,H), veil.Get());
+
+    if (cachedCapturePath_ != item.path) {
+        cachedCapture_.Reset();
+        cachedCapturePath_ = item.path;
+        cachedCapture_ = LoadBitmap(item.path);
+    }
+
+    if (cachedCapture_) {
+        const auto s = cachedCapture_->GetSize();
+        const float maxW = W - 160.0f;
+        const float maxH = H - 180.0f;
+        const float scale = std::min(maxW / s.width, maxH / s.height);
+        const float drawW = s.width * scale;
+        const float drawH = s.height * scale;
+        const float x = (W - drawW) * 0.5f;
+        const float y = (H - drawH) * 0.5f - 10.0f;
+        target_->DrawBitmap(cachedCapture_.Get(), D2D1::RectF(x,y,x+drawW,y+drawH), 1.0f,
+            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    } else {
+        DrawTextLine(L"ZERO could not decode this screenshot.", 80, H*0.45f, W-160, 50, true, white.Get());
+    }
+
+    DrawTextLine(item.path.filename().wstring(), 64, 34, W-128, 36, false, white.Get());
+    DrawTextLine(L"B Close   ·   X Delete   ·   Right Reveal", 64, H-58, W-128, 30, false, white.Get());
+}
+
+void App::DrawCaptureDeleteConfirm(float W, float H) {
+    if (!captureDeleteConfirm_) return;
+    const auto& items = captures_.Items();
+    if (items.empty() || selectedCapture_ >= items.size()) return;
+
+    ComPtr<ID2D1SolidColorBrush> veil;
+    ComPtr<ID2D1SolidColorBrush> white;
+    target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.70f), veil.GetAddressOf());
+    target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
+    target_->FillRectangle(D2D1::RectF(0,0,W,H), veil.Get());
+
+    const float left = std::max(120.0f, W*0.5f-330.0f);
+    const float top = std::max(120.0f, H*0.5f-150.0f);
+    DrawRoundedCard(D2D1::RectF(left,top,left+660,top+300), 28, brushAccent_.Get());
+    DrawTextLine(L"Delete capture?", left+40, top+40, 520, 50, true, white.Get());
+    DrawTextLine(items[selectedCapture_].path.filename().wstring(), left+40, top+105, 580, 34, false, white.Get());
+    DrawTextLine(L"This permanently removes the local capture file.", left+40, top+150, 580, 42, false, white.Get());
+    DrawTextLine(L"A Delete   ·   B Cancel", left+40, top+225, 420, 32, false, white.Get());
 }
 
 void App::DrawOverlay(float W, float H) {
@@ -262,7 +358,8 @@ void App::Paint() {
     if (!target_) return;
     target_->BeginDraw();
     target_->Clear(D2D1::ColorF(0xFBFAF7));
-    RECT rc{}; GetClientRect(hwnd_, &rc);
+    RECT rc{};
+    GetClientRect(hwnd_, &rc);
     const float W = float(rc.right), H = float(rc.bottom);
 
     DrawTextLine(L"ZERO", 42, 28, 180, 54, true);
@@ -387,7 +484,8 @@ void App::Paint() {
         DrawTextLine(L"Add a folder that contains a valid zero.manifest.json and native Windows game executable.",
             64, 214, W-128, 48, false, brushMuted_.Get());
         DrawRoundedCard(D2D1::RectF(62,310,420,390), 22, brushAccent_.Get());
-        ComPtr<ID2D1SolidColorBrush> white; target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
+        ComPtr<ID2D1SolidColorBrush> white;
+        target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
         DrawTextLine(L"A   Choose game folder", 100, 334, 280, 32, false, white.Get());
         DrawTextLine(L"ZERO validates, hashes, stages, verifies, and installs the package.",
             64, 430, W-128, 48, false, brushMuted_.Get());
@@ -403,11 +501,16 @@ void App::Paint() {
 
     if (!status_.empty() && page_ != Page::GameDetail) DrawTextLine(status_, 64, H-110, W-130, 38, false, brushMuted_.Get());
     DrawOverlay(W, H);
+    DrawCaptureViewer(W, H);
+    DrawCaptureDeleteConfirm(W, H);
+
     HRESULT hr = target_->EndDraw();
     if (hr == D2DERR_RECREATE_TARGET) {
         target_.Reset();
         cachedHero_.Reset();
         cachedHeroPath_.clear();
+        cachedCapture_.Reset();
+        cachedCapturePath_.clear();
     }
 }
 
@@ -441,10 +544,96 @@ void App::Tick() {
 void App::NavigateTo(Page p) {
     page_ = p;
     status_.clear();
-    if (p == Page::Captures) captures_.Refresh();
+    captureViewerVisible_ = false;
+    captureDeleteConfirm_ = false;
+    if (p == Page::Captures) {
+        captures_.Refresh();
+        ClampCaptureSelection();
+    }
+}
+
+void App::HandleCaptureInput(const InputSnapshot& in) {
+    const auto& items = captures_.Items();
+
+    if (captureDeleteConfirm_) {
+        if (in.back) {
+            captureDeleteConfirm_ = false;
+            return;
+        }
+        if (in.select && !items.empty() && selectedCapture_ < items.size()) {
+            std::wstring error;
+            const auto item = items[selectedCapture_];
+            if (captures_.Delete(item, error)) {
+                status_ = L"Capture deleted.";
+                captureDeleteConfirm_ = false;
+                captureViewerVisible_ = false;
+                cachedCapture_.Reset();
+                cachedCapturePath_.clear();
+                ClampCaptureSelection();
+            } else {
+                status_ = error;
+                captureDeleteConfirm_ = false;
+            }
+        }
+        return;
+    }
+
+    if (captureViewerVisible_) {
+        if (in.back) {
+            captureViewerVisible_ = false;
+            return;
+        }
+        if (items.empty() || selectedCapture_ >= items.size()) {
+            captureViewerVisible_ = false;
+            return;
+        }
+        if (in.action) {
+            captureDeleteConfirm_ = true;
+            return;
+        }
+        if (in.right) {
+            std::wstring error;
+            if (!captures_.Reveal(items[selectedCapture_], error)) status_ = error;
+            return;
+        }
+        return;
+    }
+
+    if (items.empty()) return;
+    if (in.up && selectedCapture_ > 0) {
+        --selectedCapture_;
+        ClampCaptureSelection();
+    }
+    if (in.down && selectedCapture_ + 1 < items.size()) {
+        ++selectedCapture_;
+        ClampCaptureSelection();
+    }
+    if (in.select && selectedCapture_ < items.size()) {
+        const auto& item = items[selectedCapture_];
+        if (item.kind == CaptureKind::Screenshot) {
+            captureViewerVisible_ = true;
+            cachedCapture_.Reset();
+            cachedCapturePath_.clear();
+        } else {
+            std::wstring error;
+            if (!captures_.Open(item, error)) status_ = error;
+        }
+    }
+    if (in.action && selectedCapture_ < items.size()) {
+        captureDeleteConfirm_ = true;
+    }
+    if (in.right && selectedCapture_ < items.size()) {
+        std::wstring error;
+        if (!captures_.Reveal(items[selectedCapture_], error)) status_ = error;
+    }
 }
 
 void App::HandleInput(const InputSnapshot& in) {
+    if (captureDeleteConfirm_ || captureViewerVisible_) {
+        HandleCaptureInput(in);
+        return;
+    }
+
     if (overlayVisible_) {
         if (in.up && overlayIndex_ > 0) --overlayIndex_;
         if (in.down && overlayIndex_ < 4) ++overlayIndex_;
@@ -475,6 +664,15 @@ void App::HandleInput(const InputSnapshot& in) {
     if (in.menu && runtime_.IsActive()) {
         SetOverlayVisible(true);
         return;
+    }
+
+    if (page_ == Page::Captures) {
+        if (in.shoulderLeft || in.shoulderRight) {
+            // Shoulder navigation remains available for top-level shell movement.
+        } else {
+            HandleCaptureInput(in);
+            if (in.up || in.down || in.select || in.action || in.right) return;
+        }
     }
 
     const auto n = registry_.Games().size();
@@ -575,7 +773,9 @@ void App::LaunchSelected(bool useResume) {
     std::wstring error;
     if (runtime_.Launch(game, error, resume)) {
         status_ = (resume ? L"Resuming " : L"Launching ") + Widen(game.title) + L"...";
-    } else status_ = error;
+    } else {
+        status_ = error;
+    }
 }
 
 LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -591,17 +791,40 @@ LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
     switch(msg) {
-        case WM_PAINT: { PAINTSTRUCT ps{}; BeginPaint(hwnd_,&ps); Paint(); EndPaint(hwnd_,&ps); return 0; }
-        case WM_SIZE: if (target_) target_->Resize(D2D1::SizeU(LOWORD(lp),HIWORD(lp))); return 0;
-        case WM_TIMER: Tick(); return 0;
+        case WM_PAINT: {
+            PAINTSTRUCT ps{};
+            BeginPaint(hwnd_,&ps);
+            Paint();
+            EndPaint(hwnd_,&ps);
+            return 0;
+        }
+        case WM_SIZE:
+            if (target_) target_->Resize(D2D1::SizeU(LOWORD(lp),HIWORD(lp)));
+            return 0;
+        case WM_TIMER:
+            Tick();
+            return 0;
         case WM_KEYDOWN:
-            if (wp == VK_F5) { registry_.Refresh(); captures_.Refresh(); cachedHero_.Reset(); cachedHeroPath_.clear(); status_=L"ZERO data refreshed."; return 0; }
+            if (wp == VK_F5) {
+                registry_.Refresh();
+                captures_.Refresh();
+                ClampCaptureSelection();
+                cachedHero_.Reset();
+                cachedHeroPath_.clear();
+                cachedCapture_.Reset();
+                cachedCapturePath_.clear();
+                status_=L"ZERO data refreshed.";
+                return 0;
+            }
             if (wp == 'I') { NavigateTo(Page::Import); return 0; }
             if (wp == VK_F11) { EnterBorderlessFullscreen(); return 0; }
             if (wp == VK_F1 && runtime_.IsActive()) { SetOverlayVisible(!overlayVisible_); return 0; }
             if (wp == 'Q' && (GetKeyState(VK_CONTROL)&0x8000)) { DestroyWindow(hwnd_); return 0; }
             return 0;
-        case WM_DESTROY: runtime_.Terminate(); PostQuitMessage(0); return 0;
+        case WM_DESTROY:
+            runtime_.Terminate();
+            PostQuitMessage(0);
+            return 0;
     }
     return DefWindowProcW(hwnd_,msg,wp,lp);
 }
