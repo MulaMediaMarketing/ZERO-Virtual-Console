@@ -114,7 +114,7 @@ std::optional<ResumeMetadata> RuntimeV4::Resume(const std::string& packageId) co
 std::vector<AchievementRecord> RuntimeV4::Achievements(const std::string& packageId) const {
     std::wstring error;
     auto canonical = database_.LoadAchievements(packageId, error);
-    if (!canonical.empty() || error.empty()) return canonical;
+    if (!canonical.empty()) return canonical;
     return achievements_.Load(packageId);
 }
 
