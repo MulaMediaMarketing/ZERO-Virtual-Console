@@ -1,7 +1,9 @@
 #pragma once
 #include "CaptureLibrary.h"
+#include "FriendsProvider.h"
 #include "GameRegistry.h"
 #include "GameImportService.h"
+#include "IdentityProvider.h"
 #include "ResumeStore.h"
 #include "RuntimeV4.h"
 #include "Settings.h"
@@ -41,6 +43,8 @@ private:
     GameRegistry registry_;
     GameImportService importer_;
     CaptureLibrary captures_;
+    LocalIdentityProvider identity_;
+    DisconnectedFriendsProvider friends_;
     ResumeStore resumeStore_;
     RuntimeV4 runtime_;
     SettingsStore settingsStore_;
@@ -68,6 +72,7 @@ private:
     void DrawOverlay(float width, float height);
     void DrawRecentGames(float width, float height);
     void DrawEmptyState(const std::wstring& title, const std::wstring& body, float width);
+    void DrawFriends(float width, float height);
     void DrawCaptures(float width, float height);
     void DrawCaptureViewer(float width, float height);
     void DrawCaptureDeleteConfirm(float width, float height);
