@@ -1,6 +1,7 @@
 #include "CaptureLibrary.h"
 #include <algorithm>
 #include <cwctype>
+#include <windows.h>
 #include <shellapi.h>
 
 namespace zero {
