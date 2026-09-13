@@ -103,7 +103,6 @@ bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) cons
         return false;
     }
 
-    // Compatibility mirror for the current shell. SQLite is canonical.
     std::error_code ec;
     std::filesystem::create_directories(root(), ec);
     if (ec) {
@@ -144,6 +143,12 @@ bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) cons
 
 std::optional<ResumeMetadata> ResumeStore::Load(const std::string& packageId) const {
     if (!safeId(packageId)) return std::nullopt;
+
+    PlatformDatabase database;
+    std::wstring databaseError;
+    if (const auto canonical = database.LoadResume(packageId, databaseError)) return canonical;
+
+    // Compatibility fallback for installations that predate canonical SQLite Resume rows.
     std::ifstream f(PathFor(packageId), std::ios::binary);
     if (!f) return std::nullopt;
     std::ostringstream ss;
