@@ -20,6 +20,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/main.cpp
   src/App.cpp
   src/AppPages.cpp
+  src/AppAchievements.cpp
   src/AppUx.cpp
   src/CaptureLibrary.cpp
   src/LocalIdentityProvider.cpp
