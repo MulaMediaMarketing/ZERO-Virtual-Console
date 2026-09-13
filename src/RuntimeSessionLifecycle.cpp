@@ -1,4 +1,5 @@
 #include "RuntimeSession.h"
+#include <algorithm>
 #include <objbase.h>
 #include <string>
 #include <vector>
@@ -77,8 +78,6 @@ std::vector<wchar_t> buildEnvironmentLifecycle(const GameManifest& game,
         entries.push_back(prefix + value);
     };
 
-    // Environment blocks passed to CreateProcessW are expected to be sorted
-    // case-insensitively when CREATE_UNICODE_ENVIRONMENT is used.
     setEntry(L"ZERO_RUNTIME", L"4");
     setEntry(L"ZERO_SESSION_ID", widenUtf8Lifecycle(info.sessionId));
     setEntry(L"ZERO_PACKAGE_ID", widenUtf8Lifecycle(game.packageId));
