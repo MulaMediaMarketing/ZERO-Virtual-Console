@@ -18,6 +18,8 @@ std::filesystem::path dbPath() {
 }
 
 bool PlatformDatabase::ClearResume(const std::string& packageId, std::wstring& error) const {
+    if (!Initialize(error)) return false;
+
     sqlite3* db = nullptr;
     const auto path = dbPath();
     if (sqlite3_open16(path.c_str(), &db) != SQLITE_OK) {
