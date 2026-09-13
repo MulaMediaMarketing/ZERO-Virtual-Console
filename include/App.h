@@ -17,11 +17,12 @@
 #include <wrl/client.h>
 #include <chrono>
 #include <filesystem>
+#include <string>
 
 namespace zero {
 class App {
 public:
-    enum class Page { Home, Library, Store, Friends, Captures, Settings, GameDetail, Import };
+    enum class Page { Home, Library, Store, Friends, Captures, Settings, GameDetail, Import, Achievements };
 
     App(HINSTANCE instance);
     int Run();
@@ -57,15 +58,20 @@ private:
     Input input_;
     ShellUxState shellUx_;
     Page page_{Page::Home};
+    Page achievementsReturnPage_{Page::Home};
     size_t selectedGame_{0};
     size_t selectedCapture_{0};
     size_t captureScroll_{0};
+    size_t selectedAchievement_{0};
+    size_t achievementScroll_{0};
     size_t navIndex_{0};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
     bool preferResume_{true};
     bool captureViewerVisible_{false};
     bool captureDeleteConfirm_{false};
+    bool achievementsFromOverlay_{false};
+    std::string achievementPackageId_;
     std::chrono::steady_clock::time_point lastInput_{};
     std::chrono::steady_clock::time_point lastTick_{};
     std::wstring status_;
@@ -82,13 +88,17 @@ private:
     void DrawStore(float width, float height);
     void DrawFriends(float width, float height);
     void DrawCaptures(float width, float height);
+    void DrawAchievements(float width, float height);
     void DrawCaptureViewer(float width, float height);
     void DrawCaptureDeleteConfirm(float width, float height);
     void DrawFocusRing(const D2D1_RECT_F& bounds, float radius, bool light = false);
     void Tick();
     void HandleInput(const InputSnapshot&);
     void HandleCaptureInput(const InputSnapshot&);
+    void HandleAchievementInput(const InputSnapshot&);
     void NavigateTo(Page page);
+    void OpenAchievements(const std::string& packageId, Page returnPage, bool fromOverlay);
+    void ClampAchievementSelection();
     void LaunchSelected(bool useResume);
     void ImportGameFolder();
     void EnterBorderlessFullscreen();
