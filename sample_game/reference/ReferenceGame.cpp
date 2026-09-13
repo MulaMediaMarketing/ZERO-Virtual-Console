@@ -55,7 +55,8 @@ int wmain() {
     std::error_code ec;
     if (!saveRoot.empty() && std::filesystem::exists(crashSentinel, ec)) {
         std::filesystem::remove(crashSentinel, ec);
-        writeMarker(saveRoot, "intentional_crash.triggered", "exit_code=73\n");
+        writeMarker(saveRoot, "intentional_crash.triggered", "exception_code=0xE0000073\n");
+        RaiseException(0xE0000073u, EXCEPTION_NONCONTINUABLE, 0, nullptr);
         return 73;
     }
 
