@@ -21,6 +21,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/GameImportService.cpp
   src/ManifestValidator.cpp
   src/RuntimeSession.cpp
+  src/RuntimeSessionLifecycle.cpp
   src/RuntimeIpcServer.cpp
   src/RuntimeV3.cpp
   src/RuntimeV4.cpp
