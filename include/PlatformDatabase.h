@@ -22,6 +22,7 @@ public:
                       const std::string& payload,
                       const std::string& updatedAtUtc,
                       std::wstring& error) const;
+    bool ClearResume(const std::string& packageId, std::wstring& error) const;
     bool UpsertAchievement(const std::string& packageId,
                            const std::string& achievementId,
                            const std::string& title,
