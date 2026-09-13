@@ -1,4 +1,5 @@
 #pragma once
+#include "MiniDumpWriter.h"
 #include "ZeroTypes.h"
 #include <windows.h>
 #include <chrono>
@@ -16,11 +17,15 @@ struct RuntimeSessionInfo {
     std::filesystem::path saveRoot;
     std::filesystem::path cacheRoot;
     std::filesystem::path tempRoot;
+    std::filesystem::path miniDumpPath;
+    std::string miniDumpNote;
     std::chrono::system_clock::time_point startedAt{};
     std::chrono::system_clock::time_point endedAt{};
     DWORD processId{0};
     DWORD exitCode{STILL_ACTIVE};
+    DWORD miniDumpError{0};
     bool forcedTermination{false};
+    bool miniDumpWritten{false};
 };
 
 class RuntimeSession {
@@ -30,8 +35,6 @@ public:
     RuntimeSession(const RuntimeSession&) = delete;
     RuntimeSession& operator=(const RuntimeSession&) = delete;
 
-    // Legacy one-shot launch. New runtime code should use PrepareLaunch + ResumePrepared
-    // so IPC/bootstrap setup is complete before any game code executes.
     bool Launch(const GameManifest& game, std::wstring& error);
     bool PrepareLaunch(const GameManifest& game, std::wstring& error);
     bool ResumePrepared(std::wstring& error);
@@ -39,6 +42,7 @@ public:
 
     void Poll();
     void Terminate();
+    bool CaptureDiagnosticDump();
 
     RuntimeState State() const noexcept { return state_; }
     DWORD ExitCode() const noexcept { return exitCode_; }
@@ -55,6 +59,7 @@ private:
     std::string packageId_;
     RuntimeSessionInfo info_{};
     std::filesystem::path sessionRecordPath_;
+    MiniDumpWriter miniDumpWriter_;
 
     void ResetHandles();
     void Finalize(RuntimeState finalState, DWORD code, bool forced);
