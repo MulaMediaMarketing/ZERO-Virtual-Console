@@ -40,11 +40,10 @@ std::string hexString(const std::string& value) {
 
 std::string RuntimeV3::CreateAuthToken() const {
     unsigned char bytes[32]{};
-    if (BCryptGenRandom(nullptr, bytes, sizeof(bytes), BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0) {
-        return hex(bytes, sizeof(bytes));
+    if (BCryptGenRandom(nullptr, bytes, sizeof(bytes), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
+        return {};
     }
-    const auto fallback = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-    return "fallback-" + std::to_string(fallback);
+    return hex(bytes, sizeof(bytes));
 }
 
 bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
@@ -66,6 +65,13 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
     }
 
     const auto token = CreateAuthToken();
+    if (token.empty()) {
+        error = L"ZERO Runtime could not generate a cryptographically secure IPC authentication token.";
+        v2_.Terminate();
+        playtimeFinalized_ = true;
+        return false;
+    }
+
     RuntimeIpcCallbacks callbacks;
     callbacks.onReady = [this]() {
         if (!ready_) {
@@ -94,17 +100,17 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
         return false;
     }
 
-    const auto bootstrap = v2_.Info().tempRoot / "runtime-v3.bootstrap";
+    const auto bootstrap = v2_.Info().tempRoot / "runtime-v4.bootstrap";
     std::ofstream f(bootstrap, std::ios::binary | std::ios::trunc);
     if (!f) {
-        error = L"ZERO Runtime V3 could not create the SDK bootstrap contract.";
+        error = L"ZERO Runtime V4 could not create the SDK bootstrap contract.";
         ipc_.Stop();
         v2_.Terminate();
         playtimeFinalized_ = true;
         return false;
     }
     std::string pipe(ipc_.PipeName().begin(), ipc_.PipeName().end());
-    f << "3\n" << v2_.Info().sessionId << "\n" << game.packageId << "\n" << pipe << "\n" << token << "\n";
+    f << "4\n" << v2_.Info().sessionId << "\n" << game.packageId << "\n" << pipe << "\n" << token << "\n";
     if (launchResume) {
         f << "1\n"
           << hexString(launchResume->activityId) << "\n"

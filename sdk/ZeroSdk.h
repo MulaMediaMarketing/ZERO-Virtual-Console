@@ -1,4 +1,6 @@
 #pragma once
+#include "ZeroProtocol.h"
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
@@ -41,9 +43,13 @@ private:
     std::string sessionId_;
     std::optional<ResumeContext> launchResume_;
     std::function<void(bool)> overlayCallback_;
+    uint64_t nextRequestId_{1};
 
-    bool WriteLine(const std::string& line, std::wstring& error);
-    bool ReadLine(std::string& line, std::wstring& error);
+    bool SendRequest(protocol::MessageType type,
+                     std::vector<std::string> fields,
+                     protocol::MessageType expectedType,
+                     const std::string& expectedAck,
+                     std::wstring& error);
 };
 
 } // namespace zero::sdk
