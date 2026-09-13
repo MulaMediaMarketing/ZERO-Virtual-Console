@@ -426,6 +426,7 @@ void App::Paint() {
     DrawOverlay(width, height);
     DrawCaptureViewer(width, height);
     DrawCaptureDeleteConfirm(width, height);
+    DrawLaunchRecovery(width, height);
     const HRESULT result = target_->EndDraw();
     if (result == D2DERR_RECREATE_TARGET) {
         target_.Reset();
