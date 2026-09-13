@@ -1,7 +1,25 @@
 #include "ManifestValidator.h"
+#include <windows.h>
 #include <cwchar>
 
 namespace zero {
+namespace {
+
+bool isReparsePoint(const std::filesystem::path& path) noexcept {
+    const DWORD attrs = GetFileAttributesW(path.c_str());
+    return attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+}
+
+bool safeOptionalAsset(const std::filesystem::path& asset,
+                       const std::filesystem::path& root) noexcept {
+    if (asset.empty()) return true;
+    std::error_code ec;
+    if (!std::filesystem::exists(asset, ec) || !std::filesystem::is_regular_file(asset, ec)) return false;
+    if (isReparsePoint(asset)) return false;
+    return ManifestValidator::IsPathInside(asset, root);
+}
+
+} // namespace
 
 bool ManifestValidator::IsSafePackageId(const std::string& id) noexcept {
     if (id.empty() || id.size() > 160 || id.find("..") != std::string::npos) return false;
@@ -33,8 +51,17 @@ ManifestValidationResult ManifestValidator::Validate(const GameManifest& m) {
     if (!IsSafePackageId(m.packageId)) { result.error = L"Invalid package_id."; return result; }
     if (m.title.empty()) { result.error = L"Game title is required."; return result; }
     if (m.version.empty()) { result.error = L"Game version is required."; return result; }
-    if (m.minimumRuntimeMajor > 4) { result.error = L"This game requires a newer ZERO Runtime."; return result; }
+    if (m.minimumRuntimeMajor < 1 || m.minimumRuntimeMajor > 4) {
+        result.error = m.minimumRuntimeMajor > 4
+            ? L"This game requires a newer ZERO Runtime."
+            : L"Manifest minimum_runtime_major is invalid.";
+        return result;
+    }
     if (m.root.empty() || m.executable.empty()) { result.error = L"Game root or executable is missing."; return result; }
+    if (isReparsePoint(m.root) || isReparsePoint(m.executable)) {
+        result.error = L"ZERO package roots and executables cannot be reparse points.";
+        return result;
+    }
     if (!std::filesystem::exists(m.executable) || !std::filesystem::is_regular_file(m.executable)) {
         result.error = L"Game executable does not exist."; return result;
     }
@@ -44,11 +71,14 @@ ManifestValidationResult ManifestValidator::Validate(const GameManifest& m) {
     if (!IsPathInside(m.executable, m.root)) {
         result.error = L"Game executable must remain inside the registered package directory."; return result;
     }
-    if (!m.heroImage.empty() && !IsPathInside(m.heroImage, m.root)) {
-        result.error = L"Hero artwork must remain inside the package directory."; return result;
+    if (!safeOptionalAsset(m.heroImage, m.root)) {
+        result.error = L"Hero artwork is missing, invalid, or outside the package directory."; return result;
     }
-    if (!m.iconImage.empty() && !IsPathInside(m.iconImage, m.root)) {
-        result.error = L"Icon artwork must remain inside the package directory."; return result;
+    if (!safeOptionalAsset(m.iconImage, m.root)) {
+        result.error = L"Icon artwork is missing, invalid, or outside the package directory."; return result;
+    }
+    if (!safeOptionalAsset(m.logoImage, m.root)) {
+        result.error = L"Logo artwork is missing, invalid, or outside the package directory."; return result;
     }
     result.valid = true;
     return result;
