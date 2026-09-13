@@ -44,6 +44,11 @@ target_include_directories(ZeroTestGame PRIVATE sdk)
 target_compile_definitions(ZeroTestGame PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroTestGame PRIVATE ZeroSdk)
 
+add_executable(ZeroReferenceGame sample_game/reference/ReferenceGame.cpp)
+target_include_directories(ZeroReferenceGame PRIVATE sdk)
+target_compile_definitions(ZeroReferenceGame PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroReferenceGame PRIVATE ZeroSdk)
+
 add_executable(ZeroAcceptance
   tools/AcceptanceMain.cpp
   src/MilestoneAcceptance.cpp
