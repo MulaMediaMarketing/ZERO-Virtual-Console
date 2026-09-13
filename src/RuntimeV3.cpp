@@ -60,8 +60,6 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
     playtimeSeconds_ = 0;
     activeGame_ = game;
 
-    // Prepare the process suspended. No game code executes until IPC and the bootstrap
-    // contract are fully established below.
     if (!v2_.PrepareLaunch(game, error)) {
         outcome_.store(RuntimeOutcome::LaunchFailure);
         playtimeFinalized_ = true;
@@ -168,6 +166,15 @@ void RuntimeV3::Poll() {
     if (isReady) {
         playtimeSeconds_ = static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - readyAt_).count());
+
+        if (v2_.IsActive() && ipc_.ClientSilence() >= kHeartbeatTimeout) {
+            outcome_.store(RuntimeOutcome::Hung);
+            PersistPlaytime();
+            ipc_.Stop();
+            v2_.Terminate();
+            playtimeFinalized_ = true;
+            return;
+        }
     } else if (v2_.IsActive() && std::chrono::steady_clock::now() >= readyDeadline_) {
         outcome_.store(RuntimeOutcome::ReadyTimeout);
         ipc_.Stop();
@@ -181,7 +188,8 @@ void RuntimeV3::Poll() {
     if (ended && !playtimeFinalized_) {
         if (current == RuntimeState::Crashed) {
             outcome_.store(RuntimeOutcome::Crash);
-        } else if (current == RuntimeState::Exited && outcome_.load() != RuntimeOutcome::UserTermination) {
+        } else if (current == RuntimeState::Exited && outcome_.load() != RuntimeOutcome::UserTermination &&
+                   outcome_.load() != RuntimeOutcome::Hung) {
             outcome_.store(RuntimeOutcome::CleanExit);
         } else if (current == RuntimeState::Failed && outcome_.load() == RuntimeOutcome::Starting) {
             outcome_.store(RuntimeOutcome::LaunchFailure);
@@ -197,7 +205,7 @@ void RuntimeV3::Terminate() {
         playtimeSeconds_ = static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - readyAt_).count());
     }
-    if (v2_.IsActive() && outcome_.load() != RuntimeOutcome::ReadyTimeout) {
+    if (v2_.IsActive() && outcome_.load() != RuntimeOutcome::ReadyTimeout && outcome_.load() != RuntimeOutcome::Hung) {
         outcome_.store(RuntimeOutcome::UserTermination);
     }
     PersistPlaytime();
