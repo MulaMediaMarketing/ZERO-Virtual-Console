@@ -340,6 +340,7 @@ void App::Paint() {
     } else if (page_ == Page::Store) DrawStore(width, height);
     else if (page_ == Page::Friends) DrawFriends(width, height);
     else if (page_ == Page::Captures) DrawCaptures(width, height);
+    else if (page_ == Page::Settings) DrawSettings(width, height);
     else if (page_ == Page::Achievements) DrawAchievements(width, height);
     else if (page_ == Page::GameDetail && !games.empty()) {
         const auto& game = games[std::min(selectedGame_, games.size() - 1)];
@@ -403,22 +404,6 @@ void App::Paint() {
         DrawFocusRing(button, 22, true);
         DrawTextLine(L"A   Choose game folder", 100, 334, 280, 32, false, white.Get());
         DrawTextLine(L"ZERO validates, hashes, stages, verifies, and installs the package.", 64, 430, width - 128, 48, false, brushMuted_.Get());
-    } else if (page_ == Page::Settings) {
-        const auto profile = identity_.CurrentProfile();
-        DrawTextLine(L"Settings", 62, 154, 500, 60, true);
-        DrawRoundedCard(D2D1::RectF(62, 270, width - 62, 355), 20, brushCard_.Get());
-        DrawTextLine(L"Profile", 92, 290, 180, 30, false);
-        DrawTextLine(Widen(profile.displayName.empty() ? settings_.profileName : profile.displayName), width - 420, 290, 320, 30, false, brushMuted_.Get());
-        DrawRoundedCard(D2D1::RectF(62, 375, width - 62, 460), 20, brushCard_.Get());
-        DrawTextLine(L"Zero ID", 92, 394, 180, 30, false);
-        DrawTextLine(profile.zeroId.empty() ? L"Unavailable" : Widen(profile.zeroId), 300, 394, width - 580, 30, false, brushMuted_.Get());
-        DrawTextLine(profile.localOnly ? L"Local only" : L"Connected", width - 220, 394, 120, 30, false, brushMuted_.Get());
-        const auto motionRect = D2D1::RectF(62, 480, width - 62, 565);
-        DrawRoundedCard(motionRect, 20, brushCard_.Get());
-        DrawFocusRing(motionRect, 20);
-        DrawTextLine(L"Reduced Motion", 92, 500, 220, 30, false);
-        DrawTextLine(settings_.reducedMotion ? L"On" : L"Off", width - 240, 500, 100, 30, false, brushMuted_.Get());
-        DrawTextLine(L"A Toggle", width - 380, 500, 110, 30, false, brushMuted_.Get());
     }
     target_->SetTransform(D2D1::Matrix3x2F::Identity());
     if (!status_.empty() && page_ != Page::GameDetail && page_ != Page::Achievements)
