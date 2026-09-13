@@ -1,6 +1,7 @@
 #include "GameImportService.h"
 #include "GameRegistry.h"
 #include "ManifestValidator.h"
+#include "PackageSecurity.h"
 #include <fstream>
 #include <sstream>
 
@@ -32,6 +33,11 @@ ImportResult GameImportService::ImportFolder(const std::filesystem::path& source
         return result;
     }
 
+    PackageInventory sourceInventory;
+    if (!PackageSecurity::BuildInventory(sourceRoot, sourceInventory, result.error)) {
+        return result;
+    }
+
     const auto text = readAll(manifest);
     const auto packageId = jsonString(text, "package_id");
     if (!ManifestValidator::IsSafePackageId(packageId)) {
@@ -58,12 +64,24 @@ ImportResult GameImportService::ImportFolder(const std::filesystem::path& source
         return result;
     }
 
+    PackageInventory stagedInventory;
+    if (!PackageSecurity::BuildInventory(staging, stagedInventory, result.error) ||
+        !PackageSecurity::Equivalent(sourceInventory, stagedInventory, result.error)) {
+        std::filesystem::remove_all(staging, ec);
+        return result;
+    }
+
     GameRegistry stagedRegistry(stagingBase);
     stagedRegistry.Refresh();
     const auto& games = stagedRegistry.Games();
     if (games.size() != 1 || games.front().packageId != packageId) {
         std::filesystem::remove_all(staging, ec);
         result.error = L"The staged game failed ZERO manifest validation.";
+        return result;
+    }
+
+    if (!PackageSecurity::WriteIntegrityManifest(staging, stagedInventory, result.error)) {
+        std::filesystem::remove_all(staging, ec);
         return result;
     }
 
