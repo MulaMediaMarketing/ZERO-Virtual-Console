@@ -4,6 +4,8 @@
 
 namespace zero {
 struct GameManifest {
+    int schemaVersion{1};
+    int minimumRuntimeMajor{4};
     std::string packageId;
     std::string title;
     std::string version;
@@ -11,8 +13,10 @@ struct GameManifest {
     std::filesystem::path root;
     std::filesystem::path heroImage;
     std::filesystem::path iconImage;
+    std::filesystem::path logoImage;
     bool zeroResume{false};
     bool zeroAchievements{false};
+    bool zeroOverlay{true};
     bool zeroInput{true};
 };
 
