@@ -19,7 +19,7 @@ public:
     App(HINSTANCE instance);
     int Run();
 private:
-    enum class Page { Home, Library, GameDetail, Settings };
+    enum class Page { Home, Library, GameDetail, Import, Settings };
     HINSTANCE instance_{};
     HWND hwnd_{};
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
