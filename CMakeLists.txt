@@ -11,7 +11,7 @@ endif()
 add_library(ZeroSdk STATIC
   sdk/ZeroSdk.cpp
 )
-target_include_directories(ZeroSdk PUBLIC sdk)
+target_include_directories(ZeroSdk PUBLIC sdk include)
 target_compile_definitions(ZeroSdk PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 add_executable(ZeroVirtualConsole WIN32
@@ -40,12 +40,12 @@ target_compile_definitions(ZeroVirtualConsole PRIVATE UNICODE _UNICODE WIN32_LEA
 target_link_libraries(ZeroVirtualConsole PRIVATE d2d1 dwrite windowscodecs xinput9_1_0 shlwapi shell32 ole32 bcrypt)
 
 add_executable(ZeroTestGame sample_game/TestGame.cpp)
-target_include_directories(ZeroTestGame PRIVATE sdk)
+target_include_directories(ZeroTestGame PRIVATE sdk include)
 target_compile_definitions(ZeroTestGame PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroTestGame PRIVATE ZeroSdk)
 
 add_executable(ZeroReferenceGame sample_game/reference/ReferenceGame.cpp)
-target_include_directories(ZeroReferenceGame PRIVATE sdk)
+target_include_directories(ZeroReferenceGame PRIVATE sdk include)
 target_compile_definitions(ZeroReferenceGame PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroReferenceGame PRIVATE ZeroSdk)
 
