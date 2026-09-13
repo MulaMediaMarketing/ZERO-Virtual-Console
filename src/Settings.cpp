@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "PlatformDatabase.h"
 #include <fstream>
 #include <sstream>
 
@@ -18,7 +19,16 @@ UserSettings SettingsStore::Load() const {
 }
 
 bool SettingsStore::Save(const UserSettings& s) const {
-    std::error_code ec; std::filesystem::create_directories(root_, ec);
+    PlatformDatabase database;
+    std::wstring error;
+    if (!database.SetSetting("profile", s.profileName, error)) return false;
+    if (!database.SetSetting("reduced_motion", s.reducedMotion ? "1" : "0", error)) return false;
+    if (!database.SetSetting("volume", std::to_string(s.volume), error)) return false;
+
+    // Compatibility mirror for the current shell. SQLite is canonical.
+    std::error_code ec;
+    std::filesystem::create_directories(root_, ec);
+    if (ec) return false;
     const auto tmp = root_ / "settings.tmp";
     const auto dst = root_ / "settings.ini";
     std::ofstream f(tmp, std::ios::trunc);
@@ -30,7 +40,8 @@ bool SettingsStore::Save(const UserSettings& s) const {
     std::filesystem::rename(tmp, dst, ec);
     if (ec) {
         std::filesystem::remove(dst, ec);
-        ec.clear(); std::filesystem::rename(tmp, dst, ec);
+        ec.clear();
+        std::filesystem::rename(tmp, dst, ec);
     }
     return !ec;
 }

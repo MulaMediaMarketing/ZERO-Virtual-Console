@@ -1,6 +1,7 @@
 #pragma once
 #include "AchievementStore.h"
 #include "CrashReportStore.h"
+#include "PlatformDatabase.h"
 #include "PlatformStateStore.h"
 #include "RuntimeV3.h"
 #include <optional>
@@ -31,6 +32,7 @@ public:
 
 private:
     RuntimeV3 v3_;
+    PlatformDatabase database_;
     PlatformStateStore stateStore_;
     AchievementStore achievements_;
     CrashReportStore crashReports_;

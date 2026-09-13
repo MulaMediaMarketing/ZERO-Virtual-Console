@@ -30,6 +30,8 @@ add_executable(ZeroVirtualConsole WIN32
   src/RuntimeV4.cpp
   src/ResumeStore.cpp
   src/PlatformStateStore.cpp
+  src/PlatformDatabase.cpp
+  src/PlatformDatabaseResume.cpp
   src/AchievementStore.cpp
   src/CrashReportStore.cpp
   src/MiniDumpWriter.cpp
@@ -42,7 +44,7 @@ add_executable(ZeroVirtualConsole WIN32
 
 target_include_directories(ZeroVirtualConsole PRIVATE include)
 target_compile_definitions(ZeroVirtualConsole PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(ZeroVirtualConsole PRIVATE d2d1 dwrite windowscodecs xinput9_1_0 shlwapi shell32 ole32 bcrypt advapi32 dbghelp)
+target_link_libraries(ZeroVirtualConsole PRIVATE d2d1 dwrite windowscodecs xinput9_1_0 shlwapi shell32 ole32 bcrypt advapi32 dbghelp winsqlite3)
 
 add_executable(ZeroTestGame sample_game/TestGame.cpp)
 target_include_directories(ZeroTestGame PRIVATE sdk include)
@@ -57,9 +59,11 @@ target_link_libraries(ZeroReferenceGame PRIVATE ZeroSdk)
 add_executable(ZeroAcceptance
   tools/AcceptanceMain.cpp
   src/MilestoneAcceptance.cpp
+  src/PlatformDatabase.cpp
+  src/PlatformDatabaseResume.cpp
 )
 target_include_directories(ZeroAcceptance PRIVATE include)
 target_compile_definitions(ZeroAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(ZeroAcceptance PRIVATE shell32 ole32)
+target_link_libraries(ZeroAcceptance PRIVATE shell32 ole32 winsqlite3)
 
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)

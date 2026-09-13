@@ -1,4 +1,5 @@
 #include "AchievementStore.h"
+#include "PlatformDatabase.h"
 #include <chrono>
 #include <fstream>
 #include <iomanip>
@@ -68,14 +69,28 @@ bool AchievementStore::Unlock(const std::string& packageId,
         error = L"Achievement identity is invalid.";
         return false;
     }
-    for (const auto& a : Load(packageId)) if (a.id == achievementId) return true;
+
+    PlatformDatabase database;
+    for (const auto& existing : Load(packageId)) {
+        if (existing.id == achievementId) {
+            return database.UpsertAchievement(packageId, achievementId,
+                                              existing.title.empty() ? title : existing.title,
+                                              existing.unlockedAtUtc, error);
+        }
+    }
+
+    const auto stamp = nowUtc();
+    if (!database.UpsertAchievement(packageId, achievementId, title, stamp, error)) return false;
+
+    // Compatibility mirror for the current shell. SQLite is canonical.
     std::error_code ec;
     std::filesystem::create_directories(root(), ec);
-    if (ec) { error = L"ZERO could not create the achievement directory."; return false; }
+    if (ec) { error = L"ZERO could not create the achievement mirror directory."; return false; }
     std::ofstream f(PathFor(packageId), std::ios::binary | std::ios::app);
-    if (!f) { error = L"ZERO could not persist the achievement."; return false; }
+    if (!f) { error = L"ZERO could not persist the achievement mirror."; return false; }
     f << "{\"id\":\"" << escapeJson(achievementId) << "\",\"title\":\"" << escapeJson(title)
-      << "\",\"unlocked_at\":\"" << nowUtc() << "\"}\n";
+      << "\",\"unlocked_at\":\"" << stamp << "\"}\n";
+    if (!f.good()) { error = L"ZERO could not finalize the achievement mirror."; return false; }
     return true;
 }
 
