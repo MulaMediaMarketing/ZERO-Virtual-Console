@@ -23,6 +23,7 @@ namespace zero {
 class App {
 public:
     enum class Page { Home, Library, Store, Friends, Captures, Settings, GameDetail, Import, Achievements };
+    enum class LaunchUxMode { Hidden, Starting, Failed, Ended };
 
     App(HINSTANCE instance);
     int Run();
@@ -59,6 +60,8 @@ private:
     ShellUxState shellUx_;
     Page page_{Page::Home};
     Page achievementsReturnPage_{Page::Home};
+    LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
+    RuntimeOutcome lastRuntimeOutcome_{RuntimeOutcome::None};
     size_t selectedGame_{0};
     size_t selectedCapture_{0};
     size_t captureScroll_{0};
@@ -71,7 +74,11 @@ private:
     bool captureViewerVisible_{false};
     bool captureDeleteConfirm_{false};
     bool achievementsFromOverlay_{false};
+    bool launchUsedResume_{false};
     std::string achievementPackageId_;
+    std::string launchPackageId_;
+    std::wstring launchTitle_;
+    std::wstring launchError_;
     std::chrono::steady_clock::time_point lastInput_{};
     std::chrono::steady_clock::time_point lastTick_{};
     std::wstring status_;
@@ -89,6 +96,7 @@ private:
     void DrawFriends(float width, float height);
     void DrawCaptures(float width, float height);
     void DrawAchievements(float width, float height);
+    void DrawLaunchRecovery(float width, float height);
     void DrawCaptureViewer(float width, float height);
     void DrawCaptureDeleteConfirm(float width, float height);
     void DrawFocusRing(const D2D1_RECT_F& bounds, float radius, bool light = false);
@@ -96,10 +104,14 @@ private:
     void HandleInput(const InputSnapshot&);
     void HandleCaptureInput(const InputSnapshot&);
     void HandleAchievementInput(const InputSnapshot&);
+    void HandleLaunchRecoveryInput(const InputSnapshot&);
     void NavigateTo(Page page);
     void OpenAchievements(const std::string& packageId, Page returnPage, bool fromOverlay);
     void ClampAchievementSelection();
     void LaunchSelected(bool useResume);
+    void RetryLaunch();
+    void ReturnFromLaunchUx(bool toGameDetail);
+    void UpdateLaunchUx();
     void ImportGameFolder();
     void EnterBorderlessFullscreen();
     void SetOverlayVisible(bool visible);

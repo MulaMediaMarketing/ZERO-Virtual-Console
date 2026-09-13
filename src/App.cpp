@@ -232,14 +232,7 @@ void App::Tick() {
     shellUx_.Advance(std::chrono::duration<float>(delta));
 
     runtime_.Poll();
-    if (runtime_.State() == RuntimeState::Crashed) {
-        status_ = L"The game closed unexpectedly. ZERO recorded diagnostics and is still running.";
-        if (overlayVisible_) SetOverlayVisible(false);
-    } else if (runtime_.State() == RuntimeState::Exited) {
-        if (status_.empty()) status_ = L"Game session ended.";
-        if (overlayVisible_) SetOverlayVisible(false);
-    }
-
+    UpdateLaunchUx();
     HandleInput(input_.Poll());
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
@@ -351,6 +344,11 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
 }
 
 void App::HandleInput(const InputSnapshot& in) {
+    if (launchUxMode_ != LaunchUxMode::Hidden) {
+        HandleLaunchRecoveryInput(in);
+        return;
+    }
+
     if (captureDeleteConfirm_ || captureViewerVisible_) {
         HandleCaptureInput(in);
         return;
@@ -387,7 +385,6 @@ void App::HandleInput(const InputSnapshot& in) {
             } else {
                 runtime_.Terminate();
                 SetOverlayVisible(false);
-                status_ = L"Game session ended.";
             }
         }
         return;
@@ -526,14 +523,29 @@ void App::LaunchSelected(bool useResume) {
     const auto& games = registry_.Games();
     if (games.empty() || selectedGame_ >= games.size()) return;
     const auto& game = games[selectedGame_];
+
+    launchPackageId_ = game.packageId;
+    launchTitle_ = Widen(game.title);
+    launchUsedResume_ = false;
+    launchError_.clear();
+    lastRuntimeOutcome_ = RuntimeOutcome::None;
+
     std::optional<ResumeMetadata> resume;
     if (useResume && game.zeroResume) resume = resumeStore_.Load(game.packageId);
+    launchUsedResume_ = resume.has_value();
+    launchUxMode_ = LaunchUxMode::Starting;
+    NotifyFocusMoved();
+
     std::wstring error;
     if (runtime_.Launch(game, error, resume)) {
-        status_ = (resume ? L"Resuming " : L"Launching ") + Widen(game.title) + L"...";
-    } else {
-        status_ = error;
+        status_.clear();
+        return;
     }
+
+    launchError_ = error.empty() ? L"ZERO could not create the game session." : error;
+    lastRuntimeOutcome_ = runtime_.Outcome();
+    launchUxMode_ = LaunchUxMode::Failed;
+    NotifyFocusMoved();
 }
 
 LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {

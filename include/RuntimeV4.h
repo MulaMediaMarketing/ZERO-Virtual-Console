@@ -17,6 +17,7 @@ public:
     void SetOverlayVisible(bool visible) { v3_.SetOverlayVisible(visible); }
 
     RuntimeState State() const noexcept { return v3_.State(); }
+    RuntimeOutcome Outcome() const noexcept { return v3_.Outcome(); }
     DWORD ExitCode() const noexcept { return v3_.ExitCode(); }
     const RuntimeSessionInfo& Info() const noexcept { return v3_.Info(); }
     bool IsActive() const noexcept { return v3_.IsActive(); }
