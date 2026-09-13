@@ -1,31 +1,95 @@
 #include "MilestoneAcceptance.h"
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 
 namespace zero {
+namespace {
+
+std::string readAll(const std::filesystem::path& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return {};
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+bool contains(const std::filesystem::path& path, const std::string& token) {
+    const auto text = readAll(path);
+    return !text.empty() && text.find(token) != std::string::npos;
+}
+
+bool hasRegularFile(const std::filesystem::path& root) {
+    std::error_code ec;
+    if (!std::filesystem::exists(root, ec)) return false;
+    for (std::filesystem::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
+        if (it->is_regular_file(ec)) return true;
+    }
+    return false;
+}
+
+} // namespace
 
 MilestoneAcceptance::MilestoneAcceptance(std::filesystem::path zeroRoot) : root_(std::move(zeroRoot)) {}
 
 std::vector<AcceptanceCheck> MilestoneAcceptance::Run() const {
+    constexpr const char* packageId = "zero.system.reference";
     std::vector<AcceptanceCheck> checks;
-    const auto library = root_ / "Library";
-    const auto saves = root_ / "Saves";
-    const auto resume = root_ / "Resume";
-    const auto runtime = root_ / "Runtime";
-    const auto crash = root_ / "CrashReports";
-    const auto firstBoot = root_ / "first_boot.ini";
 
-    checks.push_back({"first_boot_state", std::filesystem::exists(firstBoot),
-        std::filesystem::exists(firstBoot) ? "First-boot state exists." : "Complete first boot once."});
-    checks.push_back({"library_root", std::filesystem::exists(library),
-        std::filesystem::exists(library) ? "Library root exists." : "Import a compatible game."});
-    checks.push_back({"save_root", std::filesystem::exists(saves),
-        std::filesystem::exists(saves) ? "Managed save root exists." : "Launch a game and write a save."});
-    checks.push_back({"resume_root", std::filesystem::exists(resume),
-        std::filesystem::exists(resume) ? "Resume metadata exists." : "Set a Resume activity in a game."});
-    checks.push_back({"runtime_sessions", std::filesystem::exists(runtime / "Sessions"),
-        std::filesystem::exists(runtime / "Sessions") ? "Runtime session records exist." : "Launch a game through ZERO."});
-    checks.push_back({"crash_diagnostics", std::filesystem::exists(crash),
-        std::filesystem::exists(crash) ? "Crash diagnostics root exists." : "Run the intentional crash acceptance test."});
+    const auto firstBoot = root_ / "first_boot.ini";
+    const auto libraryPackage = root_ / "Library" / packageId;
+    const auto saveRoot = root_ / "Saves" / packageId;
+    const auto resumeFile = root_ / "Resume" / (std::string(packageId) + ".json");
+    const auto achievementFile = root_ / "Achievements" / (std::string(packageId) + ".jsonl");
+    const auto sessions = root_ / "Runtime" / "Sessions";
+    const auto crashPackage = root_ / "CrashReports" / packageId;
+
+    const bool firstBootPassed = contains(firstBoot, "completed=1") &&
+                                 contains(firstBoot, "controller=1") &&
+                                 contains(firstBoot, "display=1") &&
+                                 contains(firstBoot, "audio=1");
+    checks.push_back({"first_boot_completed", firstBootPassed,
+        firstBootPassed ? "First Boot completed with controller, display, and audio confirmation."
+                        : "Complete the native First Boot flow before acceptance."});
+
+    const bool imported = std::filesystem::exists(libraryPackage / "zero.manifest.json") &&
+                          std::filesystem::exists(libraryPackage / "ZeroReferenceGame.exe");
+    checks.push_back({"reference_package_imported", imported,
+        imported ? "Dedicated ZERO reference package is installed in the managed Library."
+                 : "Import the generated ZERO Reference Experience package."});
+
+    const bool launched = contains(saveRoot / "launch.ok", "reference_game_launched=1") &&
+                          contains(saveRoot / "ready.ok", "sdk_ready=1") &&
+                          hasRegularFile(sessions);
+    checks.push_back({"runtime_ready_session", launched,
+        launched ? "Reference game launched, SDK reported READY, and Runtime persisted a session."
+                 : "Launch the reference package through ZERO and complete the READY handshake."});
+
+    const bool sdkContract = contains(saveRoot / "sdk_contract.ok", "resume_set=1") &&
+                             contains(saveRoot / "sdk_contract.ok", "achievement_set=1") &&
+                             contains(achievementFile, "m1-reference-connected");
+    checks.push_back({"sdk_achievement_contract", sdkContract,
+        sdkContract ? "Resume registration and achievement persistence are confirmed."
+                    : "Run the reference game until Resume and achievement calls persist successfully."});
+
+    const bool resumeStored = contains(resumeFile, "m1-reference-checkpoint") &&
+                              contains(resumeFile, "checkpoint=m1_reference_validated");
+    checks.push_back({"resume_metadata_persisted", resumeStored,
+        resumeStored ? "Expected logical Resume metadata is persisted."
+                     : "Create the reference Resume activity through ZERO SDK."});
+
+    const bool resumeRoundTrip = contains(saveRoot / "resume_roundtrip.ok", "resume_valid=1") &&
+                                 contains(saveRoot / "resume_roundtrip.ok", "checkpoint=m1_reference_validated");
+    checks.push_back({"resume_roundtrip", resumeRoundTrip,
+        resumeRoundTrip ? "ZERO delivered the persisted Resume payload back into the game."
+                        : "Exit to ZERO, choose Resume, and verify the reference checkpoint is restored."});
+
+    const bool crashTriggered = contains(saveRoot / "intentional_crash.triggered", "exit_code=73") &&
+                                hasRegularFile(crashPackage);
+    checks.push_back({"crash_containment", crashTriggered,
+        crashTriggered ? "Intentional game failure produced diagnostics while ZERO remained the host."
+                       : "Create force_crash.next in the reference save root, launch once, and verify a crash report is written."});
+
     return checks;
 }
 
