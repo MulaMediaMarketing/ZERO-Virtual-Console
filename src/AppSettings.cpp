@@ -31,7 +31,8 @@ uint64_t DirectorySize(const std::filesystem::path& root) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec)) return 0;
     uint64_t total = 0;
-    for (std::filesystem::recursive_directory_iterator it(root, std::filesystem::directory_options::skip_permission_denied, ec), end;
+    for (std::filesystem::recursive_directory_iterator it(
+             root, std::filesystem::directory_options::skip_permission_denied, ec), end;
          !ec && it != end; it.increment(ec)) {
         if (it->is_regular_file(ec)) {
             const auto size = it->file_size(ec);
@@ -46,7 +47,8 @@ size_t CountJsonReports(const std::filesystem::path& root) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec)) return 0;
     size_t count = 0;
-    for (std::filesystem::recursive_directory_iterator it(root, std::filesystem::directory_options::skip_permission_denied, ec), end;
+    for (std::filesystem::recursive_directory_iterator it(
+             root, std::filesystem::directory_options::skip_permission_denied, ec), end;
          !ec && it != end; it.increment(ec)) {
         if (it->is_regular_file(ec) && _wcsicmp(it->path().extension().c_str(), L".json") == 0) ++count;
         ec.clear();
@@ -81,7 +83,8 @@ void App::OpenSettingsLocation(bool diagnosticsOnly) {
         status_ = L"ZERO could not open that system location.";
         return;
     }
-    const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(hwnd_, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+    const auto result = reinterpret_cast<INT_PTR>(
+        ShellExecuteW(hwnd_, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
     if (result <= 32) status_ = L"Windows could not open that system location.";
 }
 
@@ -99,73 +102,82 @@ void App::HandleSettingsInput(const InputSnapshot& in) {
     if (selectedSetting_ == 1 && (in.left || in.right)) {
         const int delta = in.left ? -5 : 5;
         settings_.volume = std::clamp(settings_.volume + delta, 0, 100);
-        if (!settingsStore_.Save(settings_)) status_ = L"ZERO could not persist volume settings.";
-        else status_ = L"System volume preference: " + std::to_wstring(settings_.volume) + L"%.";
+        if (!settingsStore_.Save(settings_)) {
+            status_ = L"ZERO could not persist its volume preference.";
+        } else {
+            status_ = L"ZERO volume preference: " + std::to_wstring(settings_.volume) + L"%.";
+        }
         return;
     }
 
     if (!in.select && !in.action) return;
 
     switch (selectedSetting_) {
-        case 0: {
-            status_ = L"Profile name editing is available during First Boot. Full profile editing is a later identity slice.";
+        case 0:
+            status_ = L"This build uses the local profile created during First Boot. Online profile editing is not connected.";
             break;
-        }
-        case 1: {
+        case 1:
             settings_.volume = std::clamp(settings_.volume + 5, 0, 100);
-            if (!settingsStore_.Save(settings_)) status_ = L"ZERO could not persist volume settings.";
-            else status_ = L"System volume preference: " + std::to_wstring(settings_.volume) + L"%.";
+            if (!settingsStore_.Save(settings_)) {
+                status_ = L"ZERO could not persist its volume preference.";
+            } else {
+                status_ = L"ZERO volume preference: " + std::to_wstring(settings_.volume) + L"%.";
+            }
             break;
-        }
-        case 2: {
+        case 2:
             settings_.reducedMotion = !settings_.reducedMotion;
             shellUx_.SetReducedMotion(settings_.reducedMotion);
-            if (!settingsStore_.Save(settings_)) status_ = L"ZERO could not persist motion settings.";
-            else status_ = settings_.reducedMotion ? L"Reduced Motion enabled." : L"Reduced Motion disabled.";
+            if (!settingsStore_.Save(settings_)) {
+                status_ = L"ZERO could not persist motion settings.";
+            } else {
+                status_ = settings_.reducedMotion ? L"Reduced Motion enabled." : L"Reduced Motion disabled.";
+            }
             break;
-        }
-        case 3: {
+        case 3:
             RefreshSettingsTelemetry();
             status_ = settingsControllerConnected_ ? L"Controller 1 is connected." : L"No XInput controller is currently connected.";
             break;
-        }
-        case 4: {
+        case 4:
             EnterBorderlessFullscreen();
             RefreshSettingsTelemetry();
             status_ = L"Display state refreshed.";
             break;
-        }
-        case 5: {
+        case 5:
             OpenSettingsLocation(false);
             break;
-        }
-        case 6: {
+        case 6:
             OpenSettingsLocation(true);
             break;
-        }
-        case 7: {
+        case 7:
             status_ = L"ZERO Virtual Console · Runtime V4.1 · Windows 11 x64 · local console shell.";
             break;
-        }
     }
     NotifyFocusMoved();
 }
 
 void App::DrawSettings(float width, float height) {
-    RefreshSettingsTelemetry();
     const auto profile = identity_.CurrentProfile();
 
     DrawTextLine(L"Settings", 62, 154, 500, 60, true);
-    DrawTextLine(L"System controls and local console status", 64, 204, 620, 30, false, brushMuted_.Get());
+    DrawTextLine(L"System controls and truthful local console status", 64, 204, 720, 30, false, brushMuted_.Get());
 
-    struct Row { const wchar_t* label; std::wstring value; const wchar_t* hint; };
-    const std::wstring display = std::to_wstring(settingsDisplayWidth_) + L" × " + std::to_wstring(settingsDisplayHeight_) + L" borderless";
-    const std::wstring storage = BytesLabel(settingsStorageBytes_) + L" used · " + BytesLabel(settingsFreeBytes_) + L" free";
-    const std::wstring diagnostics = std::to_wstring(settingsCrashReportCount_) + L" crash report" + (settingsCrashReportCount_ == 1 ? L"" : L"s");
+    struct Row {
+        const wchar_t* label;
+        std::wstring value;
+        const wchar_t* hint;
+    };
+
+    const std::wstring display = std::to_wstring(settingsDisplayWidth_) + L" × " +
+                                 std::to_wstring(settingsDisplayHeight_) + L" borderless";
+    const std::wstring storage = BytesLabel(settingsStorageBytes_) + L" used · " +
+                                 BytesLabel(settingsFreeBytes_) + L" free";
+    const std::wstring diagnostics = std::to_wstring(settingsCrashReportCount_) + L" crash report" +
+                                     (settingsCrashReportCount_ == 1 ? L"" : L"s");
     const std::wstring identityLabel = profile.zeroId.empty() ? L"Local identity unavailable" : Widen(profile.zeroId);
+
     Row rows[] = {
         {L"Profile", Widen(profile.displayName.empty() ? settings_.profileName : profile.displayName) + L" · " + identityLabel, L"A Info"},
-        {L"Volume", std::to_wstring(settings_.volume) + L"%", L"Left / Right Adjust"},
+        {L"ZERO Volume", std::to_wstring(settings_.volume) + L"% preference", L"Left / Right Adjust"},
         {L"Reduced Motion", settings_.reducedMotion ? L"On" : L"Off", L"A Toggle"},
         {L"Controller", settingsControllerConnected_ ? L"Controller 1 connected" : L"No XInput controller", L"A Refresh"},
         {L"Display", display, L"A Reapply fullscreen"},
@@ -186,7 +198,8 @@ void App::DrawSettings(float width, float height) {
         DrawTextLine(rows[i].hint, width - 300, y + 10, 210, 28, false, brushMuted_.Get());
     }
 
-    DrawTextLine(L"Up / Down Navigate   ·   A Select   ·   LB / RB Switch destination   ·   B Home", 64, height - 82, width - 128, 30, false, brushMuted_.Get());
+    DrawTextLine(L"Up / Down Navigate   ·   A Select   ·   LB / RB Switch destination   ·   B Home",
+                 64, height - 82, width - 128, 30, false, brushMuted_.Get());
 }
 
 } // namespace zero
