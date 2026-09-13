@@ -1,4 +1,5 @@
 #include "ResumeStore.h"
+#include "PlatformDatabase.h"
 #include <chrono>
 #include <fstream>
 #include <iomanip>
@@ -94,10 +95,19 @@ bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) cons
         error = L"Invalid package ID for Resume metadata.";
         return false;
     }
+
+    const std::string stamp = metadata.updatedAtUtc.empty() ? utcNow() : metadata.updatedAtUtc;
+    PlatformDatabase database;
+    if (!database.UpsertResume(metadata.packageId, metadata.activityId, metadata.displayLabel,
+                               metadata.payload, stamp, error)) {
+        return false;
+    }
+
+    // Compatibility mirror for the current shell. SQLite is canonical.
     std::error_code ec;
     std::filesystem::create_directories(root(), ec);
     if (ec) {
-        error = L"ZERO could not create the Resume metadata directory.";
+        error = L"ZERO could not create the Resume metadata mirror directory.";
         return false;
     }
 
@@ -105,7 +115,7 @@ bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) cons
     const auto tmp = path.wstring() + L".tmp";
     std::ofstream f(std::filesystem::path(tmp), std::ios::binary | std::ios::trunc);
     if (!f) {
-        error = L"ZERO could not write Resume metadata.";
+        error = L"ZERO could not write the Resume metadata mirror.";
         return false;
     }
 
@@ -115,7 +125,7 @@ bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) cons
       << "  \"activity_id\": \"" << escapeJson(metadata.activityId) << "\",\n"
       << "  \"display_label\": \"" << escapeJson(metadata.displayLabel) << "\",\n"
       << "  \"payload\": \"" << escapeJson(metadata.payload) << "\",\n"
-      << "  \"updated_at\": \"" << escapeJson(metadata.updatedAtUtc.empty() ? utcNow() : metadata.updatedAtUtc) << "\"\n"
+      << "  \"updated_at\": \"" << escapeJson(stamp) << "\"\n"
       << "}\n";
     f.close();
 
@@ -126,7 +136,7 @@ bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) cons
         std::filesystem::rename(std::filesystem::path(tmp), path, ec);
     }
     if (ec) {
-        error = L"ZERO could not commit Resume metadata.";
+        error = L"ZERO could not finalize the Resume metadata mirror.";
         return false;
     }
     return true;
@@ -154,10 +164,14 @@ bool ResumeStore::Clear(const std::string& packageId, std::wstring& error) const
         error = L"Invalid package ID for Resume metadata.";
         return false;
     }
+
+    PlatformDatabase database;
+    if (!database.ClearResume(packageId, error)) return false;
+
     std::error_code ec;
     std::filesystem::remove(PathFor(packageId), ec);
     if (ec) {
-        error = L"ZERO could not clear Resume metadata.";
+        error = L"ZERO could not clear the Resume metadata mirror.";
         return false;
     }
     return true;
