@@ -40,11 +40,15 @@ App::App(HINSTANCE instance)
       registry_(localRoot() / "Library"),
       importer_(localRoot() / "Library"),
       captures_(localRoot() / "Captures"),
+      identity_(localRoot()),
       settingsStore_(localRoot()) {}
 
 int App::Run() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     settings_ = settingsStore_.Load();
+    std::wstring identityError;
+    if (!identity_.Initialize(settings_.profileName, identityError)) status_ = identityError;
+    friends_.Refresh();
     registry_.Refresh();
     captures_.Refresh();
     if (!InitWindow() || !InitGraphics()) return 1;
@@ -213,6 +217,54 @@ void App::DrawEmptyState(const std::wstring& title, const std::wstring& body, fl
     DrawTextLine(body, 102, 390, W-230, 88, false, brushMuted_.Get());
 }
 
+void App::DrawFriends(float W, float H) {
+    (void)H;
+    const auto profile = identity_.CurrentProfile();
+    const auto state = friends_.State();
+    const auto& list = friends_.Friends();
+
+    DrawTextLine(L"Friends", 62, 154, 500, 60, true);
+    DrawTextLine(L"Zero Link", 64, 204, 300, 30, false, brushMuted_.Get());
+
+    DrawRoundedCard(D2D1::RectF(62,265,W-62,370), 24, brushCard_.Get());
+    DrawTextLine(profile.displayName.empty() ? L"Player" : Widen(profile.displayName), 92, 286, 420, 42, true);
+    DrawTextLine(profile.zeroId.empty() ? L"Local identity unavailable" : Widen(profile.zeroId), 92, 330, W-360, 30, false, brushMuted_.Get());
+    DrawTextLine(profile.localOnly ? L"Local Zero ID" : L"Zero ID", W-260, 298, 170, 30, false, brushMuted_.Get());
+
+    if (state == FriendsProviderState::Disconnected) {
+        DrawRoundedCard(D2D1::RectF(62,395,W-62,590), 24, brushCard_.Get());
+        DrawTextLine(L"Zero Link is not connected", 92, 430, 520, 48, true);
+        DrawTextLine(L"Presence, requests, invites, joinability, and friend activity will appear here when a Zero Link provider is connected. No placeholder users are shown.",
+                     94, 490, W-220, 70, false, brushMuted_.Get());
+        return;
+    }
+
+    if (state == FriendsProviderState::Error) {
+        DrawEmptyState(L"Zero Link is unavailable", L"The social provider reported an error. ZERO is keeping the shell usable without inventing social data.", W);
+        return;
+    }
+
+    if (list.empty()) {
+        DrawEmptyState(L"No friends to show", L"Zero Link is connected, but this provider returned no friends or presence records.", W);
+        return;
+    }
+
+    float y = 405.0f;
+    const size_t count = std::min<size_t>(5, list.size());
+    for (size_t i = 0; i < count; ++i, y += 66.0f) {
+        const auto& friendItem = list[i];
+        DrawRoundedCard(D2D1::RectF(62,y,W-62,y+52), 16, brushCard_.Get());
+        DrawTextLine(Widen(friendItem.displayName), 90, y+10, 360, 30, false);
+        std::wstring presence = L"Offline";
+        if (friendItem.presence == PresenceState::Online) presence = L"Online";
+        else if (friendItem.presence == PresenceState::InGame) {
+            presence = friendItem.gamePackageId.empty() ? L"In game" : L"In game · " + Widen(friendItem.gamePackageId);
+        }
+        if (friendItem.joinable) presence += L" · Joinable";
+        DrawTextLine(presence, W-500, y+10, 410, 30, false, brushMuted_.Get());
+    }
+}
+
 void App::ClampCaptureSelection() {
     const auto count = captures_.Items().size();
     if (count == 0) {
@@ -376,7 +428,9 @@ void App::Paint() {
 
     const auto& games = registry_.Games();
     if (page_ == Page::Home) {
-        DrawTextLine(L"Good evening, " + Widen(settings_.profileName), 62, 154, 700, 60, true);
+        const auto profile = identity_.CurrentProfile();
+        const std::string greetingName = profile.displayName.empty() ? settings_.profileName : profile.displayName;
+        DrawTextLine(L"Good evening, " + Widen(greetingName), 62, 154, 700, 60, true);
         DrawTextLine(L"Your games. One calm console experience.", 64, 204, 650, 40, false, brushMuted_.Get());
         if (games.empty()) {
             DrawEmptyState(L"No games installed", L"Open Library, then use X to import a ZERO-compatible game folder.", W);
@@ -416,9 +470,7 @@ void App::Paint() {
         DrawTextLine(L"ZERO Store", 64, 204, 300, 30, false, brushMuted_.Get());
         DrawEmptyState(L"Store service is not connected", L"This shell destination is production-wired, but commerce, entitlement, CDN, and publisher catalog services are intentionally not being faked in this build.", W);
     } else if (page_ == Page::Friends) {
-        DrawTextLine(L"Friends", 62, 154, 500, 60, true);
-        DrawTextLine(L"Zero Link", 64, 204, 300, 30, false, brushMuted_.Get());
-        DrawEmptyState(L"Friends service is not connected", L"Zero Link presence, requests, joinability, invites, and messaging will populate this page when the social provider is implemented. No fake friends are shown.", W);
+        DrawFriends(W, H);
     } else if (page_ == Page::Captures) {
         DrawCaptures(W, H);
     } else if (page_ == Page::GameDetail && !games.empty()) {
@@ -490,13 +542,18 @@ void App::Paint() {
         DrawTextLine(L"ZERO validates, hashes, stages, verifies, and installs the package.",
             64, 430, W-128, 48, false, brushMuted_.Get());
     } else if (page_ == Page::Settings) {
+        const auto profile = identity_.CurrentProfile();
         DrawTextLine(L"Settings", 62, 154, 500, 60, true);
         DrawRoundedCard(D2D1::RectF(62,270,W-62,355), 20, brushCard_.Get());
         DrawTextLine(L"Profile", 92, 290, 180, 30, false);
-        DrawTextLine(Widen(settings_.profileName), W-320, 290, 220, 30, false, brushMuted_.Get());
+        DrawTextLine(Widen(profile.displayName.empty() ? settings_.profileName : profile.displayName), W-420, 290, 320, 30, false, brushMuted_.Get());
         DrawRoundedCard(D2D1::RectF(62,375,W-62,460), 20, brushCard_.Get());
-        DrawTextLine(L"Reduced Motion", 92, 395, 220, 30, false);
-        DrawTextLine(settings_.reducedMotion ? L"On" : L"Off", W-240, 395, 100, 30, false, brushMuted_.Get());
+        DrawTextLine(L"Zero ID", 92, 394, 180, 30, false);
+        DrawTextLine(profile.zeroId.empty() ? L"Unavailable" : Widen(profile.zeroId), 300, 394, W-580, 30, false, brushMuted_.Get());
+        DrawTextLine(profile.localOnly ? L"Local only" : L"Connected", W-220, 394, 120, 30, false, brushMuted_.Get());
+        DrawRoundedCard(D2D1::RectF(62,480,W-62,565), 20, brushCard_.Get());
+        DrawTextLine(L"Reduced Motion", 92, 500, 220, 30, false);
+        DrawTextLine(settings_.reducedMotion ? L"On" : L"Off", W-240, 500, 100, 30, false, brushMuted_.Get());
     }
 
     if (!status_.empty() && page_ != Page::GameDetail) DrawTextLine(status_, 64, H-110, W-130, 38, false, brushMuted_.Get());
@@ -549,6 +606,8 @@ void App::NavigateTo(Page p) {
     if (p == Page::Captures) {
         captures_.Refresh();
         ClampCaptureSelection();
+    } else if (p == Page::Friends) {
+        friends_.Refresh();
     }
 }
 
@@ -808,6 +867,7 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
             if (wp == VK_F5) {
                 registry_.Refresh();
                 captures_.Refresh();
+                friends_.Refresh();
                 ClampCaptureSelection();
                 cachedHero_.Reset();
                 cachedHeroPath_.clear();
