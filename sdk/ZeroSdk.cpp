@@ -359,6 +359,10 @@ bool Client::SendRequest(protocol::MessageType type,
     const auto& response = pending->message;
     if (response.type == protocol::MessageType::Error) {
         error = L"ZERO Runtime rejected the SDK request.";
+        if (response.fields.size() == 1 && protocol::IsValidUtf8(response.fields[0])) {
+            const auto detail = widen(response.fields[0]);
+            if (!detail.empty()) error += L" " + detail;
+        }
         return false;
     }
     if (response.type != expectedType) {
