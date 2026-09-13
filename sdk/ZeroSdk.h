@@ -13,6 +13,10 @@
 
 namespace zero::sdk {
 
+namespace detail {
+bool InstallCrashHandler() noexcept;
+}
+
 struct ResumeContext {
     std::string activityId;
     std::string displayLabel;
@@ -52,6 +56,7 @@ private:
         protocol::Message message;
     };
 
+    bool crashHandlerInstalled_{detail::InstallCrashHandler()};
     void* pipe_{reinterpret_cast<void*>(-1)};
     std::wstring pipeName_;
     std::string authToken_;
