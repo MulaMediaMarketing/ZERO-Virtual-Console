@@ -10,9 +10,11 @@ endif()
 
 add_library(ZeroSdk STATIC
   sdk/ZeroSdk.cpp
+  sdk/ZeroSdkCrash.cpp
 )
 target_include_directories(ZeroSdk PUBLIC sdk include)
 target_compile_definitions(ZeroSdk PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroSdk PUBLIC dbghelp)
 
 add_executable(ZeroVirtualConsole WIN32
   src/main.cpp
