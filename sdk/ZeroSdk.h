@@ -21,6 +21,9 @@ public:
     void Shutdown();
     bool ReportReady(std::wstring& error);
     bool SetResumeActivity(const ResumeContext& context, std::wstring& error);
+    bool UnlockAchievement(const std::string& achievementId,
+                           const std::string& title,
+                           std::wstring& error);
     bool Ping(std::wstring& error);
 
     void SetOverlayCallback(std::function<void(bool)> callback);
