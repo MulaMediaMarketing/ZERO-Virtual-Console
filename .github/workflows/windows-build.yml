@@ -27,3 +27,6 @@ jobs:
           path: |
             build/Release/ZeroVirtualConsole.exe
             build/Release/ZeroTestGame.exe
+            build/Release/ZeroAcceptance.exe
+            installer/install-zero.ps1
+            installer/uninstall-zero.ps1
