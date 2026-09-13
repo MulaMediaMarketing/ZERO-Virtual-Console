@@ -34,7 +34,9 @@ private:
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brushAccent_;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brushCard_;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> cachedHero_;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> cachedCapture_;
     std::filesystem::path cachedHeroPath_;
+    std::filesystem::path cachedCapturePath_;
 
     GameRegistry registry_;
     GameImportService importer_;
@@ -46,10 +48,14 @@ private:
     Input input_;
     Page page_{Page::Home};
     size_t selectedGame_{0};
+    size_t selectedCapture_{0};
+    size_t captureScroll_{0};
     size_t navIndex_{0};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
     bool preferResume_{true};
+    bool captureViewerVisible_{false};
+    bool captureDeleteConfirm_{false};
     std::chrono::steady_clock::time_point lastInput_{};
     std::wstring status_;
 
@@ -63,13 +69,17 @@ private:
     void DrawRecentGames(float width, float height);
     void DrawEmptyState(const std::wstring& title, const std::wstring& body, float width);
     void DrawCaptures(float width, float height);
+    void DrawCaptureViewer(float width, float height);
+    void DrawCaptureDeleteConfirm(float width, float height);
     void Tick();
     void HandleInput(const InputSnapshot&);
+    void HandleCaptureInput(const InputSnapshot&);
     void NavigateTo(Page page);
     void LaunchSelected(bool useResume);
     void ImportGameFolder();
     void EnterBorderlessFullscreen();
     void SetOverlayVisible(bool visible);
+    void ClampCaptureSelection();
     Microsoft::WRL::ComPtr<ID2D1Bitmap> LoadBitmap(const std::filesystem::path& path);
     void DrawHeroArtwork(const GameManifest& game, const D2D1_RECT_F& bounds);
     void DrawTextLine(const std::wstring&, float x, float y, float w, float h, bool heading=false, ID2D1Brush* brush=nullptr);
