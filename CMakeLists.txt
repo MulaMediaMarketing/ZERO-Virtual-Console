@@ -76,4 +76,12 @@ target_include_directories(ZeroAcceptance PRIVATE include)
 target_compile_definitions(ZeroAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroAcceptance PRIVATE shell32 ole32 winsqlite3)
 
+add_executable(ZeroIpcPersistenceAcceptance
+  tools/IpcPersistenceAcceptance.cpp
+  src/RuntimeIpcServer.cpp
+)
+target_include_directories(ZeroIpcPersistenceAcceptance PRIVATE sdk include)
+target_compile_definitions(ZeroIpcPersistenceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroIpcPersistenceAcceptance PRIVATE ZeroSdk advapi32)
+
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
