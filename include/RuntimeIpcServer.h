@@ -1,4 +1,5 @@
 #pragma once
+#include "ZeroProtocol.h"
 #include <atomic>
 #include <functional>
 #include <mutex>
@@ -36,8 +37,9 @@ public:
 
 private:
     void ServerLoop();
-    bool HandleLine(const std::string& line, HANDLE pipe);
-    bool WriteLine(HANDLE pipe, const std::string& line);
+    bool HandleMessage(const protocol::Message& message, HANDLE pipe);
+    bool Send(HANDLE pipe, protocol::MessageType type, uint64_t requestId,
+              std::vector<std::string> fields = {});
 
     std::wstring pipeName_;
     std::string packageId_;
@@ -47,6 +49,7 @@ private:
     std::atomic<bool> stop_{false};
     std::atomic<bool> authenticated_{false};
     std::atomic<bool> ready_{false};
+    std::atomic<uint64_t> nextServerRequestId_{1};
     mutable std::mutex pipeMutex_;
     HANDLE activePipe_{INVALID_HANDLE_VALUE};
 };
