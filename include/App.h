@@ -45,6 +45,9 @@ private:
     Page page_{Page::Home};
     size_t selectedGame_{0};
     size_t navIndex_{0};
+    size_t overlayIndex_{0};
+    bool overlayVisible_{false};
+    bool preferResume_{true};
     std::chrono::steady_clock::time_point lastInput_{};
     std::wstring status_;
 
@@ -54,12 +57,15 @@ private:
     bool InitGraphics();
     void CreateDeviceResources();
     void Paint();
+    void DrawOverlay(float width, float height);
+    void DrawRecentGames(float width, float height);
     void Tick();
     void HandleInput(const InputSnapshot&);
     void NavigateTo(Page page);
-    void LaunchSelected();
+    void LaunchSelected(bool useResume);
     void ImportGameFolder();
     void EnterBorderlessFullscreen();
+    void SetOverlayVisible(bool visible);
     Microsoft::WRL::ComPtr<ID2D1Bitmap> LoadBitmap(const std::filesystem::path& path);
     void DrawHeroArtwork(const GameManifest& game, const D2D1_RECT_F& bounds);
     void DrawTextLine(const std::wstring&, float x, float y, float w, float h, bool heading=false, ID2D1Brush* brush=nullptr);
