@@ -20,6 +20,10 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Verify persistence ACK failure handling
+        shell: pwsh
+        run: ./build/Release/ZeroIpcPersistenceAcceptance.exe
+
       - name: Build ZERO reference package
         shell: pwsh
         run: ./sample_game/reference/build-reference-package.ps1 -ReferenceExe ./build/Release/ZeroReferenceGame.exe -Output ./build/ReferencePackage
@@ -37,6 +41,7 @@ jobs:
             build/Release/ZeroTestGame.exe
             build/Release/ZeroReferenceGame.exe
             build/Release/ZeroAcceptance.exe
+            build/Release/ZeroIpcPersistenceAcceptance.exe
             build/ReferencePackage/**
             tools/verify-rc-build.ps1
             docs/RUNTIME_V4_1_RC_GATE.md
