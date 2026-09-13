@@ -282,7 +282,7 @@ void App::Paint() {
         DrawTextLine(L"Good evening, " + Widen(settings_.profileName), 62, 154, 700, 60, true);
         DrawTextLine(L"Your games. One calm console experience.", 64, 204, 650, 40, false, brushMuted_.Get());
         if (games.empty()) {
-            DrawEmptyState(L"No games installed", L"Open Library, then use the Import action to add a ZERO-compatible game folder.", W);
+            DrawEmptyState(L"No games installed", L"Open Library, then use X to import a ZERO-compatible game folder.", W);
         } else {
             const auto& g = games[std::min(selectedGame_, games.size()-1)];
             const auto hero = D2D1::RectF(62,285,W-62,620);
@@ -302,9 +302,9 @@ void App::Paint() {
         }
     } else if (page_ == Page::Library) {
         DrawTextLine(L"Library", 62, 154, 500, 60, true);
-        DrawTextLine(std::to_wstring(games.size()) + L" installed   ·   I  Import Game", 64, 204, 500, 30, false, brushMuted_.Get());
+        DrawTextLine(std::to_wstring(games.size()) + L" installed   ·   A Open   ·   X Import Game", 64, 204, 620, 30, false, brushMuted_.Get());
         if (games.empty()) {
-            DrawEmptyState(L"Your library is empty", L"Use the Import action to add a validated ZERO-compatible native game package.", W);
+            DrawEmptyState(L"Your library is empty", L"Press X to import a validated ZERO-compatible native game package.", W);
         } else {
             float y=280;
             for (size_t i=0;i<games.size() && i<8;i++,y+=78) {
@@ -455,20 +455,24 @@ void App::HandleInput(const InputSnapshot& in) {
                 default: return Page::Settings;
             }
         };
-        if (in.left && navIndex_>0) {
+        if ((in.left || in.shoulderLeft) && navIndex_>0) {
             navIndex_--;
             NavigateTo(pageForNav(navIndex_));
         }
-        if (in.right && navIndex_<5) {
+        if ((in.right || in.shoulderRight) && navIndex_<5) {
             navIndex_++;
             NavigateTo(pageForNav(navIndex_));
         }
     }
 
-    if (page_ == Page::Library && n) {
-        if (in.up && selectedGame_>0) selectedGame_--;
-        if (in.down && selectedGame_+1<n) selectedGame_++;
-        if (in.select) { preferResume_ = true; NavigateTo(Page::GameDetail); }
+    if (page_ == Page::Library) {
+        if (in.action) {
+            NavigateTo(Page::Import);
+        } else if (n) {
+            if (in.up && selectedGame_>0) selectedGame_--;
+            if (in.down && selectedGame_+1<n) selectedGame_++;
+            if (in.select) { preferResume_ = true; NavigateTo(Page::GameDetail); }
+        }
     } else if (page_ == Page::Import && in.select) {
         ImportGameFolder();
     } else if (page_ == Page::Home && in.select && n) {
