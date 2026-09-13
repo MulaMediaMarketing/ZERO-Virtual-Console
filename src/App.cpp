@@ -134,7 +134,7 @@ ComPtr<ID2D1Bitmap> App::LoadBitmap(const std::filesystem::path& path) {
     if (FAILED(decoder->GetFrame(0, frame.GetAddressOf()))) return bitmap;
     ComPtr<IWICFormatConverter> converter;
     if (FAILED(wicFactory_->CreateFormatConverter(converter.GetAddressOf()))) return bitmap;
-    if (FAILED(converter_->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA,
+    if (FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA,
         WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return bitmap;
     target_->CreateBitmapFromWicBitmap(converter.Get(), nullptr, bitmap.GetAddressOf());
     return bitmap;
