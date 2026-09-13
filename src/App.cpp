@@ -212,6 +212,7 @@ void App::SetOverlayVisible(bool visible) {
     if (overlayVisible_ == visible) return;
     overlayVisible_ = visible;
     overlayIndex_ = 0;
+    if (!visible) achievementsFromOverlay_ = false;
     shellUx_.SetOverlayVisible(visible);
     NotifyFocusMoved();
     runtime_.SetOverlayVisible(visible);
@@ -260,6 +261,8 @@ void App::NavigateTo(Page next) {
         friends_.Refresh();
     } else if (next == Page::Store) {
         store_.Refresh();
+    } else if (next == Page::Achievements) {
+        ClampAchievementSelection();
     }
 }
 
@@ -354,6 +357,10 @@ void App::HandleInput(const InputSnapshot& in) {
     }
 
     if (overlayVisible_) {
+        if (achievementsFromOverlay_) {
+            HandleAchievementInput(in);
+            return;
+        }
         if (in.up && overlayIndex_ > 0) {
             --overlayIndex_;
             NotifyFocusMoved();
@@ -376,8 +383,7 @@ void App::HandleInput(const InputSnapshot& in) {
                 navIndex_ = 4;
                 NavigateTo(Page::Captures);
             } else if (overlayIndex_ == 3) {
-                const auto count = runtime_.Achievements(runtime_.Info().packageId).size();
-                status_ = L"Achievements unlocked: " + std::to_wstring(count);
+                OpenAchievements(runtime_.Info().packageId, page_, true);
             } else {
                 runtime_.Terminate();
                 SetOverlayVisible(false);
@@ -389,6 +395,11 @@ void App::HandleInput(const InputSnapshot& in) {
 
     if (in.menu && runtime_.IsActive()) {
         SetOverlayVisible(true);
+        return;
+    }
+
+    if (page_ == Page::Achievements) {
+        HandleAchievementInput(in);
         return;
     }
 
@@ -408,6 +419,10 @@ void App::HandleInput(const InputSnapshot& in) {
         if (hasResume && in.right && !preferResume_) {
             preferResume_ = true;
             NotifyFocusMoved();
+        }
+        if (in.action) {
+            OpenAchievements(game.packageId, Page::GameDetail, false);
+            return;
         }
     } else {
         if ((in.left || in.shoulderLeft) && navIndex_ > 0) {
@@ -554,6 +569,7 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
                 friends_.Refresh();
                 store_.Refresh();
                 ClampCaptureSelection();
+                ClampAchievementSelection();
                 cachedHero_.Reset();
                 cachedHeroPath_.clear();
                 cachedCapture_.Reset();
