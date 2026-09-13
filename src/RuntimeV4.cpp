@@ -2,12 +2,13 @@
 
 namespace zero {
 
-bool RuntimeV4::Launch(const GameManifest& game, std::wstring& error) {
+bool RuntimeV4::Launch(const GameManifest& game, std::wstring& error,
+                       const std::optional<ResumeMetadata>& launchResume) {
     v3_.SetAchievementCallback([this](const std::string& id, const std::string& title) {
         std::wstring ignored;
         UnlockAchievement(id, title, ignored);
     });
-    if (!v3_.Launch(game, error)) return false;
+    if (!v3_.Launch(game, error, launchResume)) return false;
     activePackageId_ = game.packageId;
     activeSessionId_ = v3_.Info().sessionId;
     sessionRecorded_ = false;
