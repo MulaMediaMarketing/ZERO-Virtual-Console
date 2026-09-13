@@ -20,8 +20,10 @@ private:
     Step step_{Step::Welcome};
     bool finished_{false};
     bool accepted_{false};
+    bool controllerConnected_{false};
     unsigned volume_{80};
     WORD previousButtons_{0};
+    std::wstring notice_;
 
     static LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
     LRESULT HandleMessage(UINT, WPARAM, LPARAM);
@@ -29,9 +31,10 @@ private:
     void EnterFullscreen();
     void Paint();
     void PollController();
-    void Advance();
+    void Advance(bool fromController = false);
     void Back();
     void Complete();
+    void UpdateDisplayMetadata();
     void DrawCentered(HDC dc, const std::wstring& text, int y, int height, HFONT font, COLORREF color);
 };
 
