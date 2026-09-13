@@ -30,7 +30,13 @@ public:
     RuntimeSession(const RuntimeSession&) = delete;
     RuntimeSession& operator=(const RuntimeSession&) = delete;
 
+    // Legacy one-shot launch. New runtime code should use PrepareLaunch + ResumePrepared
+    // so IPC/bootstrap setup is complete before any game code executes.
     bool Launch(const GameManifest& game, std::wstring& error);
+    bool PrepareLaunch(const GameManifest& game, std::wstring& error);
+    bool ResumePrepared(std::wstring& error);
+    void FailPrepared(DWORD code, const char* phase = "launch_failed");
+
     void Poll();
     void Terminate();
 
@@ -39,6 +45,7 @@ public:
     const std::string& ActivePackageId() const noexcept { return packageId_; }
     const RuntimeSessionInfo& Info() const noexcept { return info_; }
     bool IsActive() const noexcept;
+    bool IsPrepared() const noexcept { return state_ == RuntimeState::Launching && process_.hThread != nullptr; }
 
 private:
     PROCESS_INFORMATION process_{};
