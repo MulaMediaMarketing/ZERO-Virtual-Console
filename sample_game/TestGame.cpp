@@ -11,7 +11,7 @@ int wmain() {
         std::filesystem::path p(savePath);
         std::filesystem::create_directories(p);
         std::ofstream f(p / "test_save.txt", std::ios::app);
-        f << "ZERO Runtime V4 hardening session launched successfully.\n";
+        f << "ZERO Console Experience M1 session launched successfully.\n";
     }
 
     zero::sdk::Client zero;
@@ -26,22 +26,33 @@ int wmain() {
         return 3;
     }
 
+    std::wstring launchState = L"Play launch: no incoming Resume context.";
+    if (zero.LaunchResume()) {
+        launchState = L"Resume launch context received from ZERO.";
+        if (n > 0) {
+            std::ofstream f(std::filesystem::path(savePath) / "resume_launch.txt", std::ios::trunc);
+            f << "activity=" << zero.LaunchResume()->activityId << "\n";
+            f << "label=" << zero.LaunchResume()->displayLabel << "\n";
+            f << "payload=" << zero.LaunchResume()->payload << "\n";
+        }
+    }
+
     zero::sdk::ResumeContext resume;
-    resume.activityId = "runtime-v4-hardening-test";
-    resume.displayLabel = "Runtime V4 Validation";
-    resume.payload = "checkpoint=v4_hardening_validated";
+    resume.activityId = "console-m1-checkpoint";
+    resume.displayLabel = "Console M1 Validation";
+    resume.payload = "checkpoint=console_m1_validated";
     if (!zero.SetResumeActivity(resume, error)) {
         MessageBoxW(nullptr, error.c_str(), L"ZERO Resume Error", MB_OK | MB_ICONERROR);
         return 4;
     }
 
-    if (!zero.UnlockAchievement("runtime-v4-connected", "Runtime V4 Connected", error)) {
+    if (!zero.UnlockAchievement("console-m1-connected", "Console M1 Connected", error)) {
         MessageBoxW(nullptr, error.c_str(), L"ZERO Achievement Error", MB_OK | MB_ICONERROR);
         return 5;
     }
 
-    MessageBoxW(nullptr,
-        L"ZERO Runtime V4 hardening validation succeeded.\n\nAuthenticated SDK IPC: OK\nREADY handshake: OK\nResume metadata: OK\nAchievement routing: OK\n\nClose this window to return to ZERO.",
-        L"ZERO Test Game", MB_OK | MB_ICONINFORMATION);
+    std::wstring message = L"ZERO Console Experience M1 validation succeeded.\n\n" + launchState +
+        L"\nAuthenticated SDK IPC: OK\nREADY handshake: OK\nResume metadata: OK\nAchievement routing: OK\n\nUse the ZERO overlay while this game is active.";
+    MessageBoxW(nullptr, message.c_str(), L"ZERO Test Game", MB_OK | MB_ICONINFORMATION);
     return 0;
 }
