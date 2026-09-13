@@ -160,6 +160,11 @@ void RuntimeV3::PersistPlaytime() const {
 }
 
 void RuntimeV3::Poll() {
+    // Capture a best-effort postmortem dump before RuntimeSession closes the process handle.
+    if (v2_.HasAbnormalExit()) {
+        v2_.CaptureDiagnosticDump();
+    }
+
     v2_.Poll();
 
     const bool isReady = ready_.load();
@@ -170,6 +175,8 @@ void RuntimeV3::Poll() {
         if (v2_.IsActive() && ipc_.ClientSilence() >= kHeartbeatTimeout) {
             outcome_.store(RuntimeOutcome::Hung);
             PersistPlaytime();
+            // Hung sessions are dumped while the process is still alive, before termination.
+            v2_.CaptureDiagnosticDump();
             ipc_.Stop();
             v2_.Terminate();
             playtimeFinalized_ = true;

@@ -12,10 +12,15 @@ struct CrashReport {
     std::string version;
     std::string executable;
     std::string timestampUtc;
+    std::string outcome;
+    std::string miniDumpPath;
+    std::string miniDumpNote;
     uint32_t processId{0};
     uint32_t exitCode{0};
+    uint32_t miniDumpError{0};
     uint64_t playtimeSeconds{0};
     bool forcedTermination{false};
+    bool miniDumpWritten{false};
 };
 
 class CrashReportStore {

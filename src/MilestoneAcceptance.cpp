@@ -28,6 +28,29 @@ bool hasRegularFile(const std::filesystem::path& root) {
     return false;
 }
 
+bool hasNonEmptyExtension(const std::filesystem::path& root, const wchar_t* extension) {
+    std::error_code ec;
+    if (!std::filesystem::exists(root, ec)) return false;
+    for (std::filesystem::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
+        if (!it->is_regular_file(ec)) continue;
+        if (_wcsicmp(it->path().extension().c_str(), extension) != 0) continue;
+        const auto bytes = it->file_size(ec);
+        if (!ec && bytes > 0) return true;
+        ec.clear();
+    }
+    return false;
+}
+
+bool anyJsonContains(const std::filesystem::path& root, const std::string& token) {
+    std::error_code ec;
+    if (!std::filesystem::exists(root, ec)) return false;
+    for (std::filesystem::directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
+        if (!it->is_regular_file(ec) || _wcsicmp(it->path().extension().c_str(), L".json") != 0) continue;
+        if (contains(it->path(), token)) return true;
+    }
+    return false;
+}
+
 } // namespace
 
 MilestoneAcceptance::MilestoneAcceptance(std::filesystem::path zeroRoot) : root_(std::move(zeroRoot)) {}
@@ -84,11 +107,12 @@ std::vector<AcceptanceCheck> MilestoneAcceptance::Run() const {
         resumeRoundTrip ? "ZERO delivered the persisted Resume payload back into the game."
                         : "Exit to ZERO, choose Resume, and verify the reference checkpoint is restored."});
 
-    const bool crashTriggered = contains(saveRoot / "intentional_crash.triggered", "exit_code=73") &&
-                                hasRegularFile(crashPackage);
+    const bool crashTriggered = contains(saveRoot / "intentional_crash.triggered", "exception_code=0xE0000073") &&
+                                hasNonEmptyExtension(crashPackage, L".dmp") &&
+                                anyJsonContains(crashPackage, "\"minidump_written\": true");
     checks.push_back({"crash_containment", crashTriggered,
-        crashTriggered ? "Intentional game failure produced diagnostics while ZERO remained the host."
-                       : "Create force_crash.next in the reference save root, launch once, and verify a crash report is written."});
+        crashTriggered ? "Intentional unhandled exception produced a non-empty minidump and crash metadata while ZERO remained the host."
+                       : "Trigger the reference exception and verify both .dmp and crash JSON diagnostics are produced."});
 
     return checks;
 }
