@@ -55,6 +55,7 @@ private:
     std::atomic<uint64_t> nextServerRequestId_{1};
     std::atomic<int64_t> lastClientActivityMs_{0};
     mutable std::mutex pipeMutex_;
+    std::mutex writeMutex_;
     HANDLE activePipe_{INVALID_HANDLE_VALUE};
 };
 
