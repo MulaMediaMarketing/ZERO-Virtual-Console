@@ -22,7 +22,7 @@ void RuntimeV4::Poll() {
         report.packageId = info.packageId;
         report.title = info.title;
         report.version = info.version;
-        report.executable = info.executable.u8string();
+        report.executable = info.executable.string();
         report.processId = info.processId;
         report.exitCode = v3_.ExitCode();
         report.playtimeSeconds = v3_.PlaytimeSeconds();
