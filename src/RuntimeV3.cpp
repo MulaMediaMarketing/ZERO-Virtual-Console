@@ -53,13 +53,17 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
         return false;
     }
 
-    ready_ = false;
+    ready_.store(false);
+    outcome_.store(RuntimeOutcome::Starting);
     overlayVisible_ = false;
     playtimeFinalized_ = false;
     playtimeSeconds_ = 0;
     activeGame_ = game;
 
-    if (!v2_.Launch(game, error)) {
+    // Prepare the process suspended. No game code executes until IPC and the bootstrap
+    // contract are fully established below.
+    if (!v2_.PrepareLaunch(game, error)) {
+        outcome_.store(RuntimeOutcome::LaunchFailure);
         playtimeFinalized_ = true;
         return false;
     }
@@ -67,16 +71,18 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
     const auto token = CreateAuthToken();
     if (token.empty()) {
         error = L"ZERO Runtime could not generate a cryptographically secure IPC authentication token.";
-        v2_.Terminate();
+        outcome_.store(RuntimeOutcome::LaunchFailure);
+        v2_.FailPrepared(0xE110, "auth_token_failed");
         playtimeFinalized_ = true;
         return false;
     }
 
     RuntimeIpcCallbacks callbacks;
     callbacks.onReady = [this]() {
-        if (!ready_) {
-            ready_ = true;
+        bool expected = false;
+        if (ready_.compare_exchange_strong(expected, true)) {
             readyAt_ = std::chrono::steady_clock::now();
+            outcome_.store(RuntimeOutcome::Running);
         }
     };
     callbacks.onResume = [this](const std::string& activityId,
@@ -95,7 +101,8 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
     };
 
     if (!ipc_.Start(v2_.Info().sessionId, game.packageId, token, std::move(callbacks), error)) {
-        v2_.Terminate();
+        outcome_.store(RuntimeOutcome::HandshakeFailure);
+        v2_.FailPrepared(0xE111, "ipc_start_failed");
         playtimeFinalized_ = true;
         return false;
     }
@@ -104,11 +111,13 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
     std::ofstream f(bootstrap, std::ios::binary | std::ios::trunc);
     if (!f) {
         error = L"ZERO Runtime V4 could not create the SDK bootstrap contract.";
+        outcome_.store(RuntimeOutcome::HandshakeFailure);
         ipc_.Stop();
-        v2_.Terminate();
+        v2_.FailPrepared(0xE112, "bootstrap_failed");
         playtimeFinalized_ = true;
         return false;
     }
+
     std::string pipe(ipc_.PipeName().begin(), ipc_.PipeName().end());
     f << "4\n" << v2_.Info().sessionId << "\n" << game.packageId << "\n" << pipe << "\n" << token << "\n";
     if (launchResume) {
@@ -119,6 +128,26 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
     } else {
         f << "0\n\n\n\n";
     }
+    f.flush();
+    if (!f.good()) {
+        error = L"ZERO Runtime V4 could not finalize the SDK bootstrap contract.";
+        outcome_.store(RuntimeOutcome::HandshakeFailure);
+        f.close();
+        ipc_.Stop();
+        v2_.FailPrepared(0xE113, "bootstrap_commit_failed");
+        playtimeFinalized_ = true;
+        return false;
+    }
+    f.close();
+
+    if (!v2_.ResumePrepared(error)) {
+        outcome_.store(RuntimeOutcome::LaunchFailure);
+        ipc_.Stop();
+        playtimeFinalized_ = true;
+        return false;
+    }
+
+    readyDeadline_ = std::chrono::steady_clock::now() + kReadyTimeout;
     return true;
 }
 
@@ -135,14 +164,28 @@ void RuntimeV3::PersistPlaytime() const {
 void RuntimeV3::Poll() {
     v2_.Poll();
 
-    if (ready_) {
+    const bool isReady = ready_.load();
+    if (isReady) {
         playtimeSeconds_ = static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - readyAt_).count());
+    } else if (v2_.IsActive() && std::chrono::steady_clock::now() >= readyDeadline_) {
+        outcome_.store(RuntimeOutcome::ReadyTimeout);
+        ipc_.Stop();
+        v2_.Terminate();
+        playtimeFinalized_ = true;
+        return;
     }
 
     const auto current = v2_.State();
     const bool ended = current == RuntimeState::Exited || current == RuntimeState::Crashed || current == RuntimeState::Failed;
     if (ended && !playtimeFinalized_) {
+        if (current == RuntimeState::Crashed) {
+            outcome_.store(RuntimeOutcome::Crash);
+        } else if (current == RuntimeState::Exited && outcome_.load() != RuntimeOutcome::UserTermination) {
+            outcome_.store(RuntimeOutcome::CleanExit);
+        } else if (current == RuntimeState::Failed && outcome_.load() == RuntimeOutcome::Starting) {
+            outcome_.store(RuntimeOutcome::LaunchFailure);
+        }
         PersistPlaytime();
         ipc_.Stop();
         playtimeFinalized_ = true;
@@ -150,9 +193,12 @@ void RuntimeV3::Poll() {
 }
 
 void RuntimeV3::Terminate() {
-    if (ready_) {
+    if (ready_.load()) {
         playtimeSeconds_ = static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - readyAt_).count());
+    }
+    if (v2_.IsActive() && outcome_.load() != RuntimeOutcome::ReadyTimeout) {
+        outcome_.store(RuntimeOutcome::UserTermination);
     }
     PersistPlaytime();
     ipc_.Stop();
