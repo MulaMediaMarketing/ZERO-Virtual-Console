@@ -23,6 +23,8 @@ const char* outcomeName(RuntimeOutcome outcome) {
 
 bool RuntimeV4::Launch(const GameManifest& game, std::wstring& error,
                        const std::optional<ResumeMetadata>& launchResume) {
+    if (!database_.UpsertGame(game, error)) return false;
+
     v3_.SetAchievementCallback([this](const std::string& id, const std::string& title) {
         std::wstring ignored;
         UnlockAchievement(id, title, ignored);
@@ -59,14 +61,20 @@ void RuntimeV4::Poll() {
         report.miniDumpError = info.miniDumpError;
         report.miniDumpNote = info.miniDumpNote;
         std::wstring ignored;
-        crashReports_.Save(report, ignored);
-        crashReported_ = true;
+        if (crashReports_.Save(report, ignored)) crashReported_ = true;
     }
 
     if (!sessionRecorded_ && (state == RuntimeState::Exited || state == RuntimeState::Crashed || state == RuntimeState::Failed)) {
-        std::wstring ignored;
         const bool crashLike = state == RuntimeState::Crashed || outcome == RuntimeOutcome::Hung;
-        stateStore_.RecordSession(activePackageId_, activeSessionId_, v3_.PlaytimeSeconds(), v3_.ExitCode(), crashLike, ignored);
+        std::wstring dbError;
+        if (!database_.RecordSession(activePackageId_, activeSessionId_, v3_.PlaytimeSeconds(),
+                                     v3_.ExitCode(), outcomeName(outcome), crashLike, dbError)) {
+            return; // Retry on the next Poll rather than falsely finalizing persistence.
+        }
+
+        std::wstring mirrorError;
+        stateStore_.RecordSession(activePackageId_, activeSessionId_, v3_.PlaytimeSeconds(),
+                                  v3_.ExitCode(), crashLike, mirrorError);
         sessionRecorded_ = true;
     }
 }
