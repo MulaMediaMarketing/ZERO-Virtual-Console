@@ -39,7 +39,7 @@ public:
     RuntimeOutcome Outcome() const noexcept { return outcome_.load(); }
 
     void SetOverlayVisible(bool visible);
-    void SetAchievementCallback(std::function<void(const std::string&, const std::string&)> callback) {
+    void SetAchievementCallback(std::function<bool(const std::string&, const std::string&)> callback) {
         achievementCallback_ = std::move(callback);
     }
 
@@ -55,7 +55,7 @@ private:
     std::chrono::steady_clock::time_point readyAt_{};
     std::chrono::steady_clock::time_point readyDeadline_{};
     uint64_t playtimeSeconds_{0};
-    std::function<void(const std::string&, const std::string&)> achievementCallback_;
+    std::function<bool(const std::string&, const std::string&)> achievementCallback_;
 
     static constexpr std::chrono::seconds kReadyTimeout{20};
     static constexpr std::chrono::seconds kHeartbeatTimeout{10};
