@@ -1,13 +1,17 @@
 #pragma once
 #include "GameRegistry.h"
+#include "GameImportService.h"
+#include "ResumeStore.h"
 #include "RuntimeV4.h"
 #include "Settings.h"
 #include "Input.h"
 #include <windows.h>
 #include <d2d1.h>
 #include <dwrite.h>
+#include <wincodec.h>
 #include <wrl/client.h>
 #include <chrono>
+#include <filesystem>
 
 namespace zero {
 class App {
@@ -15,11 +19,12 @@ public:
     App(HINSTANCE instance);
     int Run();
 private:
-    enum class Page { Home, Library, GameDetail, Settings };
+    enum class Page { Home, Library, GameDetail, Import, Settings };
     HINSTANCE instance_{};
     HWND hwnd_{};
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
     Microsoft::WRL::ComPtr<IDWriteFactory> writeFactory_;
+    Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory_;
     Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> target_;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> heading_;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> body_;
@@ -27,8 +32,12 @@ private:
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brushMuted_;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brushAccent_;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brushCard_;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> cachedHero_;
+    std::filesystem::path cachedHeroPath_;
 
     GameRegistry registry_;
+    GameImportService importer_;
+    ResumeStore resumeStore_;
     RuntimeV4 runtime_;
     SettingsStore settingsStore_;
     UserSettings settings_;
@@ -49,6 +58,10 @@ private:
     void HandleInput(const InputSnapshot&);
     void NavigateTo(Page page);
     void LaunchSelected();
+    void ImportGameFolder();
+    void EnterBorderlessFullscreen();
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> LoadBitmap(const std::filesystem::path& path);
+    void DrawHeroArtwork(const GameManifest& game, const D2D1_RECT_F& bounds);
     void DrawTextLine(const std::wstring&, float x, float y, float w, float h, bool heading=false, ID2D1Brush* brush=nullptr);
     void DrawRoundedCard(const D2D1_RECT_F&, float radius, ID2D1Brush* fill);
     std::wstring Widen(const std::string&) const;
