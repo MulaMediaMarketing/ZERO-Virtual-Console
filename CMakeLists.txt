@@ -29,6 +29,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/PlatformStateStore.cpp
   src/AchievementStore.cpp
   src/CrashReportStore.cpp
+  src/MiniDumpWriter.cpp
   src/FirstBootService.cpp
   src/FirstBootWizard.cpp
   src/MilestoneAcceptance.cpp
@@ -38,7 +39,7 @@ add_executable(ZeroVirtualConsole WIN32
 
 target_include_directories(ZeroVirtualConsole PRIVATE include)
 target_compile_definitions(ZeroVirtualConsole PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(ZeroVirtualConsole PRIVATE d2d1 dwrite windowscodecs xinput9_1_0 shlwapi shell32 ole32 bcrypt advapi32)
+target_link_libraries(ZeroVirtualConsole PRIVATE d2d1 dwrite windowscodecs xinput9_1_0 shlwapi shell32 ole32 bcrypt advapi32 dbghelp)
 
 add_executable(ZeroTestGame sample_game/TestGame.cpp)
 target_include_directories(ZeroTestGame PRIVATE sdk include)
