@@ -25,6 +25,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/ResumeStore.cpp
   src/PlatformStateStore.cpp
   src/AchievementStore.cpp
+  src/CrashReportStore.cpp
   src/Settings.cpp
   src/Input.cpp
 )
