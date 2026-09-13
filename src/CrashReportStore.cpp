@@ -15,6 +15,7 @@ std::string esc(const std::string& s) {
         else if (c == '"') out += "\\\"";
         else if (c == '\n') out += "\\n";
         else if (c == '\r') out += "\\r";
+        else if (c == '\t') out += "\\t";
         else out += c;
     }
     return out;
@@ -53,17 +54,22 @@ bool CrashReportStore::Save(const CrashReport& report, std::wstring& error) cons
 
     const std::string stamp = report.timestampUtc.empty() ? utcNow() : report.timestampUtc;
     f << "{\n"
-      << "  \"schema\": 1,\n"
+      << "  \"schema\": 2,\n"
       << "  \"session_id\": \"" << esc(report.sessionId) << "\",\n"
       << "  \"package_id\": \"" << esc(report.packageId) << "\",\n"
       << "  \"title\": \"" << esc(report.title) << "\",\n"
       << "  \"version\": \"" << esc(report.version) << "\",\n"
       << "  \"executable\": \"" << esc(report.executable) << "\",\n"
-      << "  \"timestamp_utc\": \"" << stamp << "\",\n"
+      << "  \"timestamp_utc\": \"" << esc(stamp) << "\",\n"
+      << "  \"outcome\": \"" << esc(report.outcome) << "\",\n"
       << "  \"process_id\": " << report.processId << ",\n"
       << "  \"exit_code\": " << report.exitCode << ",\n"
       << "  \"playtime_seconds\": " << report.playtimeSeconds << ",\n"
-      << "  \"forced_termination\": " << (report.forcedTermination ? "true" : "false") << "\n"
+      << "  \"forced_termination\": " << (report.forcedTermination ? "true" : "false") << ",\n"
+      << "  \"minidump_written\": " << (report.miniDumpWritten ? "true" : "false") << ",\n"
+      << "  \"minidump_path\": \"" << esc(report.miniDumpPath) << "\",\n"
+      << "  \"minidump_error\": " << report.miniDumpError << ",\n"
+      << "  \"minidump_note\": \"" << esc(report.miniDumpNote) << "\"\n"
       << "}\n";
     f.close();
 
