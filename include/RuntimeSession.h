@@ -3,7 +3,6 @@
 #include <windows.h>
 #include <chrono>
 #include <filesystem>
-#include <functional>
 #include <string>
 
 namespace zero {
@@ -26,14 +25,12 @@ struct RuntimeSessionInfo {
 
 class RuntimeSession {
 public:
-    using PreResumeHook = std::function<bool(const RuntimeSessionInfo&, std::wstring&)>;
-
     RuntimeSession();
     ~RuntimeSession();
     RuntimeSession(const RuntimeSession&) = delete;
     RuntimeSession& operator=(const RuntimeSession&) = delete;
 
-    bool Launch(const GameManifest& game, std::wstring& error, PreResumeHook preResume = {});
+    bool Launch(const GameManifest& game, std::wstring& error);
     void Poll();
     void Terminate();
 
