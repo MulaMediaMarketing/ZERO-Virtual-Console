@@ -19,6 +19,7 @@ target_link_libraries(ZeroSdk PUBLIC dbghelp)
 add_executable(ZeroVirtualConsole WIN32
   src/main.cpp
   src/App.cpp
+  src/AppUx.cpp
   src/CaptureLibrary.cpp
   src/LocalIdentityProvider.cpp
   src/GameRegistry.cpp
