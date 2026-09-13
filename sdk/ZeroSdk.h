@@ -1,9 +1,12 @@
 #pragma once
 #include "ZeroProtocol.h"
+#include <atomic>
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 
 namespace zero::sdk {
 
@@ -44,12 +47,16 @@ private:
     std::optional<ResumeContext> launchResume_;
     std::function<void(bool)> overlayCallback_;
     uint64_t nextRequestId_{1};
+    std::mutex ioMutex_;
+    std::atomic<bool> heartbeatStop_{true};
+    std::thread heartbeatThread_;
 
     bool SendRequest(protocol::MessageType type,
                      std::vector<std::string> fields,
                      protocol::MessageType expectedType,
                      const std::string& expectedAck,
                      std::wstring& error);
+    void HeartbeatLoop();
 };
 
 } // namespace zero::sdk
