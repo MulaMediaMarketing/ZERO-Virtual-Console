@@ -28,14 +28,16 @@ public:
                            const std::string& title,
                            std::wstring& error);
 
-    GamePlatformState PlatformState(const std::string& packageId) const { return stateStore_.Load(packageId); }
-    std::vector<AchievementRecord> Achievements(const std::string& packageId) const { return achievements_.Load(packageId); }
+    GamePlatformState PlatformState(const std::string& packageId) const;
+    std::optional<ResumeMetadata> Resume(const std::string& packageId) const;
+    std::vector<AchievementRecord> Achievements(const std::string& packageId) const;
 
 private:
     RuntimeV3 v3_;
     PlatformDatabase database_;
     PlatformStateStore stateStore_;
     AchievementStore achievements_;
+    ResumeStore resumeStore_;
     CrashReportStore crashReports_;
     std::string activePackageId_;
     std::string activeSessionId_;
