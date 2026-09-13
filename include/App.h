@@ -16,6 +16,7 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -67,6 +68,7 @@ private:
     size_t captureScroll_{0};
     size_t selectedAchievement_{0};
     size_t achievementScroll_{0};
+    size_t selectedSetting_{0};
     size_t navIndex_{0};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
@@ -75,6 +77,12 @@ private:
     bool captureDeleteConfirm_{false};
     bool achievementsFromOverlay_{false};
     bool launchUsedResume_{false};
+    bool settingsControllerConnected_{false};
+    uint64_t settingsStorageBytes_{0};
+    uint64_t settingsFreeBytes_{0};
+    size_t settingsCrashReportCount_{0};
+    unsigned settingsDisplayWidth_{0};
+    unsigned settingsDisplayHeight_{0};
     std::string achievementPackageId_;
     std::string launchPackageId_;
     std::wstring launchTitle_;
@@ -96,6 +104,7 @@ private:
     void DrawFriends(float width, float height);
     void DrawCaptures(float width, float height);
     void DrawAchievements(float width, float height);
+    void DrawSettings(float width, float height);
     void DrawLaunchRecovery(float width, float height);
     void DrawCaptureViewer(float width, float height);
     void DrawCaptureDeleteConfirm(float width, float height);
@@ -104,6 +113,7 @@ private:
     void HandleInput(const InputSnapshot&);
     void HandleCaptureInput(const InputSnapshot&);
     void HandleAchievementInput(const InputSnapshot&);
+    void HandleSettingsInput(const InputSnapshot&);
     void HandleLaunchRecoveryInput(const InputSnapshot&);
     void NavigateTo(Page page);
     void OpenAchievements(const std::string& packageId, Page returnPage, bool fromOverlay);
@@ -112,6 +122,8 @@ private:
     void RetryLaunch();
     void ReturnFromLaunchUx(bool toGameDetail);
     void UpdateLaunchUx();
+    void RefreshSettingsTelemetry();
+    void OpenSettingsLocation(bool diagnosticsOnly);
     void ImportGameFolder();
     void EnterBorderlessFullscreen();
     void SetOverlayVisible(bool visible);
