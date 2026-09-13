@@ -20,6 +20,10 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Build ZERO reference package
+        shell: pwsh
+        run: ./sample_game/reference/build-reference-package.ps1 -ReferenceExe ./build/Release/ZeroReferenceGame.exe -Output ./build/ReferencePackage
+
       - name: Upload ZERO binaries
         uses: actions/upload-artifact@v4
         with:
@@ -27,6 +31,8 @@ jobs:
           path: |
             build/Release/ZeroVirtualConsole.exe
             build/Release/ZeroTestGame.exe
+            build/Release/ZeroReferenceGame.exe
             build/Release/ZeroAcceptance.exe
+            build/ReferencePackage/**
             installer/install-zero.ps1
             installer/uninstall-zero.ps1
