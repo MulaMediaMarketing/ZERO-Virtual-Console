@@ -7,12 +7,12 @@ namespace zero {
 
 class FirstBootWizard {
 public:
+    enum class Step { Welcome, Profile, Controller, Display, Audio, Complete };
+
     FirstBootWizard(HINSTANCE instance, FirstBootService& service);
     bool Run();
 
 private:
-    enum class Step { Welcome, Profile, Controller, Display, Audio, Complete };
-
     HINSTANCE instance_{};
     HWND hwnd_{};
     FirstBootService& service_;
