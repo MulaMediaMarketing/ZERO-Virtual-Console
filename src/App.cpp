@@ -326,23 +326,62 @@ void App::Paint() {
         DrawCaptures(W, H);
     } else if (page_ == Page::GameDetail && !games.empty()) {
         const auto& g = games[std::min(selectedGame_, games.size()-1)];
-        DrawTextLine(Widen(g.title), 62, 154, 700, 60, true);
-        DrawTextLine(Widen(g.packageId), 64, 208, 700, 35, false, brushMuted_.Get());
         const auto platform = runtime_.PlatformState(g.packageId);
-        DrawTextLine(L"Playtime  " + std::to_wstring(platform.totalPlaytimeSeconds / 60) + L" min", 64, 280, 400, 30, false);
-        DrawTextLine(L"Launches  " + std::to_wstring(platform.launchCount), 64, 320, 400, 30, false);
+        const auto achievements = runtime_.Achievements(g.packageId);
         const auto resume = g.zeroResume ? resumeStore_.Load(g.packageId) : std::nullopt;
+        const float split = std::max(760.0f, W - 470.0f);
+        const auto hero = D2D1::RectF(62,150,split,535);
+
+        DrawHeroArtwork(g, hero);
+        ComPtr<ID2D1SolidColorBrush> shade;
         ComPtr<ID2D1SolidColorBrush> white;
+        target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.48f), shade.GetAddressOf());
         target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-        DrawRoundedCard(D2D1::RectF(64,410,244,468), 20, preferResume_ && resume ? brushCard_.Get() : brushAccent_.Get());
-        DrawTextLine(L"Play", 118, 426, 90, 30, false, preferResume_ && resume ? brushText_.Get() : white.Get());
+        target_->FillRectangle(hero, shade.Get());
+
+        DrawTextLine(Widen(g.title), 104, 205, split-150, 58, true, white.Get());
+        DrawTextLine(Widen(g.packageId), 106, 263, split-170, 32, false, white.Get());
+        DrawTextLine(L"Version " + Widen(g.version), 106, 300, 380, 30, false, white.Get());
+
+        DrawRoundedCard(D2D1::RectF(104,430,282,488), 20,
+            preferResume_ && resume ? brushCard_.Get() : white.Get());
+        DrawTextLine(L"Play", 166, 446, 90, 30, false, brushText_.Get());
         if (resume) {
-            DrawRoundedCard(D2D1::RectF(264,410,464,468), 20, preferResume_ ? brushAccent_.Get() : brushCard_.Get());
-            DrawTextLine(L"Resume", 318, 426, 110, 30, false, preferResume_ ? white.Get() : brushText_.Get());
-            DrawTextLine(L"Resume point: " + Widen(resume->displayLabel), 64, 500, W-130, 40, false, brushMuted_.Get());
-            DrawTextLine(L"Left/Right chooses Play or Resume", 64, 540, W-130, 34, false, brushMuted_.Get());
+            DrawRoundedCard(D2D1::RectF(300,430,500,488), 20,
+                preferResume_ ? white.Get() : brushCard_.Get());
+            DrawTextLine(L"Resume", 354, 446, 110, 30, false, brushText_.Get());
         }
-        DrawTextLine(status_, 64, 590, W-130, 60, false, brushMuted_.Get());
+
+        const float cardLeft = split + 20.0f;
+        DrawRoundedCard(D2D1::RectF(cardLeft,150,W-62,535), 26, brushCard_.Get());
+        DrawTextLine(L"Game Status", cardLeft+28, 180, 260, 42, true);
+        DrawTextLine(L"Playtime", cardLeft+28, 245, 160, 30, false, brushMuted_.Get());
+        DrawTextLine(std::to_wstring(platform.totalPlaytimeSeconds / 60) + L" min", W-250, 245, 150, 30, false);
+        DrawTextLine(L"Launches", cardLeft+28, 285, 160, 30, false, brushMuted_.Get());
+        DrawTextLine(std::to_wstring(platform.launchCount), W-250, 285, 150, 30, false);
+        DrawTextLine(L"Achievements", cardLeft+28, 325, 180, 30, false, brushMuted_.Get());
+        DrawTextLine(std::to_wstring(achievements.size()) + L" unlocked", W-250, 325, 150, 30, false);
+        DrawTextLine(L"Resume", cardLeft+28, 365, 160, 30, false, brushMuted_.Get());
+        const std::wstring resumeState = !g.zeroResume ? L"Not supported" : (resume ? L"Checkpoint ready" : L"No checkpoint");
+        DrawTextLine(resumeState, W-280, 365, 180, 30, false);
+        DrawTextLine(L"Last session", cardLeft+28, 405, 160, 30, false, brushMuted_.Get());
+        const std::wstring lastSession = platform.launchCount == 0 ? L"Never played" :
+            (platform.lastSessionCrashed ? L"Ended unexpectedly" : L"Clean exit");
+        DrawTextLine(lastSession, W-280, 405, 180, 30, false);
+        DrawTextLine(L"Last played", cardLeft+28, 445, 160, 30, false, brushMuted_.Get());
+        DrawTextLine(platform.lastPlayedAtUtc.empty() ? L"—" : Widen(platform.lastPlayedAtUtc), W-330, 445, 230, 30, false);
+        DrawTextLine(L"Exit code", cardLeft+28, 485, 160, 30, false, brushMuted_.Get());
+        DrawTextLine(std::to_wstring(platform.lastExitCode), W-250, 485, 150, 30, false);
+
+        if (resume) {
+            DrawRoundedCard(D2D1::RectF(62,565,W-62,635), 20, brushCard_.Get());
+            DrawTextLine(L"Continue from", 88, 584, 180, 30, false, brushMuted_.Get());
+            DrawTextLine(Widen(resume->displayLabel), 270, 584, W-360, 30, false);
+        }
+        DrawTextLine(resume ? L"Left / Right  Choose Play or Resume   ·   A  Launch   ·   B  Library"
+                            : L"A  Play   ·   B  Library",
+                     64, 670, W-128, 32, false, brushMuted_.Get());
+        if (!status_.empty()) DrawTextLine(status_, 64, 716, W-128, 42, false, brushMuted_.Get());
     } else if (page_ == Page::Import) {
         DrawTextLine(L"Import a game", 62, 154, 600, 60, true);
         DrawTextLine(L"Add a folder that contains a valid zero.manifest.json and native Windows game executable.",
