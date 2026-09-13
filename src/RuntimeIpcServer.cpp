@@ -1,4 +1,6 @@
 #include "RuntimeIpcServer.h"
+#include <sddl.h>
+#include <vector>
 
 namespace zero {
 namespace {
@@ -15,6 +17,39 @@ std::wstring widen(const std::string& s) {
 int64_t nowMs() noexcept {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+PSECURITY_DESCRIPTOR buildPipeSecurityDescriptor() {
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return nullptr;
+
+    DWORD bytes = 0;
+    GetTokenInformation(token, TokenUser, nullptr, 0, &bytes);
+    if (!bytes) {
+        CloseHandle(token);
+        return nullptr;
+    }
+
+    std::vector<unsigned char> buffer(bytes);
+    if (!GetTokenInformation(token, TokenUser, buffer.data(), bytes, &bytes)) {
+        CloseHandle(token);
+        return nullptr;
+    }
+    CloseHandle(token);
+
+    auto* tokenUser = reinterpret_cast<TOKEN_USER*>(buffer.data());
+    LPWSTR sidString = nullptr;
+    if (!ConvertSidToStringSidW(tokenUser->User.Sid, &sidString)) return nullptr;
+
+    const std::wstring sddl = L"D:P(A;;GA;;;" + std::wstring(sidString) + L")(A;;GA;;;SY)";
+    LocalFree(sidString);
+
+    PSECURITY_DESCRIPTOR descriptor = nullptr;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.c_str(), SDDL_REVISION_1, &descriptor, nullptr)) {
+        return nullptr;
+    }
+    return descriptor;
 }
 
 } // namespace
@@ -81,6 +116,7 @@ void RuntimeIpcServer::Stop() {
 
 bool RuntimeIpcServer::Send(HANDLE pipe, protocol::MessageType type, uint64_t requestId,
                             std::vector<std::string> fields) {
+    std::scoped_lock lock(writeMutex_);
     protocol::Message message;
     message.type = type;
     message.requestId = requestId;
@@ -148,35 +184,54 @@ bool RuntimeIpcServer::HandleMessage(const protocol::Message& message, HANDLE pi
 }
 
 void RuntimeIpcServer::ServerLoop() {
-    HANDLE pipe = CreateNamedPipeW(
-        pipeName_.c_str(),
-        PIPE_ACCESS_DUPLEX,
-        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-        1,
-        protocol::kMaxFrameBytes + 4,
-        protocol::kMaxFrameBytes + 4,
-        0,
-        nullptr);
-    if (pipe == INVALID_HANDLE_VALUE) return;
+    while (!stop_.load()) {
+        PSECURITY_DESCRIPTOR descriptor = buildPipeSecurityDescriptor();
+        if (!descriptor) return;
 
-    {
-        std::scoped_lock lock(pipeMutex_);
-        activePipe_ = pipe;
-    }
+        SECURITY_ATTRIBUTES security{};
+        security.nLength = sizeof(security);
+        security.lpSecurityDescriptor = descriptor;
+        security.bInheritHandle = FALSE;
 
-    const BOOL connected = ConnectNamedPipe(pipe, nullptr) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
-    if (connected && !stop_.load()) {
-        while (!stop_.load()) {
-            protocol::Message message;
-            if (!protocol::ReadMessage(pipe, message)) break;
-            if (!HandleMessage(message, pipe)) break;
+        HANDLE pipe = CreateNamedPipeW(
+            pipeName_.c_str(),
+            PIPE_ACCESS_DUPLEX,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+            1,
+            protocol::kMaxFrameBytes + 4,
+            protocol::kMaxFrameBytes + 4,
+            0,
+            &security);
+        LocalFree(descriptor);
+        if (pipe == INVALID_HANDLE_VALUE) return;
+
+        {
+            std::scoped_lock lock(pipeMutex_);
+            activePipe_ = pipe;
+            authenticated_.store(false);
+        }
+
+        const BOOL connected = ConnectNamedPipe(pipe, nullptr) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
+        if (connected && !stop_.load()) {
+            while (!stop_.load()) {
+                protocol::Message message;
+                if (!protocol::ReadMessage(pipe, message)) break;
+                if (!HandleMessage(message, pipe)) break;
+            }
+        }
+
+        {
+            std::scoped_lock lock(pipeMutex_);
+            if (activePipe_ == pipe) activePipe_ = INVALID_HANDLE_VALUE;
+            authenticated_.store(false);
+        }
+        DisconnectNamedPipe(pipe);
+        CloseHandle(pipe);
+
+        if (!stop_.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
-
-    std::scoped_lock lock(pipeMutex_);
-    if (activePipe_ == pipe) activePipe_ = INVALID_HANDLE_VALUE;
-    DisconnectNamedPipe(pipe);
-    CloseHandle(pipe);
 }
 
 } // namespace zero
