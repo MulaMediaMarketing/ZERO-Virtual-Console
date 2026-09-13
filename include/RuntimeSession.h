@@ -43,6 +43,7 @@ public:
     void Poll();
     void Terminate();
     bool CaptureDiagnosticDump();
+    bool HasAbnormalExit() const noexcept;
 
     RuntimeState State() const noexcept { return state_; }
     DWORD ExitCode() const noexcept { return exitCode_; }
