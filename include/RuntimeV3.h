@@ -4,13 +4,15 @@
 #include "RuntimeSession.h"
 #include <chrono>
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace zero {
 
 class RuntimeV3 {
 public:
-    bool Launch(const GameManifest& game, std::wstring& error);
+    bool Launch(const GameManifest& game, std::wstring& error,
+                const std::optional<ResumeMetadata>& launchResume = std::nullopt);
     void Poll();
     void Terminate();
 
