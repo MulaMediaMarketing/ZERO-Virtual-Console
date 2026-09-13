@@ -43,4 +43,12 @@ target_include_directories(ZeroTestGame PRIVATE sdk)
 target_compile_definitions(ZeroTestGame PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroTestGame PRIVATE ZeroSdk)
 
-install(TARGETS ZeroVirtualConsole RUNTIME DESTINATION .)
+add_executable(ZeroAcceptance
+  tools/AcceptanceMain.cpp
+  src/MilestoneAcceptance.cpp
+)
+target_include_directories(ZeroAcceptance PRIVATE include)
+target_compile_definitions(ZeroAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroAcceptance PRIVATE shell32 ole32)
+
+install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
