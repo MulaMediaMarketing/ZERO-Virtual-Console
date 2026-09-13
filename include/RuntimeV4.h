@@ -3,12 +3,14 @@
 #include "CrashReportStore.h"
 #include "PlatformStateStore.h"
 #include "RuntimeV3.h"
+#include <optional>
 
 namespace zero {
 
 class RuntimeV4 {
 public:
-    bool Launch(const GameManifest& game, std::wstring& error);
+    bool Launch(const GameManifest& game, std::wstring& error,
+                const std::optional<ResumeMetadata>& launchResume = std::nullopt);
     void Poll();
     void Terminate();
     void SetOverlayVisible(bool visible) { v3_.SetOverlayVisible(visible); }
