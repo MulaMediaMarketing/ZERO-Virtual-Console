@@ -29,6 +29,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/AchievementStore.cpp
   src/CrashReportStore.cpp
   src/FirstBootService.cpp
+  src/FirstBootWizard.cpp
   src/MilestoneAcceptance.cpp
   src/Settings.cpp
   src/Input.cpp
