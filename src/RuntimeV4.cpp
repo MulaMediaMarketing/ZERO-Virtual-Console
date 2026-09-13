@@ -69,7 +69,7 @@ void RuntimeV4::Poll() {
         std::wstring dbError;
         if (!database_.RecordSession(activePackageId_, activeSessionId_, v3_.PlaytimeSeconds(),
                                      v3_.ExitCode(), outcomeName(outcome), crashLike, dbError)) {
-            return; // Retry on the next Poll rather than falsely finalizing persistence.
+            return;
         }
 
         std::wstring mirrorError;
@@ -97,6 +97,25 @@ bool RuntimeV4::UnlockAchievement(const std::string& achievementId,
         return false;
     }
     return achievements_.Unlock(activePackageId_, achievementId, title, error);
+}
+
+GamePlatformState RuntimeV4::PlatformState(const std::string& packageId) const {
+    std::wstring error;
+    if (const auto canonical = database_.LoadGameState(packageId, error)) return *canonical;
+    return stateStore_.Load(packageId);
+}
+
+std::optional<ResumeMetadata> RuntimeV4::Resume(const std::string& packageId) const {
+    std::wstring error;
+    if (const auto canonical = database_.LoadResume(packageId, error)) return canonical;
+    return resumeStore_.Load(packageId);
+}
+
+std::vector<AchievementRecord> RuntimeV4::Achievements(const std::string& packageId) const {
+    std::wstring error;
+    auto canonical = database_.LoadAchievements(packageId, error);
+    if (!canonical.empty()) return canonical;
+    return achievements_.Load(packageId);
 }
 
 } // namespace zero

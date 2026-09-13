@@ -1,7 +1,12 @@
 #pragma once
+#include "AchievementStore.h"
+#include "PlatformStateStore.h"
+#include "ResumeStore.h"
 #include "ZeroTypes.h"
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace zero {
 
@@ -31,6 +36,13 @@ public:
     bool SetSetting(const std::string& key,
                     const std::string& value,
                     std::wstring& error) const;
+
+    std::optional<GamePlatformState> LoadGameState(const std::string& packageId,
+                                                   std::wstring& error) const;
+    std::optional<ResumeMetadata> LoadResume(const std::string& packageId,
+                                             std::wstring& error) const;
+    std::vector<AchievementRecord> LoadAchievements(const std::string& packageId,
+                                                     std::wstring& error) const;
 };
 
 } // namespace zero

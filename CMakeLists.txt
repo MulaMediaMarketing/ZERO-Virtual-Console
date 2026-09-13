@@ -40,6 +40,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/PlatformStateStore.cpp
   src/PlatformDatabase.cpp
   src/PlatformDatabaseResume.cpp
+  src/PlatformDatabaseReads.cpp
   src/AchievementStore.cpp
   src/CrashReportStore.cpp
   src/MiniDumpWriter.cpp
@@ -69,6 +70,7 @@ add_executable(ZeroAcceptance
   src/MilestoneAcceptance.cpp
   src/PlatformDatabase.cpp
   src/PlatformDatabaseResume.cpp
+  src/PlatformDatabaseReads.cpp
 )
 target_include_directories(ZeroAcceptance PRIVATE include)
 target_compile_definitions(ZeroAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
