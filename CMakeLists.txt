@@ -20,6 +20,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/main.cpp
   src/App.cpp
   src/CaptureLibrary.cpp
+  src/LocalIdentityProvider.cpp
   src/GameRegistry.cpp
   src/GameImportService.cpp
   src/ManifestValidator.cpp
