@@ -79,6 +79,9 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error) {
         std::wstring ignored;
         resumeStore_.Save(metadata, ignored);
     };
+    callbacks.onAchievement = [this](const std::string& id, const std::string& title) {
+        if (achievementCallback_) achievementCallback_(id, title);
+    };
 
     if (!ipc_.Start(v2_.Info().sessionId, game.packageId, token, std::move(callbacks), error)) {
         v2_.Terminate();
@@ -86,10 +89,6 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error) {
         return false;
     }
 
-    // Runtime V2 currently builds its environment before V3 IPC exists. Publish the
-    // bootstrap contract in the session temp directory so SDK clients can discover it
-    // without putting secrets on the command line. Environment injection moves into the
-    // launcher itself in the next hardening pass.
     const auto bootstrap = v2_.Info().tempRoot / "runtime-v3.bootstrap";
     std::ofstream f(bootstrap, std::ios::binary | std::ios::trunc);
     if (!f) {
@@ -115,7 +114,6 @@ void RuntimeV3::PersistPlaytime() const {
 }
 
 void RuntimeV3::Poll() {
-    const auto previous = v2_.State();
     v2_.Poll();
 
     if (ready_) {
@@ -130,8 +128,6 @@ void RuntimeV3::Poll() {
         ipc_.Stop();
         playtimeFinalized_ = true;
     }
-
-    (void)previous;
 }
 
 void RuntimeV3::Terminate() {

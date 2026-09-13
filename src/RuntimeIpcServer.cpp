@@ -113,6 +113,12 @@ bool RuntimeIpcServer::HandleLine(const std::string& line, HANDLE pipe) {
         return true;
     }
 
+    if (fields[0] == "ACHIEVEMENT" && fields.size() >= 3) {
+        if (callbacks_.onAchievement) callbacks_.onAchievement(fields[1], fields[2]);
+        WriteLine(pipe, "ACK\tACHIEVEMENT");
+        return true;
+    }
+
     if (fields[0] == "OVERLAY_ACK" && fields.size() >= 2) {
         if (callbacks_.onOverlayFocus) callbacks_.onOverlayFocus(fields[1] == "1");
         return true;

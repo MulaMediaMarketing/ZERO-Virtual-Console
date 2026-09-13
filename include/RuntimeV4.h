@@ -1,5 +1,6 @@
 #pragma once
 #include "AchievementStore.h"
+#include "CrashReportStore.h"
 #include "PlatformStateStore.h"
 #include "RuntimeV3.h"
 
@@ -19,6 +20,10 @@ public:
     bool Ready() const noexcept { return v3_.Ready(); }
     uint64_t PlaytimeSeconds() const noexcept { return v3_.PlaytimeSeconds(); }
 
+    bool UnlockAchievement(const std::string& achievementId,
+                           const std::string& title,
+                           std::wstring& error);
+
     GamePlatformState PlatformState(const std::string& packageId) const { return stateStore_.Load(packageId); }
     std::vector<AchievementRecord> Achievements(const std::string& packageId) const { return achievements_.Load(packageId); }
 
@@ -26,9 +31,11 @@ private:
     RuntimeV3 v3_;
     PlatformStateStore stateStore_;
     AchievementStore achievements_;
+    CrashReportStore crashReports_;
     std::string activePackageId_;
     std::string activeSessionId_;
     bool sessionRecorded_{true};
+    bool crashReported_{false};
 };
 
 } // namespace zero
