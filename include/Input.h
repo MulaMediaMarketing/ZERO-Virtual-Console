@@ -8,8 +8,11 @@ struct InputSnapshot {
     bool left{};
     bool right{};
     bool select{};
+    bool action{};
     bool back{};
     bool menu{};
+    bool shoulderLeft{};
+    bool shoulderRight{};
 };
 
 class Input {
