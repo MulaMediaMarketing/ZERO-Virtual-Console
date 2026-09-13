@@ -7,6 +7,7 @@
 #include "ResumeStore.h"
 #include "RuntimeV4.h"
 #include "Settings.h"
+#include "StoreProvider.h"
 #include "Input.h"
 #include <windows.h>
 #include <d2d1.h>
@@ -45,6 +46,7 @@ private:
     CaptureLibrary captures_;
     LocalIdentityProvider identity_;
     DisconnectedFriendsProvider friends_;
+    DisconnectedStoreProvider store_;
     ResumeStore resumeStore_;
     RuntimeV4 runtime_;
     SettingsStore settingsStore_;
@@ -72,6 +74,7 @@ private:
     void DrawOverlay(float width, float height);
     void DrawRecentGames(float width, float height);
     void DrawEmptyState(const std::wstring& title, const std::wstring& body, float width);
+    void DrawStore(float width, float height);
     void DrawFriends(float width, float height);
     void DrawCaptures(float width, float height);
     void DrawCaptureViewer(float width, float height);
