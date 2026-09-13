@@ -87,7 +87,7 @@ void FirstBootWizard::Paint() {
     SetTextColor(dc, RGB(20,20,20));
     DrawTextW(dc, L"ZERO", -1, &brand, DT_LEFT | DT_TOP | DT_SINGLELINE);
 
-    const int centerY = std::max(180, rc.bottom / 2 - 170);
+    const int centerY = std::max(180, static_cast<int>(rc.bottom / 2 - 170));
     std::wstring heading;
     std::wstring description;
     std::wstring action;
