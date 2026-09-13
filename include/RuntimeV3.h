@@ -3,6 +3,7 @@
 #include "RuntimeIpcServer.h"
 #include "RuntimeSession.h"
 #include <chrono>
+#include <functional>
 #include <string>
 
 namespace zero {
@@ -21,6 +22,9 @@ public:
     uint64_t PlaytimeSeconds() const noexcept { return playtimeSeconds_; }
 
     void SetOverlayVisible(bool visible);
+    void SetAchievementCallback(std::function<void(const std::string&, const std::string&)> callback) {
+        achievementCallback_ = std::move(callback);
+    }
 
 private:
     RuntimeSession v2_;
@@ -32,6 +36,7 @@ private:
     bool playtimeFinalized_{true};
     std::chrono::steady_clock::time_point readyAt_{};
     uint64_t playtimeSeconds_{0};
+    std::function<void(const std::string&, const std::string&)> achievementCallback_;
 
     std::string CreateAuthToken() const;
     void PersistPlaytime() const;
