@@ -7,6 +7,7 @@
 #include "ResumeStore.h"
 #include "RuntimeV4.h"
 #include "Settings.h"
+#include "ShellUxState.h"
 #include "StoreProvider.h"
 #include "Input.h"
 #include <windows.h>
@@ -52,6 +53,7 @@ private:
     SettingsStore settingsStore_;
     UserSettings settings_;
     Input input_;
+    ShellUxState shellUx_;
     Page page_{Page::Home};
     size_t selectedGame_{0};
     size_t selectedCapture_{0};
@@ -63,6 +65,7 @@ private:
     bool captureViewerVisible_{false};
     bool captureDeleteConfirm_{false};
     std::chrono::steady_clock::time_point lastInput_{};
+    std::chrono::steady_clock::time_point lastTick_{};
     std::wstring status_;
 
     static LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
@@ -79,6 +82,7 @@ private:
     void DrawCaptures(float width, float height);
     void DrawCaptureViewer(float width, float height);
     void DrawCaptureDeleteConfirm(float width, float height);
+    void DrawFocusRing(const D2D1_RECT_F& bounds, float radius, bool light = false);
     void Tick();
     void HandleInput(const InputSnapshot&);
     void HandleCaptureInput(const InputSnapshot&);
@@ -88,6 +92,7 @@ private:
     void EnterBorderlessFullscreen();
     void SetOverlayVisible(bool visible);
     void ClampCaptureSelection();
+    void NotifyFocusMoved();
     Microsoft::WRL::ComPtr<ID2D1Bitmap> LoadBitmap(const std::filesystem::path& path);
     void DrawHeroArtwork(const GameManifest& game, const D2D1_RECT_F& bounds);
     void DrawTextLine(const std::wstring&, float x, float y, float w, float h, bool heading=false, ID2D1Brush* brush=nullptr);
