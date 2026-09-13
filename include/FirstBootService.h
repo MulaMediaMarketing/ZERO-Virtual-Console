@@ -8,8 +8,12 @@ struct FirstBootState {
     bool completed{false};
     std::string profileName{"Player"};
     bool controllerConfirmed{false};
+    bool controllerDetected{false};
     bool displayConfirmed{false};
     bool audioConfirmed{false};
+    unsigned volume{80};
+    unsigned displayWidth{0};
+    unsigned displayHeight{0};
 };
 
 class FirstBootService {
