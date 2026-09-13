@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include <atomic>
+#include <iterator>
 
 namespace zero::sdk::detail {
 namespace {
