@@ -116,6 +116,7 @@ void RuntimeIpcServer::Stop() {
 
 bool RuntimeIpcServer::Send(HANDLE pipe, protocol::MessageType type, uint64_t requestId,
                             std::vector<std::string> fields) {
+    std::scoped_lock lock(writeMutex_);
     protocol::Message message;
     message.type = type;
     message.requestId = requestId;
