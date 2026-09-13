@@ -1,4 +1,5 @@
 #pragma once
+#include "CaptureLibrary.h"
 #include "GameRegistry.h"
 #include "GameImportService.h"
 #include "ResumeStore.h"
@@ -19,7 +20,7 @@ public:
     App(HINSTANCE instance);
     int Run();
 private:
-    enum class Page { Home, Library, GameDetail, Import, Settings };
+    enum class Page { Home, Library, Store, Friends, Captures, Settings, GameDetail, Import };
     HINSTANCE instance_{};
     HWND hwnd_{};
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
@@ -37,6 +38,7 @@ private:
 
     GameRegistry registry_;
     GameImportService importer_;
+    CaptureLibrary captures_;
     ResumeStore resumeStore_;
     RuntimeV4 runtime_;
     SettingsStore settingsStore_;
@@ -59,6 +61,8 @@ private:
     void Paint();
     void DrawOverlay(float width, float height);
     void DrawRecentGames(float width, float height);
+    void DrawEmptyState(const std::wstring& title, const std::wstring& body, float width);
+    void DrawCaptures(float width, float height);
     void Tick();
     void HandleInput(const InputSnapshot&);
     void NavigateTo(Page page);
