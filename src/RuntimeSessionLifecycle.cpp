@@ -85,6 +85,9 @@ std::vector<wchar_t> buildEnvironmentLifecycle(const GameManifest& game,
     setEntry(L"ZERO_SAVE_ROOT", info.saveRoot.wstring());
     setEntry(L"ZERO_CACHE_ROOT", info.cacheRoot.wstring());
     setEntry(L"ZERO_TEMP_ROOT", info.tempRoot.wstring());
+    if (!info.miniDumpPath.empty()) {
+        setEntry(L"ZERO_CRASH_DUMP_PATH", info.miniDumpPath.wstring());
+    }
 
     std::sort(entries.begin(), entries.end(), [](const std::wstring& a, const std::wstring& b) {
         return _wcsicmp(a.c_str(), b.c_str()) < 0;
@@ -148,6 +151,21 @@ bool RuntimeSession::PrepareLaunch(const GameManifest& game, std::wstring& error
         state_ = RuntimeState::Failed;
         return false;
     }
+
+    // Pre-provision a canonical dump destination so SDK-integrated games can capture
+    // an unhandled exception while the crashing process is still alive.
+    {
+        std::error_code ec;
+        const auto zeroRoot = info_.saveRoot.parent_path().parent_path();
+        const auto crashDir = zeroRoot / "CrashReports" / widenUtf8Lifecycle(game.packageId);
+        std::filesystem::create_directories(crashDir, ec);
+        if (!ec) {
+            info_.miniDumpPath = crashDir / (widenUtf8Lifecycle(info_.sessionId) + L".dmp");
+        } else {
+            info_.miniDumpNote = "Runtime could not provision the SDK minidump directory.";
+        }
+    }
+
     if (!CreateContainmentJob(error)) {
         state_ = RuntimeState::Failed;
         WriteSessionRecord("launch_failed");
