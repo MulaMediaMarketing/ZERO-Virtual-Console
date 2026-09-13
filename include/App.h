@@ -21,10 +21,12 @@
 namespace zero {
 class App {
 public:
+    enum class Page { Home, Library, Store, Friends, Captures, Settings, GameDetail, Import };
+
     App(HINSTANCE instance);
     int Run();
+
 private:
-    enum class Page { Home, Library, Store, Friends, Captures, Settings, GameDetail, Import };
     HINSTANCE instance_{};
     HWND hwnd_{};
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
