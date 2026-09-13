@@ -2,12 +2,25 @@
 #include "ResumeStore.h"
 #include "RuntimeIpcServer.h"
 #include "RuntimeSession.h"
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <optional>
 #include <string>
 
 namespace zero {
+
+enum class RuntimeOutcome {
+    None,
+    Starting,
+    Running,
+    CleanExit,
+    Crash,
+    UserTermination,
+    LaunchFailure,
+    HandshakeFailure,
+    ReadyTimeout
+};
 
 class RuntimeV3 {
 public:
@@ -20,8 +33,9 @@ public:
     DWORD ExitCode() const noexcept { return v2_.ExitCode(); }
     const RuntimeSessionInfo& Info() const noexcept { return v2_.Info(); }
     bool IsActive() const noexcept { return v2_.IsActive(); }
-    bool Ready() const noexcept { return ready_; }
+    bool Ready() const noexcept { return ready_.load(); }
     uint64_t PlaytimeSeconds() const noexcept { return playtimeSeconds_; }
+    RuntimeOutcome Outcome() const noexcept { return outcome_.load(); }
 
     void SetOverlayVisible(bool visible);
     void SetAchievementCallback(std::function<void(const std::string&, const std::string&)> callback) {
@@ -33,12 +47,16 @@ private:
     RuntimeIpcServer ipc_;
     ResumeStore resumeStore_;
     GameManifest activeGame_{};
-    bool ready_{false};
+    std::atomic<bool> ready_{false};
+    std::atomic<RuntimeOutcome> outcome_{RuntimeOutcome::None};
     bool overlayVisible_{false};
     bool playtimeFinalized_{true};
     std::chrono::steady_clock::time_point readyAt_{};
+    std::chrono::steady_clock::time_point readyDeadline_{};
     uint64_t playtimeSeconds_{0};
     std::function<void(const std::string&, const std::string&)> achievementCallback_;
+
+    static constexpr std::chrono::seconds kReadyTimeout{20};
 
     std::string CreateAuthToken() const;
     void PersistPlaytime() const;
