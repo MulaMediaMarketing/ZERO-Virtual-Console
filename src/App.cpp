@@ -1,10 +1,8 @@
 #include "App.h"
 #include <shlobj.h>
 #include <shobjidl.h>
-#include <filesystem>
-#include <sstream>
 #include <algorithm>
-#include <vector>
+#include <filesystem>
 
 using Microsoft::WRL::ComPtr;
 
@@ -20,18 +18,15 @@ std::filesystem::path localRoot() {
     return std::filesystem::current_path() / "ZeroData";
 }
 
-std::wstring captureKindLabel(CaptureKind kind) {
-    return kind == CaptureKind::Screenshot ? L"Screenshot" : L"Video clip";
-}
-
-std::wstring fileSizeLabel(uint64_t bytes) {
-    if (bytes >= 1024ull * 1024ull * 1024ull)
-        return std::to_wstring(bytes / (1024ull * 1024ull * 1024ull)) + L" GB";
-    if (bytes >= 1024ull * 1024ull)
-        return std::to_wstring(bytes / (1024ull * 1024ull)) + L" MB";
-    if (bytes >= 1024ull)
-        return std::to_wstring(bytes / 1024ull) + L" KB";
-    return std::to_wstring(bytes) + L" B";
+App::Page pageForNavIndex(size_t index) {
+    switch (index) {
+        case 0: return App::Page::Home;
+        case 1: return App::Page::Library;
+        case 2: return App::Page::Store;
+        case 3: return App::Page::Friends;
+        case 4: return App::Page::Captures;
+        default: return App::Page::Settings;
+    }
 }
 }
 
@@ -46,11 +41,16 @@ App::App(HINSTANCE instance)
 int App::Run() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     settings_ = settingsStore_.Load();
+    shellUx_.SetReducedMotion(settings_.reducedMotion);
+    lastTick_ = std::chrono::steady_clock::now();
+
     std::wstring identityError;
     if (!identity_.Initialize(settings_.profileName, identityError)) status_ = identityError;
     friends_.Refresh();
+    store_.Refresh();
     registry_.Refresh();
     captures_.Refresh();
+
     if (!InitWindow() || !InitGraphics()) return 1;
     ShowWindow(hwnd_, SW_SHOW);
     EnterBorderlessFullscreen();
@@ -62,6 +62,7 @@ int App::Run() {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+
     settingsStore_.Save(settings_);
     CoUninitialize();
     return static_cast<int>(msg.wParam);
@@ -97,12 +98,13 @@ bool App::InitGraphics() {
     if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, d2dFactory_.GetAddressOf()))) return false;
     if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
         reinterpret_cast<IUnknown**>(writeFactory_.GetAddressOf())))) return false;
-    CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-        IID_PPV_ARGS(wicFactory_.GetAddressOf()));
-    writeFactory_->CreateTextFormat(L"Segoe UI Variable Display", nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 34.0f, L"en-us", heading_.GetAddressOf());
-    writeFactory_->CreateTextFormat(L"Segoe UI Variable Text", nullptr, DWRITE_FONT_WEIGHT_NORMAL,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 18.0f, L"en-us", body_.GetAddressOf());
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(wicFactory_.GetAddressOf())))) return false;
+
+    if (FAILED(writeFactory_->CreateTextFormat(L"Segoe UI Variable Display", nullptr, DWRITE_FONT_WEIGHT_SEMI_BOLD,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 34.0f, L"en-us", heading_.GetAddressOf()))) return false;
+    if (FAILED(writeFactory_->CreateTextFormat(L"Segoe UI Variable Text", nullptr, DWRITE_FONT_WEIGHT_NORMAL,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 18.0f, L"en-us", body_.GetAddressOf()))) return false;
     heading_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
     body_->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
     return true;
@@ -112,7 +114,7 @@ void App::CreateDeviceResources() {
     if (target_) return;
     RECT rc{};
     GetClientRect(hwnd_, &rc);
-    auto size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+    const auto size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
     d2dFactory_->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
         D2D1::HwndRenderTargetProperties(hwnd_, size), target_.GetAddressOf());
     if (!target_) return;
@@ -171,98 +173,24 @@ void App::DrawHeroArtwork(const GameManifest& game, const D2D1_RECT_F& bounds) {
     target_->DrawBitmap(cachedHero_.Get(), bounds, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, src);
 }
 
-void App::DrawTextLine(const std::wstring& s, float x, float y, float w, float h, bool head, ID2D1Brush* brush) {
+void App::DrawTextLine(const std::wstring& text, float x, float y, float w, float h, bool head, ID2D1Brush* brush) {
     if (!target_) return;
-    target_->DrawTextW(s.c_str(), static_cast<UINT32>(s.size()), head ? heading_.Get() : body_.Get(),
-        D2D1::RectF(x,y,x+w,y+h), brush ? brush : brushText_.Get());
+    target_->DrawTextW(text.c_str(), static_cast<UINT32>(text.size()), head ? heading_.Get() : body_.Get(),
+        D2D1::RectF(x, y, x + w, y + h), brush ? brush : brushText_.Get());
 }
 
-void App::DrawRoundedCard(const D2D1_RECT_F& r, float radius, ID2D1Brush* fill) {
-    target_->FillRoundedRectangle(D2D1::RoundedRect(r, radius, radius), fill);
+void App::DrawRoundedCard(const D2D1_RECT_F& rect, float radius, ID2D1Brush* fill) {
+    if (!target_ || !fill) return;
+    target_->FillRoundedRectangle(D2D1::RoundedRect(rect, radius, radius), fill);
 }
 
-std::wstring App::Widen(const std::string& s) const {
-    if (s.empty()) return {};
-    const int count = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
-    if (count <= 0) return std::wstring(s.begin(), s.end());
+std::wstring App::Widen(const std::string& text) const {
+    if (text.empty()) return {};
+    const int count = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    if (count <= 0) return std::wstring(text.begin(), text.end());
     std::wstring out(static_cast<size_t>(count), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), count);
+    MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), count);
     return out;
-}
-
-void App::DrawRecentGames(float W, float H) {
-    const auto& games = registry_.Games();
-    if (games.empty() || H < 780.0f) return;
-    std::vector<size_t> order(games.size());
-    for (size_t i = 0; i < games.size(); ++i) order[i] = i;
-    std::sort(order.begin(), order.end(), [this, &games](size_t a, size_t b) {
-        return runtime_.PlatformState(games[a].packageId).lastPlayedAtUtc >
-               runtime_.PlatformState(games[b].packageId).lastPlayedAtUtc;
-    });
-    DrawTextLine(L"Recently Played", 64, 650, 260, 30, false, brushMuted_.Get());
-    const size_t count = std::min<size_t>(4, order.size());
-    const float gap = 14.0f;
-    const float cardW = (W - 128.0f - gap * 3.0f) / 4.0f;
-    for (size_t i = 0; i < count; ++i) {
-        const auto& game = games[order[i]];
-        const float x = 64.0f + i * (cardW + gap);
-        DrawRoundedCard(D2D1::RectF(x, 690, x + cardW, 755), 16, brushCard_.Get());
-        DrawTextLine(Widen(game.title), x + 18, 710, cardW - 36, 30, false);
-    }
-}
-
-void App::DrawEmptyState(const std::wstring& title, const std::wstring& body, float W) {
-    DrawRoundedCard(D2D1::RectF(62,270,W-62,540), 28, brushCard_.Get());
-    DrawTextLine(title, 100, 322, W-200, 52, true);
-    DrawTextLine(body, 102, 390, W-230, 88, false, brushMuted_.Get());
-}
-
-void App::DrawFriends(float W, float H) {
-    (void)H;
-    const auto profile = identity_.CurrentProfile();
-    const auto state = friends_.State();
-    const auto& list = friends_.Friends();
-
-    DrawTextLine(L"Friends", 62, 154, 500, 60, true);
-    DrawTextLine(L"Zero Link", 64, 204, 300, 30, false, brushMuted_.Get());
-
-    DrawRoundedCard(D2D1::RectF(62,265,W-62,370), 24, brushCard_.Get());
-    DrawTextLine(profile.displayName.empty() ? L"Player" : Widen(profile.displayName), 92, 286, 420, 42, true);
-    DrawTextLine(profile.zeroId.empty() ? L"Local identity unavailable" : Widen(profile.zeroId), 92, 330, W-360, 30, false, brushMuted_.Get());
-    DrawTextLine(profile.localOnly ? L"Local Zero ID" : L"Zero ID", W-260, 298, 170, 30, false, brushMuted_.Get());
-
-    if (state == FriendsProviderState::Disconnected) {
-        DrawRoundedCard(D2D1::RectF(62,395,W-62,590), 24, brushCard_.Get());
-        DrawTextLine(L"Zero Link is not connected", 92, 430, 520, 48, true);
-        DrawTextLine(L"Presence, requests, invites, joinability, and friend activity will appear here when a Zero Link provider is connected. No placeholder users are shown.",
-                     94, 490, W-220, 70, false, brushMuted_.Get());
-        return;
-    }
-
-    if (state == FriendsProviderState::Error) {
-        DrawEmptyState(L"Zero Link is unavailable", L"The social provider reported an error. ZERO is keeping the shell usable without inventing social data.", W);
-        return;
-    }
-
-    if (list.empty()) {
-        DrawEmptyState(L"No friends to show", L"Zero Link is connected, but this provider returned no friends or presence records.", W);
-        return;
-    }
-
-    float y = 405.0f;
-    const size_t count = std::min<size_t>(5, list.size());
-    for (size_t i = 0; i < count; ++i, y += 66.0f) {
-        const auto& friendItem = list[i];
-        DrawRoundedCard(D2D1::RectF(62,y,W-62,y+52), 16, brushCard_.Get());
-        DrawTextLine(Widen(friendItem.displayName), 90, y+10, 360, 30, false);
-        std::wstring presence = L"Offline";
-        if (friendItem.presence == PresenceState::Online) presence = L"Online";
-        else if (friendItem.presence == PresenceState::InGame) {
-            presence = friendItem.gamePackageId.empty() ? L"In game" : L"In game · " + Widen(friendItem.gamePackageId);
-        }
-        if (friendItem.joinable) presence += L" · Joinable";
-        DrawTextLine(presence, W-500, y+10, 410, 30, false, brushMuted_.Get());
-    }
 }
 
 void App::ClampCaptureSelection() {
@@ -280,301 +208,12 @@ void App::ClampCaptureSelection() {
     captureScroll_ = std::min(captureScroll_, maxStart);
 }
 
-void App::DrawCaptures(float W, float H) {
-    (void)H;
-    const auto& items = captures_.Items();
-    DrawTextLine(L"Captures", 62, 154, 500, 60, true);
-    DrawTextLine(std::to_wstring(items.size()) + L" local captures   ·   A View/Open   ·   X Delete   ·   Right Reveal", 64, 204, W-128, 30, false, brushMuted_.Get());
-    if (items.empty()) {
-        DrawEmptyState(L"No captures yet", L"Screenshots and clips created through ZERO will appear here. No sample captures are injected.", W);
-        return;
-    }
-
-    const size_t end = std::min(items.size(), captureScroll_ + 6);
-    float y = 270.0f;
-    for (size_t i = captureScroll_; i < end; ++i, y += 78.0f) {
-        const auto& item = items[i];
-        if (i == selectedCapture_) {
-            DrawRoundedCard(D2D1::RectF(62,y,W-62,y+62), 18, brushAccent_.Get());
-            ComPtr<ID2D1SolidColorBrush> white;
-            target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-            DrawTextLine(item.path.filename().wstring(), 92, y+10, W-430, 30, false, white.Get());
-            DrawTextLine(captureKindLabel(item.kind) + L"  ·  " + fileSizeLabel(item.sizeBytes), W-385, y+10, 300, 30, false, white.Get());
-        } else {
-            DrawRoundedCard(D2D1::RectF(62,y,W-62,y+62), 18, brushCard_.Get());
-            DrawTextLine(item.path.filename().wstring(), 92, y+10, W-430, 30, false);
-            DrawTextLine(captureKindLabel(item.kind) + L"  ·  " + fileSizeLabel(item.sizeBytes), W-385, y+10, 300, 30, false, brushMuted_.Get());
-        }
-    }
-}
-
-void App::DrawCaptureViewer(float W, float H) {
-    if (!captureViewerVisible_) return;
-    const auto& items = captures_.Items();
-    if (items.empty() || selectedCapture_ >= items.size()) return;
-    const auto& item = items[selectedCapture_];
-
-    ComPtr<ID2D1SolidColorBrush> veil;
-    ComPtr<ID2D1SolidColorBrush> white;
-    target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.94f), veil.GetAddressOf());
-    target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-    target_->FillRectangle(D2D1::RectF(0,0,W,H), veil.Get());
-
-    if (cachedCapturePath_ != item.path) {
-        cachedCapture_.Reset();
-        cachedCapturePath_ = item.path;
-        cachedCapture_ = LoadBitmap(item.path);
-    }
-
-    if (cachedCapture_) {
-        const auto s = cachedCapture_->GetSize();
-        const float maxW = W - 160.0f;
-        const float maxH = H - 180.0f;
-        const float scale = std::min(maxW / s.width, maxH / s.height);
-        const float drawW = s.width * scale;
-        const float drawH = s.height * scale;
-        const float x = (W - drawW) * 0.5f;
-        const float y = (H - drawH) * 0.5f - 10.0f;
-        target_->DrawBitmap(cachedCapture_.Get(), D2D1::RectF(x,y,x+drawW,y+drawH), 1.0f,
-            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-    } else {
-        DrawTextLine(L"ZERO could not decode this screenshot.", 80, H*0.45f, W-160, 50, true, white.Get());
-    }
-
-    DrawTextLine(item.path.filename().wstring(), 64, 34, W-128, 36, false, white.Get());
-    DrawTextLine(L"B Close   ·   X Delete   ·   Right Reveal", 64, H-58, W-128, 30, false, white.Get());
-}
-
-void App::DrawCaptureDeleteConfirm(float W, float H) {
-    if (!captureDeleteConfirm_) return;
-    const auto& items = captures_.Items();
-    if (items.empty() || selectedCapture_ >= items.size()) return;
-
-    ComPtr<ID2D1SolidColorBrush> veil;
-    ComPtr<ID2D1SolidColorBrush> white;
-    target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.70f), veil.GetAddressOf());
-    target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-    target_->FillRectangle(D2D1::RectF(0,0,W,H), veil.Get());
-
-    const float left = std::max(120.0f, W*0.5f-330.0f);
-    const float top = std::max(120.0f, H*0.5f-150.0f);
-    DrawRoundedCard(D2D1::RectF(left,top,left+660,top+300), 28, brushAccent_.Get());
-    DrawTextLine(L"Delete capture?", left+40, top+40, 520, 50, true, white.Get());
-    DrawTextLine(items[selectedCapture_].path.filename().wstring(), left+40, top+105, 580, 34, false, white.Get());
-    DrawTextLine(L"This permanently removes the local capture file.", left+40, top+150, 580, 42, false, white.Get());
-    DrawTextLine(L"A Delete   ·   B Cancel", left+40, top+225, 420, 32, false, white.Get());
-}
-
-void App::DrawOverlay(float W, float H) {
-    if (!overlayVisible_) return;
-    ComPtr<ID2D1SolidColorBrush> veil;
-    ComPtr<ID2D1SolidColorBrush> panel;
-    ComPtr<ID2D1SolidColorBrush> white;
-    target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.62f), veil.GetAddressOf());
-    target_->CreateSolidColorBrush(D2D1::ColorF(0x181818, 0.98f), panel.GetAddressOf());
-    target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-    target_->FillRectangle(D2D1::RectF(0,0,W,H), veil.Get());
-
-    const float left = W - 470.0f;
-    DrawRoundedCard(D2D1::RectF(left, 40, W - 40, H - 40), 28, panel.Get());
-    DrawTextLine(L"ZERO", left + 34, 75, 250, 48, true, white.Get());
-    DrawTextLine(L"SYSTEM OVERLAY", left + 36, 119, 280, 28, false, brushMuted_.Get());
-
-    std::wstring session = L"No active session";
-    std::wstring playtime = L"0 min";
-    std::wstring achievements = L"0 unlocked";
-    if (runtime_.IsActive() || runtime_.State() == RuntimeState::Running) {
-        session = Widen(runtime_.Info().title);
-        playtime = std::to_wstring(runtime_.PlaytimeSeconds() / 60) + L" min";
-        achievements = std::to_wstring(runtime_.Achievements(runtime_.Info().packageId).size()) + L" unlocked";
-    }
-    DrawTextLine(session, left + 36, 170, 350, 34, false, white.Get());
-    DrawTextLine(L"Playtime   " + playtime, left + 36, 210, 350, 30, false, brushMuted_.Get());
-    DrawTextLine(L"Achievements   " + achievements, left + 36, 246, 350, 30, false, brushMuted_.Get());
-
-    const wchar_t* options[] = {L"Continue Game", L"Friends", L"Captures", L"Achievements", L"Exit Game"};
-    for (size_t i = 0; i < 5; ++i) {
-        const float y = 305.0f + static_cast<float>(i) * 66.0f;
-        if (overlayIndex_ == i) {
-            ComPtr<ID2D1SolidColorBrush> selected;
-            target_->CreateSolidColorBrush(D2D1::ColorF(0x333333), selected.GetAddressOf());
-            DrawRoundedCard(D2D1::RectF(left + 26, y, W - 66, y + 50), 16, selected.Get());
-        }
-        DrawTextLine(options[i], left + 48, y + 11, 300, 30, false, white.Get());
-    }
-    DrawTextLine(L"A Select   B Close", left + 36, H - 92, 320, 30, false, brushMuted_.Get());
-}
-
-void App::Paint() {
-    CreateDeviceResources();
-    if (!target_) return;
-    target_->BeginDraw();
-    target_->Clear(D2D1::ColorF(0xFBFAF7));
-    RECT rc{};
-    GetClientRect(hwnd_, &rc);
-    const float W = float(rc.right), H = float(rc.bottom);
-
-    DrawTextLine(L"ZERO", 42, 28, 180, 54, true);
-    DrawTextLine(L"VIRTUAL CONSOLE", 44, 68, 210, 28, false, brushMuted_.Get());
-
-    const wchar_t* nav[] = {L"Home", L"Library", L"Store", L"Friends", L"Captures", L"Settings"};
-    const float navStart = 300.0f;
-    const float navStep = 128.0f;
-    for (int i=0;i<6;i++) {
-        const float x = navStart + i*navStep;
-        if (navIndex_ == size_t(i)) DrawRoundedCard(D2D1::RectF(x-16,38,x+102,82), 18, brushCard_.Get());
-        DrawTextLine(nav[i], x, 48, 104, 30, false);
-    }
-
-    const auto& games = registry_.Games();
-    if (page_ == Page::Home) {
-        const auto profile = identity_.CurrentProfile();
-        const std::string greetingName = profile.displayName.empty() ? settings_.profileName : profile.displayName;
-        DrawTextLine(L"Good evening, " + Widen(greetingName), 62, 154, 700, 60, true);
-        DrawTextLine(L"Your games. One calm console experience.", 64, 204, 650, 40, false, brushMuted_.Get());
-        if (games.empty()) {
-            DrawEmptyState(L"No games installed", L"Open Library, then use X to import a ZERO-compatible game folder.", W);
-        } else {
-            const auto& g = games[std::min(selectedGame_, games.size()-1)];
-            const auto hero = D2D1::RectF(62,285,W-62,620);
-            DrawHeroArtwork(g, hero);
-            ComPtr<ID2D1SolidColorBrush> shade;
-            ComPtr<ID2D1SolidColorBrush> white;
-            target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.50f), shade.GetAddressOf());
-            target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-            target_->FillRectangle(hero, shade.Get());
-            DrawTextLine(Widen(g.title), 108, 334, 760, 60, true, white.Get());
-            DrawTextLine(L"Version " + Widen(g.version), 110, 392, 400, 35, false, white.Get());
-            const auto resume = g.zeroResume ? resumeStore_.Load(g.packageId) : std::nullopt;
-            DrawRoundedCard(D2D1::RectF(108,500,300,556), 20, white.Get());
-            DrawTextLine(resume ? L"Resume" : L"Play", 160, 515, 120, 30, false, brushText_.Get());
-            if (resume) DrawTextLine(L"Continue: " + Widen(resume->displayLabel), 330, 515, 500, 30, false, white.Get());
-            DrawRecentGames(W, H);
-        }
-    } else if (page_ == Page::Library) {
-        DrawTextLine(L"Library", 62, 154, 500, 60, true);
-        DrawTextLine(std::to_wstring(games.size()) + L" installed   ·   A Open   ·   X Import Game", 64, 204, 620, 30, false, brushMuted_.Get());
-        if (games.empty()) {
-            DrawEmptyState(L"Your library is empty", L"Press X to import a validated ZERO-compatible native game package.", W);
-        } else {
-            float y=280;
-            for (size_t i=0;i<games.size() && i<8;i++,y+=78) {
-                auto rect = D2D1::RectF(62,y,W-62,y+62);
-                if (i==selectedGame_) DrawRoundedCard(rect, 18, brushCard_.Get());
-                DrawTextLine(Widen(games[i].title), 92, y+14, 540, 30, false);
-                DrawTextLine(Widen(games[i].version), W-250, y+14, 120, 30, false, brushMuted_.Get());
-            }
-        }
-    } else if (page_ == Page::Store) {
-        DrawTextLine(L"Store", 62, 154, 500, 60, true);
-        DrawTextLine(L"ZERO Store", 64, 204, 300, 30, false, brushMuted_.Get());
-        DrawEmptyState(L"Store service is not connected", L"This shell destination is production-wired, but commerce, entitlement, CDN, and publisher catalog services are intentionally not being faked in this build.", W);
-    } else if (page_ == Page::Friends) {
-        DrawFriends(W, H);
-    } else if (page_ == Page::Captures) {
-        DrawCaptures(W, H);
-    } else if (page_ == Page::GameDetail && !games.empty()) {
-        const auto& g = games[std::min(selectedGame_, games.size()-1)];
-        const auto platform = runtime_.PlatformState(g.packageId);
-        const auto achievements = runtime_.Achievements(g.packageId);
-        const auto resume = g.zeroResume ? resumeStore_.Load(g.packageId) : std::nullopt;
-        const float split = std::max(760.0f, W - 470.0f);
-        const auto hero = D2D1::RectF(62,150,split,535);
-
-        DrawHeroArtwork(g, hero);
-        ComPtr<ID2D1SolidColorBrush> shade;
-        ComPtr<ID2D1SolidColorBrush> white;
-        target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.48f), shade.GetAddressOf());
-        target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-        target_->FillRectangle(hero, shade.Get());
-
-        DrawTextLine(Widen(g.title), 104, 205, split-150, 58, true, white.Get());
-        DrawTextLine(Widen(g.packageId), 106, 263, split-170, 32, false, white.Get());
-        DrawTextLine(L"Version " + Widen(g.version), 106, 300, 380, 30, false, white.Get());
-
-        DrawRoundedCard(D2D1::RectF(104,430,282,488), 20,
-            preferResume_ && resume ? brushCard_.Get() : white.Get());
-        DrawTextLine(L"Play", 166, 446, 90, 30, false, brushText_.Get());
-        if (resume) {
-            DrawRoundedCard(D2D1::RectF(300,430,500,488), 20,
-                preferResume_ ? white.Get() : brushCard_.Get());
-            DrawTextLine(L"Resume", 354, 446, 110, 30, false, brushText_.Get());
-        }
-
-        const float cardLeft = split + 20.0f;
-        DrawRoundedCard(D2D1::RectF(cardLeft,150,W-62,535), 26, brushCard_.Get());
-        DrawTextLine(L"Game Status", cardLeft+28, 180, 260, 42, true);
-        DrawTextLine(L"Playtime", cardLeft+28, 245, 160, 30, false, brushMuted_.Get());
-        DrawTextLine(std::to_wstring(platform.totalPlaytimeSeconds / 60) + L" min", W-250, 245, 150, 30, false);
-        DrawTextLine(L"Launches", cardLeft+28, 285, 160, 30, false, brushMuted_.Get());
-        DrawTextLine(std::to_wstring(platform.launchCount), W-250, 285, 150, 30, false);
-        DrawTextLine(L"Achievements", cardLeft+28, 325, 180, 30, false, brushMuted_.Get());
-        DrawTextLine(std::to_wstring(achievements.size()) + L" unlocked", W-250, 325, 150, 30, false);
-        DrawTextLine(L"Resume", cardLeft+28, 365, 160, 30, false, brushMuted_.Get());
-        const std::wstring resumeState = !g.zeroResume ? L"Not supported" : (resume ? L"Checkpoint ready" : L"No checkpoint");
-        DrawTextLine(resumeState, W-280, 365, 180, 30, false);
-        DrawTextLine(L"Last session", cardLeft+28, 405, 160, 30, false, brushMuted_.Get());
-        const std::wstring lastSession = platform.launchCount == 0 ? L"Never played" :
-            (platform.lastSessionCrashed ? L"Ended unexpectedly" : L"Clean exit");
-        DrawTextLine(lastSession, W-280, 405, 180, 30, false);
-        DrawTextLine(L"Last played", cardLeft+28, 445, 160, 30, false, brushMuted_.Get());
-        DrawTextLine(platform.lastPlayedAtUtc.empty() ? L"—" : Widen(platform.lastPlayedAtUtc), W-330, 445, 230, 30, false);
-        DrawTextLine(L"Exit code", cardLeft+28, 485, 160, 30, false, brushMuted_.Get());
-        DrawTextLine(std::to_wstring(platform.lastExitCode), W-250, 485, 150, 30, false);
-
-        if (resume) {
-            DrawRoundedCard(D2D1::RectF(62,565,W-62,635), 20, brushCard_.Get());
-            DrawTextLine(L"Continue from", 88, 584, 180, 30, false, brushMuted_.Get());
-            DrawTextLine(Widen(resume->displayLabel), 270, 584, W-360, 30, false);
-        }
-        DrawTextLine(resume ? L"Left / Right  Choose Play or Resume   ·   A  Launch   ·   B  Library"
-                            : L"A  Play   ·   B  Library",
-                     64, 670, W-128, 32, false, brushMuted_.Get());
-        if (!status_.empty()) DrawTextLine(status_, 64, 716, W-128, 42, false, brushMuted_.Get());
-    } else if (page_ == Page::Import) {
-        DrawTextLine(L"Import a game", 62, 154, 600, 60, true);
-        DrawTextLine(L"Add a folder that contains a valid zero.manifest.json and native Windows game executable.",
-            64, 214, W-128, 48, false, brushMuted_.Get());
-        DrawRoundedCard(D2D1::RectF(62,310,420,390), 22, brushAccent_.Get());
-        ComPtr<ID2D1SolidColorBrush> white;
-        target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-        DrawTextLine(L"A   Choose game folder", 100, 334, 280, 32, false, white.Get());
-        DrawTextLine(L"ZERO validates, hashes, stages, verifies, and installs the package.",
-            64, 430, W-128, 48, false, brushMuted_.Get());
-    } else if (page_ == Page::Settings) {
-        const auto profile = identity_.CurrentProfile();
-        DrawTextLine(L"Settings", 62, 154, 500, 60, true);
-        DrawRoundedCard(D2D1::RectF(62,270,W-62,355), 20, brushCard_.Get());
-        DrawTextLine(L"Profile", 92, 290, 180, 30, false);
-        DrawTextLine(Widen(profile.displayName.empty() ? settings_.profileName : profile.displayName), W-420, 290, 320, 30, false, brushMuted_.Get());
-        DrawRoundedCard(D2D1::RectF(62,375,W-62,460), 20, brushCard_.Get());
-        DrawTextLine(L"Zero ID", 92, 394, 180, 30, false);
-        DrawTextLine(profile.zeroId.empty() ? L"Unavailable" : Widen(profile.zeroId), 300, 394, W-580, 30, false, brushMuted_.Get());
-        DrawTextLine(profile.localOnly ? L"Local only" : L"Connected", W-220, 394, 120, 30, false, brushMuted_.Get());
-        DrawRoundedCard(D2D1::RectF(62,480,W-62,565), 20, brushCard_.Get());
-        DrawTextLine(L"Reduced Motion", 92, 500, 220, 30, false);
-        DrawTextLine(settings_.reducedMotion ? L"On" : L"Off", W-240, 500, 100, 30, false, brushMuted_.Get());
-    }
-
-    if (!status_.empty() && page_ != Page::GameDetail) DrawTextLine(status_, 64, H-110, W-130, 38, false, brushMuted_.Get());
-    DrawOverlay(W, H);
-    DrawCaptureViewer(W, H);
-    DrawCaptureDeleteConfirm(W, H);
-
-    HRESULT hr = target_->EndDraw();
-    if (hr == D2DERR_RECREATE_TARGET) {
-        target_.Reset();
-        cachedHero_.Reset();
-        cachedHeroPath_.clear();
-        cachedCapture_.Reset();
-        cachedCapturePath_.clear();
-    }
-}
-
 void App::SetOverlayVisible(bool visible) {
     if (overlayVisible_ == visible) return;
     overlayVisible_ = visible;
     overlayIndex_ = 0;
+    shellUx_.SetOverlayVisible(visible);
+    NotifyFocusMoved();
     runtime_.SetOverlayVisible(visible);
     if (visible) {
         SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
@@ -586,6 +225,11 @@ void App::SetOverlayVisible(bool visible) {
 }
 
 void App::Tick() {
+    const auto now = std::chrono::steady_clock::now();
+    const auto delta = now - lastTick_;
+    lastTick_ = now;
+    shellUx_.Advance(std::chrono::duration<float>(delta));
+
     runtime_.Poll();
     if (runtime_.State() == RuntimeState::Crashed) {
         status_ = L"The game closed unexpectedly. ZERO recorded diagnostics and is still running.";
@@ -594,20 +238,28 @@ void App::Tick() {
         if (status_.empty()) status_ = L"Game session ended.";
         if (overlayVisible_) SetOverlayVisible(false);
     }
+
     HandleInput(input_.Poll());
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
-void App::NavigateTo(Page p) {
-    page_ = p;
+void App::NavigateTo(Page next) {
+    if (page_ != next) {
+        page_ = next;
+        shellUx_.BeginPageTransition();
+        NotifyFocusMoved();
+    }
     status_.clear();
     captureViewerVisible_ = false;
     captureDeleteConfirm_ = false;
-    if (p == Page::Captures) {
+
+    if (next == Page::Captures) {
         captures_.Refresh();
         ClampCaptureSelection();
-    } else if (p == Page::Friends) {
+    } else if (next == Page::Friends) {
         friends_.Refresh();
+    } else if (next == Page::Store) {
+        store_.Refresh();
     }
 }
 
@@ -617,6 +269,7 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
     if (captureDeleteConfirm_) {
         if (in.back) {
             captureDeleteConfirm_ = false;
+            NotifyFocusMoved();
             return;
         }
         if (in.select && !items.empty() && selectedCapture_ < items.size()) {
@@ -629,6 +282,7 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
                 cachedCapture_.Reset();
                 cachedCapturePath_.clear();
                 ClampCaptureSelection();
+                NotifyFocusMoved();
             } else {
                 status_ = error;
                 captureDeleteConfirm_ = false;
@@ -640,6 +294,7 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
     if (captureViewerVisible_) {
         if (in.back) {
             captureViewerVisible_ = false;
+            NotifyFocusMoved();
             return;
         }
         if (items.empty() || selectedCapture_ >= items.size()) {
@@ -648,6 +303,7 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
         }
         if (in.action) {
             captureDeleteConfirm_ = true;
+            NotifyFocusMoved();
             return;
         }
         if (in.right) {
@@ -662,10 +318,12 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
     if (in.up && selectedCapture_ > 0) {
         --selectedCapture_;
         ClampCaptureSelection();
+        NotifyFocusMoved();
     }
     if (in.down && selectedCapture_ + 1 < items.size()) {
         ++selectedCapture_;
         ClampCaptureSelection();
+        NotifyFocusMoved();
     }
     if (in.select && selectedCapture_ < items.size()) {
         const auto& item = items[selectedCapture_];
@@ -673,6 +331,7 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
             captureViewerVisible_ = true;
             cachedCapture_.Reset();
             cachedCapturePath_.clear();
+            NotifyFocusMoved();
         } else {
             std::wstring error;
             if (!captures_.Open(item, error)) status_ = error;
@@ -680,6 +339,7 @@ void App::HandleCaptureInput(const InputSnapshot& in) {
     }
     if (in.action && selectedCapture_ < items.size()) {
         captureDeleteConfirm_ = true;
+        NotifyFocusMoved();
     }
     if (in.right && selectedCapture_ < items.size()) {
         std::wstring error;
@@ -694,10 +354,17 @@ void App::HandleInput(const InputSnapshot& in) {
     }
 
     if (overlayVisible_) {
-        if (in.up && overlayIndex_ > 0) --overlayIndex_;
-        if (in.down && overlayIndex_ < 4) ++overlayIndex_;
-        if (in.menu || in.back) SetOverlayVisible(false);
-        else if (in.select) {
+        if (in.up && overlayIndex_ > 0) {
+            --overlayIndex_;
+            NotifyFocusMoved();
+        }
+        if (in.down && overlayIndex_ < 4) {
+            ++overlayIndex_;
+            NotifyFocusMoved();
+        }
+        if (in.menu || in.back) {
+            SetOverlayVisible(false);
+        } else if (in.select) {
             if (overlayIndex_ == 0) {
                 SetOverlayVisible(false);
             } else if (overlayIndex_ == 1) {
@@ -711,7 +378,7 @@ void App::HandleInput(const InputSnapshot& in) {
             } else if (overlayIndex_ == 3) {
                 const auto count = runtime_.Achievements(runtime_.Info().packageId).size();
                 status_ = L"Achievements unlocked: " + std::to_wstring(count);
-            } else if (overlayIndex_ == 4) {
+            } else {
                 runtime_.Terminate();
                 SetOverlayVisible(false);
                 status_ = L"Game session ended.";
@@ -725,66 +392,73 @@ void App::HandleInput(const InputSnapshot& in) {
         return;
     }
 
-    if (page_ == Page::Captures) {
-        if (in.shoulderLeft || in.shoulderRight) {
-            // Shoulder navigation remains available for top-level shell movement.
-        } else {
-            HandleCaptureInput(in);
-            if (in.up || in.down || in.select || in.action || in.right) return;
-        }
+    if (page_ == Page::Captures && !(in.shoulderLeft || in.shoulderRight)) {
+        HandleCaptureInput(in);
+        if (in.up || in.down || in.select || in.action || in.right) return;
     }
 
-    const auto n = registry_.Games().size();
-    if (page_ == Page::GameDetail && n) {
-        const auto& game = registry_.Games()[std::min(selectedGame_, n - 1)];
+    const auto gameCount = registry_.Games().size();
+    if (page_ == Page::GameDetail && gameCount) {
+        const auto& game = registry_.Games()[std::min(selectedGame_, gameCount - 1)];
         const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
-        if (hasResume && in.left) preferResume_ = false;
-        if (hasResume && in.right) preferResume_ = true;
-    } else {
-        auto pageForNav = [](size_t index) {
-            switch (index) {
-                case 0: return Page::Home;
-                case 1: return Page::Library;
-                case 2: return Page::Store;
-                case 3: return Page::Friends;
-                case 4: return Page::Captures;
-                default: return Page::Settings;
-            }
-        };
-        if ((in.left || in.shoulderLeft) && navIndex_>0) {
-            navIndex_--;
-            NavigateTo(pageForNav(navIndex_));
+        if (hasResume && in.left && preferResume_) {
+            preferResume_ = false;
+            NotifyFocusMoved();
         }
-        if ((in.right || in.shoulderRight) && navIndex_<5) {
-            navIndex_++;
-            NavigateTo(pageForNav(navIndex_));
+        if (hasResume && in.right && !preferResume_) {
+            preferResume_ = true;
+            NotifyFocusMoved();
+        }
+    } else {
+        if ((in.left || in.shoulderLeft) && navIndex_ > 0) {
+            --navIndex_;
+            NavigateTo(pageForNavIndex(navIndex_));
+        }
+        if ((in.right || in.shoulderRight) && navIndex_ < 5) {
+            ++navIndex_;
+            NavigateTo(pageForNavIndex(navIndex_));
         }
     }
 
     if (page_ == Page::Library) {
         if (in.action) {
             NavigateTo(Page::Import);
-        } else if (n) {
-            if (in.up && selectedGame_>0) selectedGame_--;
-            if (in.down && selectedGame_+1<n) selectedGame_++;
-            if (in.select) { preferResume_ = true; NavigateTo(Page::GameDetail); }
+        } else if (gameCount) {
+            if (in.up && selectedGame_ > 0) {
+                --selectedGame_;
+                NotifyFocusMoved();
+            }
+            if (in.down && selectedGame_ + 1 < gameCount) {
+                ++selectedGame_;
+                NotifyFocusMoved();
+            }
+            if (in.select) {
+                preferResume_ = true;
+                NavigateTo(Page::GameDetail);
+            }
         }
     } else if (page_ == Page::Import && in.select) {
         ImportGameFolder();
-    } else if (page_ == Page::Home && in.select && n) {
-        const auto& game = registry_.Games()[std::min(selectedGame_, n - 1)];
+    } else if (page_ == Page::Home && in.select && gameCount) {
+        const auto& game = registry_.Games()[std::min(selectedGame_, gameCount - 1)];
         const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
         LaunchSelected(hasResume);
-    } else if (page_ == Page::GameDetail && in.select && n) {
+    } else if (page_ == Page::GameDetail && in.select && gameCount) {
         LaunchSelected(preferResume_);
+    } else if (page_ == Page::Settings && in.select) {
+        settings_.reducedMotion = !settings_.reducedMotion;
+        shellUx_.SetReducedMotion(settings_.reducedMotion);
+        settingsStore_.Save(settings_);
+        status_ = settings_.reducedMotion ? L"Reduced Motion enabled." : L"Reduced Motion disabled.";
+        NotifyFocusMoved();
     }
 
     if (in.back) {
         if (page_ == Page::GameDetail || page_ == Page::Import) {
-            navIndex_=1;
+            navIndex_ = 1;
             NavigateTo(Page::Library);
         } else if (page_ != Page::Home) {
-            navIndex_=0;
+            navIndex_ = 0;
             NavigateTo(Page::Home);
         }
     }
@@ -802,12 +476,21 @@ void App::ImportGameFolder() {
     dialog->SetTitle(L"Choose a ZERO-compatible game folder");
     const HRESULT shown = dialog->Show(hwnd_);
     if (shown == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return;
-    if (FAILED(shown)) { status_ = L"ZERO could not open the selected folder."; return; }
+    if (FAILED(shown)) {
+        status_ = L"ZERO could not open the selected folder.";
+        return;
+    }
 
     ComPtr<IShellItem> item;
-    if (FAILED(dialog->GetResult(item.GetAddressOf()))) { status_ = L"ZERO could not read the selected folder."; return; }
+    if (FAILED(dialog->GetResult(item.GetAddressOf()))) {
+        status_ = L"ZERO could not read the selected folder.";
+        return;
+    }
     PWSTR raw = nullptr;
-    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw)) || !raw) { status_ = L"ZERO could not resolve the selected folder."; return; }
+    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw)) || !raw) {
+        status_ = L"ZERO could not resolve the selected folder.";
+        return;
+    }
     std::filesystem::path source(raw);
     CoTaskMemFree(raw);
 
@@ -816,16 +499,17 @@ void App::ImportGameFolder() {
         status_ = result.error.empty() ? L"ZERO rejected this game package." : result.error;
         return;
     }
+
     registry_.Refresh();
     selectedGame_ = registry_.Games().empty() ? 0 : registry_.Games().size() - 1;
-    status_ = L"Game imported successfully.";
     navIndex_ = 1;
-    page_ = Page::Library;
+    NavigateTo(Page::Library);
+    status_ = L"Game imported successfully.";
 }
 
 void App::LaunchSelected(bool useResume) {
     const auto& games = registry_.Games();
-    if (games.empty() || selectedGame_>=games.size()) return;
+    if (games.empty() || selectedGame_ >= games.size()) return;
     const auto& game = games[selectedGame_];
     std::optional<ResumeMetadata> resume;
     if (useResume && game.zeroResume) resume = resumeStore_.Load(game.packageId);
@@ -845,20 +529,20 @@ LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         self->hwnd_ = hwnd;
     }
-    return self ? self->HandleMessage(msg,wp,lp) : DefWindowProcW(hwnd,msg,wp,lp);
+    return self ? self->HandleMessage(msg, wp, lp) : DefWindowProcW(hwnd, msg, wp, lp);
 }
 
 LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
-    switch(msg) {
+    switch (msg) {
         case WM_PAINT: {
             PAINTSTRUCT ps{};
-            BeginPaint(hwnd_,&ps);
+            BeginPaint(hwnd_, &ps);
             Paint();
-            EndPaint(hwnd_,&ps);
+            EndPaint(hwnd_, &ps);
             return 0;
         }
         case WM_SIZE:
-            if (target_) target_->Resize(D2D1::SizeU(LOWORD(lp),HIWORD(lp)));
+            if (target_) target_->Resize(D2D1::SizeU(LOWORD(lp), HIWORD(lp)));
             return 0;
         case WM_TIMER:
             Tick();
@@ -868,25 +552,38 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
                 registry_.Refresh();
                 captures_.Refresh();
                 friends_.Refresh();
+                store_.Refresh();
                 ClampCaptureSelection();
                 cachedHero_.Reset();
                 cachedHeroPath_.clear();
                 cachedCapture_.Reset();
                 cachedCapturePath_.clear();
-                status_=L"ZERO data refreshed.";
+                status_ = L"ZERO data refreshed.";
                 return 0;
             }
-            if (wp == 'I') { NavigateTo(Page::Import); return 0; }
-            if (wp == VK_F11) { EnterBorderlessFullscreen(); return 0; }
-            if (wp == VK_F1 && runtime_.IsActive()) { SetOverlayVisible(!overlayVisible_); return 0; }
-            if (wp == 'Q' && (GetKeyState(VK_CONTROL)&0x8000)) { DestroyWindow(hwnd_); return 0; }
+            if (wp == 'I') {
+                NavigateTo(Page::Import);
+                return 0;
+            }
+            if (wp == VK_F11) {
+                EnterBorderlessFullscreen();
+                return 0;
+            }
+            if (wp == VK_F1 && runtime_.IsActive()) {
+                SetOverlayVisible(!overlayVisible_);
+                return 0;
+            }
+            if (wp == 'Q' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+                DestroyWindow(hwnd_);
+                return 0;
+            }
             return 0;
         case WM_DESTROY:
             runtime_.Terminate();
             PostQuitMessage(0);
             return 0;
     }
-    return DefWindowProcW(hwnd_,msg,wp,lp);
+    return DefWindowProcW(hwnd_, msg, wp, lp);
 }
 
 } // namespace zero
