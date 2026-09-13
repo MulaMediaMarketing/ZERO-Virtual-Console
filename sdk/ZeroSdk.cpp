@@ -29,6 +29,10 @@ std::string envUtf8(const wchar_t* key) {
     return out;
 }
 
+bool safeField(const std::string& value) {
+    return value.find('\t') == std::string::npos && value.find('\n') == std::string::npos && value.find('\r') == std::string::npos;
+}
+
 } // namespace
 
 Client::Client() = default;
@@ -134,13 +138,26 @@ bool Client::ReportReady(std::wstring& error) {
 }
 
 bool Client::SetResumeActivity(const ResumeContext& c, std::wstring& error) {
-    if (c.activityId.find('\t') != std::string::npos || c.displayLabel.find('\t') != std::string::npos || c.payload.find('\t') != std::string::npos) {
-        error = L"Resume fields may not contain tabs in Runtime V3 protocol.";
+    if (!safeField(c.activityId) || !safeField(c.displayLabel) || !safeField(c.payload)) {
+        error = L"Resume fields contain characters unsupported by the current protocol.";
         return false;
     }
     if (!WriteLine("RESUME\t" + c.activityId + "\t" + c.displayLabel + "\t" + c.payload, error)) return false;
     std::string response;
     return ReadLine(response, error) && response == "ACK\tRESUME";
+}
+
+bool Client::UnlockAchievement(const std::string& achievementId,
+                               const std::string& title,
+                               std::wstring& error) {
+    if (achievementId.empty() || achievementId.size() > 160 || title.empty() || title.size() > 256 ||
+        !safeField(achievementId) || !safeField(title)) {
+        error = L"Achievement fields are invalid.";
+        return false;
+    }
+    if (!WriteLine("ACHIEVEMENT\t" + achievementId + "\t" + title, error)) return false;
+    std::string response;
+    return ReadLine(response, error) && response == "ACK\tACHIEVEMENT";
 }
 
 bool Client::Ping(std::wstring& error) {
