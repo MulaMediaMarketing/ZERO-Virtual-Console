@@ -21,6 +21,17 @@ std::filesystem::path zeroDataRoot() {
     return std::filesystem::temp_directory_path() / "ZERO";
 }
 
+std::string utf8(const std::wstring& value) {
+    if (value.empty()) return {};
+    const int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
+                                          static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) return {};
+    std::string out(static_cast<size_t>(bytes), '\0');
+    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()),
+                             out.data(), bytes, nullptr, nullptr)) return {};
+    return out;
+}
+
 std::string hex(const unsigned char* data, size_t n) {
     static constexpr char lut[] = "0123456789abcdef";
     std::string out;
@@ -116,7 +127,16 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
         return false;
     }
 
-    std::string pipe(ipc_.PipeName().begin(), ipc_.PipeName().end());
+    const auto pipe = utf8(ipc_.PipeName());
+    if (pipe.empty()) {
+        error = L"ZERO Runtime V4 could not encode the IPC pipe identity.";
+        outcome_.store(RuntimeOutcome::HandshakeFailure);
+        f.close();
+        ipc_.Stop();
+        v2_.FailPrepared(0xE114, "pipe_encoding_failed");
+        playtimeFinalized_ = true;
+        return false;
+    }
     f << "4\n" << v2_.Info().sessionId << "\n" << game.packageId << "\n" << pipe << "\n" << token << "\n";
     if (launchResume) {
         f << "1\n"
@@ -160,7 +180,6 @@ void RuntimeV3::PersistPlaytime() const {
 }
 
 void RuntimeV3::Poll() {
-    // Capture a best-effort postmortem dump before RuntimeSession closes the process handle.
     if (v2_.HasAbnormalExit()) {
         v2_.CaptureDiagnosticDump();
     }
@@ -175,7 +194,6 @@ void RuntimeV3::Poll() {
         if (v2_.IsActive() && ipc_.ClientSilence() >= kHeartbeatTimeout) {
             outcome_.store(RuntimeOutcome::Hung);
             PersistPlaytime();
-            // Hung sessions are dumped while the process is still alive, before termination.
             v2_.CaptureDiagnosticDump();
             ipc_.Stop();
             v2_.Terminate();
