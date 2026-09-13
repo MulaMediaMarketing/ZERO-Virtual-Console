@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "minimum_runtime_major": 4,
+  "package_id": "zero.system.reference",
+  "title": "ZERO Reference Experience",
+  "version": "1.0.0-m1",
+  "executable": "ZeroReferenceGame.exe",
+  "hero_image": "Assets/hero.bmp",
+  "icon_image": "Assets/icon.bmp",
+  "logo_image": "Assets/logo.bmp",
+  "zero_resume": true,
+  "zero_achievements": true,
+  "zero_overlay": true,
+  "zero_input": true
+}
