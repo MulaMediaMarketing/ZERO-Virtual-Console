@@ -134,7 +134,7 @@ ComPtr<ID2D1Bitmap> App::LoadBitmap(const std::filesystem::path& path) {
     if (FAILED(decoder->GetFrame(0, frame.GetAddressOf()))) return bitmap;
     ComPtr<IWICFormatConverter> converter;
     if (FAILED(wicFactory_->CreateFormatConverter(converter.GetAddressOf()))) return bitmap;
-    if (FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA,
+    if (FAILED(converter_->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA,
         WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return bitmap;
     target_->CreateBitmapFromWicBitmap(converter.Get(), nullptr, bitmap.GetAddressOf());
     return bitmap;
@@ -256,6 +256,8 @@ void App::NavigateTo(Page next) {
         store_.Refresh();
     } else if (next == Page::Achievements) {
         ClampAchievementSelection();
+    } else if (next == Page::Settings) {
+        RefreshSettingsTelemetry();
     }
 }
 
@@ -405,6 +407,12 @@ void App::HandleInput(const InputSnapshot& in) {
         if (in.up || in.down || in.select || in.action || in.right) return;
     }
 
+    if (page_ == Page::Settings && !(in.shoulderLeft || in.shoulderRight)) {
+        const bool volumeHorizontal = selectedSetting_ == 1 && (in.left || in.right);
+        HandleSettingsInput(in);
+        if (in.up || in.down || in.select || in.action || volumeHorizontal) return;
+    }
+
     const auto gameCount = registry_.Games().size();
     if (page_ == Page::GameDetail && gameCount) {
         const auto& game = registry_.Games()[std::min(selectedGame_, gameCount - 1)];
@@ -457,12 +465,6 @@ void App::HandleInput(const InputSnapshot& in) {
         LaunchSelected(hasResume);
     } else if (page_ == Page::GameDetail && in.select && gameCount) {
         LaunchSelected(preferResume_);
-    } else if (page_ == Page::Settings && in.select) {
-        settings_.reducedMotion = !settings_.reducedMotion;
-        shellUx_.SetReducedMotion(settings_.reducedMotion);
-        settingsStore_.Save(settings_);
-        status_ = settings_.reducedMotion ? L"Reduced Motion enabled." : L"Reduced Motion disabled.";
-        NotifyFocusMoved();
     }
 
     if (in.back) {
@@ -582,6 +584,7 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
                 store_.Refresh();
                 ClampCaptureSelection();
                 ClampAchievementSelection();
+                RefreshSettingsTelemetry();
                 cachedHero_.Reset();
                 cachedHeroPath_.clear();
                 cachedCapture_.Reset();
