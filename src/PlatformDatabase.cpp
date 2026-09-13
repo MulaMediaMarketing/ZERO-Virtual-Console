@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace zero {
 namespace {
@@ -24,7 +25,6 @@ class Statement {
 public:
     explicit Statement(sqlite3_stmt* stmt) : stmt_(stmt) {}
     ~Statement() { if (stmt_) sqlite3_finalize(stmt_); }
-    sqlite3_stmt* get() const { return stmt_; }
 private:
     sqlite3_stmt* stmt_{nullptr};
 };
@@ -53,9 +53,10 @@ std::wstring widenUtf8(const char* text) {
     if (!text || !*text) return {};
     const int n = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, nullptr, 0);
     if (n <= 1) return L"SQLite operation failed.";
-    std::wstring out(static_cast<size_t>(n - 1), L'\0');
-    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, out.data(), n);
-    return out;
+    std::vector<wchar_t> buffer(static_cast<size_t>(n));
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, buffer.data(), n))
+        return L"SQLite operation failed.";
+    return std::wstring(buffer.data());
 }
 
 bool fail(sqlite3* db, const wchar_t* prefix, std::wstring& error) {
@@ -88,10 +89,8 @@ bool openDatabase(DbHandle& handle, std::wstring& error) {
         error = L"ZERO could not create the platform database directory.";
         return false;
     }
-
-    const int rc = sqlite3_open16(path.c_str(), handle.out());
-    if (rc != SQLITE_OK) return fail(handle.get(), L"ZERO could not open the platform database.", error);
-
+    if (sqlite3_open16(path.c_str(), handle.out()) != SQLITE_OK)
+        return fail(handle.get(), L"ZERO could not open the platform database.", error);
     sqlite3_busy_timeout(handle.get(), 3000);
     if (!exec(handle.get(), "PRAGMA journal_mode=WAL;", error)) return false;
     if (!exec(handle.get(), "PRAGMA synchronous=FULL;", error)) return false;
@@ -149,19 +148,9 @@ CREATE TABLE IF NOT EXISTS settings(
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_sessions_package_recorded
-    ON sessions(package_id, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sessions_package_recorded ON sessions(package_id, recorded_at DESC);
 )SQL";
     return exec(db, schema, error);
-}
-
-bool prepare(sqlite3* db, const char* sql, Statement*& owner, std::wstring& error) {
-    sqlite3_stmt* raw = nullptr;
-    if (sqlite3_prepare_v2(db, sql, -1, &raw, nullptr) != SQLITE_OK) {
-        return fail(db, L"ZERO could not prepare a database statement.", error);
-    }
-    owner = new Statement(raw);
-    return true;
 }
 
 bool bindText(sqlite3_stmt* stmt, int index, const std::string& value) {
@@ -195,19 +184,18 @@ bool PlatformDatabase::Initialize(std::wstring& error) const {
 bool PlatformDatabase::UpsertGame(const GameManifest& game, std::wstring& error) const {
     DbHandle db;
     if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
-
     static constexpr const char* sql =
         "INSERT INTO games(package_id,title,version,executable,updated_at) VALUES(?,?,?,?,?) "
-        "ON CONFLICT(package_id) DO UPDATE SET title=excluded.title, version=excluded.version, "
-        "executable=excluded.executable, updated_at=excluded.updated_at;";
+        "ON CONFLICT(package_id) DO UPDATE SET title=excluded.title,version=excluded.version,"
+        "executable=excluded.executable,updated_at=excluded.updated_at;";
     sqlite3_stmt* raw = nullptr;
     if (sqlite3_prepare_v2(db.get(), sql, -1, &raw, nullptr) != SQLITE_OK)
         return fail(db.get(), L"ZERO could not prepare the game database write.", error);
     Statement stmt(raw);
     const auto stamp = utcNow();
     const auto executable = pathUtf8(game.executable);
-    if (!bindText(raw, 1, game.packageId) || !bindText(raw, 2, game.title) ||
-        !bindText(raw, 3, game.version) || !bindText(raw, 4, executable) || !bindText(raw, 5, stamp))
+    if (!bindText(raw, 1, game.packageId) || !bindText(raw, 2, game.title) || !bindText(raw, 3, game.version) ||
+        !bindText(raw, 4, executable) || !bindText(raw, 5, stamp))
         return fail(db.get(), L"ZERO could not bind the game database write.", error);
     return stepDone(db.get(), raw, error);
 }
@@ -224,9 +212,10 @@ bool PlatformDatabase::RecordSession(const std::string& packageId,
     if (!exec(db.get(), "BEGIN IMMEDIATE;", error)) return false;
 
     bool ok = true;
+    bool inserted = false;
     const auto stamp = utcNow();
     static constexpr const char* sessionSql =
-        "INSERT OR REPLACE INTO sessions(session_id,package_id,playtime_seconds,exit_code,outcome,crashed,recorded_at) "
+        "INSERT OR IGNORE INTO sessions(session_id,package_id,playtime_seconds,exit_code,outcome,crashed,recorded_at) "
         "VALUES(?,?,?,?,?,?,?);";
     sqlite3_stmt* raw = nullptr;
     if (sqlite3_prepare_v2(db.get(), sessionSql, -1, &raw, nullptr) != SQLITE_OK) ok = false;
@@ -237,26 +226,26 @@ bool PlatformDatabase::RecordSession(const std::string& packageId,
              sqlite3_bind_int64(raw, 4, static_cast<sqlite3_int64>(exitCode)) == SQLITE_OK &&
              bindText(raw, 5, outcome) && sqlite3_bind_int(raw, 6, crashed ? 1 : 0) == SQLITE_OK &&
              bindText(raw, 7, stamp) && sqlite3_step(raw) == SQLITE_DONE;
+        inserted = ok && sqlite3_changes(db.get()) == 1;
     }
 
-    static constexpr const char* statsSql =
-        "INSERT INTO game_stats(package_id,total_playtime_seconds,launch_count,last_session_id,last_played_utc,last_exit_code,last_crashed) "
-        "VALUES(?,?,?,?,?,?,?) "
-        "ON CONFLICT(package_id) DO UPDATE SET "
-        "total_playtime_seconds=game_stats.total_playtime_seconds+excluded.total_playtime_seconds, "
-        "launch_count=game_stats.launch_count+1, last_session_id=excluded.last_session_id, "
-        "last_played_utc=excluded.last_played_utc, last_exit_code=excluded.last_exit_code, "
-        "last_crashed=excluded.last_crashed;";
-    raw = nullptr;
-    if (ok && sqlite3_prepare_v2(db.get(), statsSql, -1, &raw, nullptr) == SQLITE_OK) {
-        Statement stmt(raw);
-        ok = bindText(raw, 1, packageId) &&
-             sqlite3_bind_int64(raw, 2, static_cast<sqlite3_int64>(playtimeSeconds)) == SQLITE_OK &&
-             sqlite3_bind_int(raw, 3, 1) == SQLITE_OK && bindText(raw, 4, sessionId) &&
-             bindText(raw, 5, stamp) && sqlite3_bind_int64(raw, 6, static_cast<sqlite3_int64>(exitCode)) == SQLITE_OK &&
-             sqlite3_bind_int(raw, 7, crashed ? 1 : 0) == SQLITE_OK && sqlite3_step(raw) == SQLITE_DONE;
-    } else if (ok) {
-        ok = false;
+    if (ok && inserted) {
+        static constexpr const char* statsSql =
+            "INSERT INTO game_stats(package_id,total_playtime_seconds,launch_count,last_session_id,last_played_utc,last_exit_code,last_crashed) "
+            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(package_id) DO UPDATE SET "
+            "total_playtime_seconds=game_stats.total_playtime_seconds+excluded.total_playtime_seconds,"
+            "launch_count=game_stats.launch_count+1,last_session_id=excluded.last_session_id,"
+            "last_played_utc=excluded.last_played_utc,last_exit_code=excluded.last_exit_code,last_crashed=excluded.last_crashed;";
+        raw = nullptr;
+        if (sqlite3_prepare_v2(db.get(), statsSql, -1, &raw, nullptr) != SQLITE_OK) ok = false;
+        if (ok) {
+            Statement stmt(raw);
+            ok = bindText(raw, 1, packageId) &&
+                 sqlite3_bind_int64(raw, 2, static_cast<sqlite3_int64>(playtimeSeconds)) == SQLITE_OK &&
+                 sqlite3_bind_int(raw, 3, 1) == SQLITE_OK && bindText(raw, 4, sessionId) && bindText(raw, 5, stamp) &&
+                 sqlite3_bind_int64(raw, 6, static_cast<sqlite3_int64>(exitCode)) == SQLITE_OK &&
+                 sqlite3_bind_int(raw, 7, crashed ? 1 : 0) == SQLITE_OK && sqlite3_step(raw) == SQLITE_DONE;
+        }
     }
 
     if (!ok) {
@@ -264,8 +253,7 @@ bool PlatformDatabase::RecordSession(const std::string& packageId,
         exec(db.get(), "ROLLBACK;", ignored);
         return fail(db.get(), L"ZERO could not transactionally record the runtime session.", error);
     }
-    if (!exec(db.get(), "COMMIT;", error)) return false;
-    return true;
+    return exec(db.get(), "COMMIT;", error);
 }
 
 bool PlatformDatabase::UpsertResume(const std::string& packageId,
@@ -278,8 +266,8 @@ bool PlatformDatabase::UpsertResume(const std::string& packageId,
     if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
     static constexpr const char* sql =
         "INSERT INTO resume_activities(package_id,activity_id,display_label,payload,updated_at) VALUES(?,?,?,?,?) "
-        "ON CONFLICT(package_id) DO UPDATE SET activity_id=excluded.activity_id, display_label=excluded.display_label, "
-        "payload=excluded.payload, updated_at=excluded.updated_at;";
+        "ON CONFLICT(package_id) DO UPDATE SET activity_id=excluded.activity_id,display_label=excluded.display_label,"
+        "payload=excluded.payload,updated_at=excluded.updated_at;";
     sqlite3_stmt* raw = nullptr;
     if (sqlite3_prepare_v2(db.get(), sql, -1, &raw, nullptr) != SQLITE_OK)
         return fail(db.get(), L"ZERO could not prepare the Resume database write.", error);
@@ -305,8 +293,7 @@ bool PlatformDatabase::UpsertAchievement(const std::string& packageId,
         return fail(db.get(), L"ZERO could not prepare the achievement database write.", error);
     Statement stmt(raw);
     const auto stamp = unlockedAtUtc.empty() ? utcNow() : unlockedAtUtc;
-    if (!bindText(raw, 1, packageId) || !bindText(raw, 2, achievementId) ||
-        !bindText(raw, 3, title) || !bindText(raw, 4, stamp))
+    if (!bindText(raw, 1, packageId) || !bindText(raw, 2, achievementId) || !bindText(raw, 3, title) || !bindText(raw, 4, stamp))
         return fail(db.get(), L"ZERO could not bind the achievement database write.", error);
     return stepDone(db.get(), raw, error);
 }
@@ -318,7 +305,7 @@ bool PlatformDatabase::SetSetting(const std::string& key,
     if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
     static constexpr const char* sql =
         "INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at;";
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at;";
     sqlite3_stmt* raw = nullptr;
     if (sqlite3_prepare_v2(db.get(), sql, -1, &raw, nullptr) != SQLITE_OK)
         return fail(db.get(), L"ZERO could not prepare the settings database write.", error);
