@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <algorithm>
+#include <cwctype>
 #include <fstream>
 #include <iomanip>
 #include <set>
@@ -17,7 +18,7 @@ bool reservedComponent(const std::wstring& component) {
     std::wstring base = component;
     const auto dot = base.find(L'.');
     if (dot != std::wstring::npos) base.resize(dot);
-    std::transform(base.begin(), base.end(), base.begin(), ::towupper);
+    std::transform(base.begin(), base.end(), base.begin(), [](wchar_t c) { return static_cast<wchar_t>(std::towupper(c)); });
     static const std::set<std::wstring> names = {
         L"CON", L"PRN", L"AUX", L"NUL",
         L"COM1", L"COM2", L"COM3", L"COM4", L"COM5", L"COM6", L"COM7", L"COM8", L"COM9",
@@ -36,6 +37,10 @@ bool safeRelativePath(const std::filesystem::path& relative) {
         if (value == L".." || value == L"." || reservedComponent(value)) return false;
     }
     return true;
+}
+
+bool isGeneratedIntegrityManifest(const std::filesystem::path& relative) {
+    return _wcsicmp(relative.generic_wstring().c_str(), L"zero.integrity.sha256") == 0;
 }
 
 bool isReparsePoint(const std::filesystem::path& path) {
@@ -147,6 +152,7 @@ bool PackageSecurity::BuildInventory(const std::filesystem::path& root,
             error = L"ZERO packages may contain regular files and directories only.";
             return false;
         }
+        if (isGeneratedIntegrityManifest(relative)) continue;
         if (++inventory.fileCount > kMaxFiles) {
             error = L"ZERO package exceeds the maximum supported file count.";
             return false;
