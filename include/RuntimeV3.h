@@ -19,7 +19,8 @@ enum class RuntimeOutcome {
     UserTermination,
     LaunchFailure,
     HandshakeFailure,
-    ReadyTimeout
+    ReadyTimeout,
+    Hung
 };
 
 class RuntimeV3 {
@@ -57,6 +58,7 @@ private:
     std::function<void(const std::string&, const std::string&)> achievementCallback_;
 
     static constexpr std::chrono::seconds kReadyTimeout{20};
+    static constexpr std::chrono::seconds kHeartbeatTimeout{10};
 
     std::string CreateAuthToken() const;
     void PersistPlaytime() const;

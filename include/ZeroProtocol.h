@@ -22,7 +22,8 @@ enum class MessageType : uint16_t {
     OverlayAck = 8,
     Ping = 9,
     Pong = 10,
-    Error = 11
+    Error = 11,
+    Heartbeat = 12
 };
 
 struct Message {

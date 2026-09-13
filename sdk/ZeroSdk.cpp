@@ -131,10 +131,16 @@ bool Client::Initialize(std::wstring& error, unsigned timeoutMs) {
         Shutdown();
         return false;
     }
+
+    heartbeatStop_.store(false);
+    heartbeatThread_ = std::thread(&Client::HeartbeatLoop, this);
     return true;
 }
 
 void Client::Shutdown() {
+    heartbeatStop_.store(true);
+    if (heartbeatThread_.joinable()) heartbeatThread_.join();
+    std::scoped_lock lock(ioMutex_);
     if (IsConnected()) CloseHandle(static_cast<HANDLE>(pipe_));
     pipe_ = reinterpret_cast<void*>(-1);
     packageId_.clear();
@@ -143,11 +149,27 @@ void Client::Shutdown() {
     nextRequestId_ = 1;
 }
 
+void Client::HeartbeatLoop() {
+    while (!heartbeatStop_.load()) {
+        for (int i = 0; i < 20 && !heartbeatStop_.load(); ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (heartbeatStop_.load()) break;
+        std::scoped_lock lock(ioMutex_);
+        if (!IsConnected()) break;
+        protocol::Message heartbeat;
+        heartbeat.type = protocol::MessageType::Heartbeat;
+        heartbeat.requestId = nextRequestId_++;
+        if (!protocol::WriteMessage(static_cast<HANDLE>(pipe_), heartbeat)) break;
+    }
+}
+
 bool Client::SendRequest(protocol::MessageType type,
                          std::vector<std::string> fields,
                          protocol::MessageType expectedType,
                          const std::string& expectedAck,
                          std::wstring& error) {
+    std::scoped_lock lock(ioMutex_);
     if (!IsConnected()) { error = L"ZERO SDK is not connected."; return false; }
     protocol::Message request;
     request.type = type;
@@ -213,6 +235,7 @@ bool Client::Ping(std::wstring& error) {
 void Client::SetOverlayCallback(std::function<void(bool)> callback) { overlayCallback_ = std::move(callback); }
 
 bool Client::Poll(std::wstring& error) {
+    std::scoped_lock lock(ioMutex_);
     if (!IsConnected()) return false;
     DWORD available = 0;
     if (!PeekNamedPipe(static_cast<HANDLE>(pipe_), nullptr, 0, nullptr, &available, nullptr)) {

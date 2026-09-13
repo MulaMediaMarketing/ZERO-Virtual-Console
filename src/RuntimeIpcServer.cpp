@@ -12,10 +12,26 @@ std::wstring widen(const std::string& s) {
     return out;
 }
 
+int64_t nowMs() noexcept {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 } // namespace
 
 RuntimeIpcServer::RuntimeIpcServer() = default;
 RuntimeIpcServer::~RuntimeIpcServer() { Stop(); }
+
+void RuntimeIpcServer::TouchClientActivity() noexcept {
+    lastClientActivityMs_.store(nowMs(), std::memory_order_relaxed);
+}
+
+std::chrono::milliseconds RuntimeIpcServer::ClientSilence() const noexcept {
+    const auto last = lastClientActivityMs_.load(std::memory_order_relaxed);
+    if (last <= 0) return std::chrono::milliseconds::max();
+    const auto age = nowMs() - last;
+    return std::chrono::milliseconds(age < 0 ? 0 : age);
+}
 
 bool RuntimeIpcServer::Start(const std::string& sessionId,
                              const std::string& packageId,
@@ -41,6 +57,7 @@ bool RuntimeIpcServer::Start(const std::string& sessionId,
     authenticated_.store(false);
     ready_.store(false);
     nextServerRequestId_.store(1);
+    lastClientActivityMs_.store(0);
     thread_ = std::thread(&RuntimeIpcServer::ServerLoop, this);
     return true;
 }
@@ -89,8 +106,11 @@ bool RuntimeIpcServer::HandleMessage(const protocol::Message& message, HANDLE pi
             return false;
         }
         authenticated_.store(true);
+        TouchClientActivity();
         return Send(pipe, MessageType::Welcome, message.requestId, {"4"});
     }
+
+    TouchClientActivity();
 
     switch (message.type) {
         case MessageType::Ready:
@@ -117,6 +137,10 @@ bool RuntimeIpcServer::HandleMessage(const protocol::Message& message, HANDLE pi
         case MessageType::Ping:
             if (!message.fields.empty()) return Send(pipe, MessageType::Error, message.requestId, {"BAD_PING"});
             return Send(pipe, MessageType::Pong, message.requestId);
+
+        case MessageType::Heartbeat:
+            if (!message.fields.empty()) return Send(pipe, MessageType::Error, message.requestId, {"BAD_HEARTBEAT"});
+            return true;
 
         default:
             return Send(pipe, MessageType::Error, message.requestId, {"UNKNOWN_COMMAND"});
