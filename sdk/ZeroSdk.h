@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace zero::sdk {
@@ -32,11 +33,13 @@ public:
     bool IsConnected() const noexcept;
     const std::string& PackageId() const noexcept { return packageId_; }
     const std::string& SessionId() const noexcept { return sessionId_; }
+    const std::optional<ResumeContext>& LaunchResume() const noexcept { return launchResume_; }
 
 private:
     void* pipe_{reinterpret_cast<void*>(-1)};
     std::string packageId_;
     std::string sessionId_;
+    std::optional<ResumeContext> launchResume_;
     std::function<void(bool)> overlayCallback_;
 
     bool WriteLine(const std::string& line, std::wstring& error);

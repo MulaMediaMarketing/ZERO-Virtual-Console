@@ -32,6 +32,10 @@ std::string hex(const unsigned char* data, size_t n) {
     return out;
 }
 
+std::string hexString(const std::string& value) {
+    return hex(reinterpret_cast<const unsigned char*>(value.data()), value.size());
+}
+
 } // namespace
 
 std::string RuntimeV3::CreateAuthToken() const {
@@ -43,7 +47,8 @@ std::string RuntimeV3::CreateAuthToken() const {
     return "fallback-" + std::to_string(fallback);
 }
 
-bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error) {
+bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
+                       const std::optional<ResumeMetadata>& launchResume) {
     if (IsActive()) {
         error = L"A game session is already active.";
         return false;
@@ -100,6 +105,14 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error) {
     }
     std::string pipe(ipc_.PipeName().begin(), ipc_.PipeName().end());
     f << "3\n" << v2_.Info().sessionId << "\n" << game.packageId << "\n" << pipe << "\n" << token << "\n";
+    if (launchResume) {
+        f << "1\n"
+          << hexString(launchResume->activityId) << "\n"
+          << hexString(launchResume->displayLabel) << "\n"
+          << hexString(launchResume->payload) << "\n";
+    } else {
+        f << "0\n\n\n\n";
+    }
     return true;
 }
 

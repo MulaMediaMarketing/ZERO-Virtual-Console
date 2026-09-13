@@ -33,6 +33,26 @@ bool safeField(const std::string& value) {
     return value.find('\t') == std::string::npos && value.find('\n') == std::string::npos && value.find('\r') == std::string::npos;
 }
 
+int hexNibble(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+bool hexDecode(const std::string& encoded, std::string& out) {
+    if (encoded.size() % 2 != 0) return false;
+    out.clear();
+    out.reserve(encoded.size() / 2);
+    for (size_t i = 0; i < encoded.size(); i += 2) {
+        const int hi = hexNibble(encoded[i]);
+        const int lo = hexNibble(encoded[i + 1]);
+        if (hi < 0 || lo < 0) return false;
+        out.push_back(static_cast<char>((hi << 4) | lo));
+    }
+    return true;
+}
+
 } // namespace
 
 Client::Client() = default;
@@ -72,6 +92,22 @@ bool Client::Initialize(std::wstring& error, unsigned timeoutMs) {
         return false;
     }
 
+    std::string resumeFlag, activityHex, labelHex, payloadHex;
+    std::getline(f, resumeFlag);
+    std::getline(f, activityHex);
+    std::getline(f, labelHex);
+    std::getline(f, payloadHex);
+    if (resumeFlag == "1") {
+        ResumeContext context;
+        if (!hexDecode(activityHex, context.activityId) ||
+            !hexDecode(labelHex, context.displayLabel) ||
+            !hexDecode(payloadHex, context.payload)) {
+            error = L"ZERO launch Resume context is invalid.";
+            return false;
+        }
+        launchResume_ = std::move(context);
+    }
+
     const auto pipeW = widen(pipeName);
     while (true) {
         HANDLE h = CreateFileW(pipeW.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -101,6 +137,7 @@ void Client::Shutdown() {
     pipe_ = reinterpret_cast<void*>(-1);
     packageId_.clear();
     sessionId_.clear();
+    launchResume_.reset();
 }
 
 bool Client::WriteLine(const std::string& line, std::wstring& error) {

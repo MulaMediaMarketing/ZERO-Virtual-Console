@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <sstream>
 #include <algorithm>
+#include <vector>
 
 using Microsoft::WRL::ComPtr;
 
@@ -103,7 +104,6 @@ void App::CreateDeviceResources() {
 ComPtr<ID2D1Bitmap> App::LoadBitmap(const std::filesystem::path& path) {
     ComPtr<ID2D1Bitmap> bitmap;
     if (!target_ || !wicFactory_ || path.empty() || !std::filesystem::exists(path)) return bitmap;
-
     ComPtr<IWICBitmapDecoder> decoder;
     if (FAILED(wicFactory_->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ,
         WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf()))) return bitmap;
@@ -127,8 +127,27 @@ void App::DrawHeroArtwork(const GameManifest& game, const D2D1_RECT_F& bounds) {
         cachedHeroPath_ = game.heroImage;
         cachedHero_ = LoadBitmap(game.heroImage);
     }
-    if (cachedHero_) target_->DrawBitmap(cachedHero_.Get(), bounds, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-    else DrawRoundedCard(bounds, 30, brushCard_.Get());
+    if (!cachedHero_) {
+        DrawRoundedCard(bounds, 30, brushCard_.Get());
+        return;
+    }
+
+    const auto source = cachedHero_->GetSize();
+    const float destW = bounds.right - bounds.left;
+    const float destH = bounds.bottom - bounds.top;
+    const float srcAspect = source.width / source.height;
+    const float dstAspect = destW / destH;
+    D2D1_RECT_F src = D2D1::RectF(0, 0, source.width, source.height);
+    if (srcAspect > dstAspect) {
+        const float cropW = source.height * dstAspect;
+        const float x = (source.width - cropW) * 0.5f;
+        src = D2D1::RectF(x, 0, x + cropW, source.height);
+    } else if (srcAspect < dstAspect) {
+        const float cropH = source.width / dstAspect;
+        const float y = (source.height - cropH) * 0.5f;
+        src = D2D1::RectF(0, y, source.width, y + cropH);
+    }
+    target_->DrawBitmap(cachedHero_.Get(), bounds, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, src);
 }
 
 void App::DrawTextLine(const std::wstring& s, float x, float y, float w, float h, bool head, ID2D1Brush* brush) {
@@ -148,6 +167,67 @@ std::wstring App::Widen(const std::string& s) const {
     std::wstring out(static_cast<size_t>(count), L'\0');
     MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), count);
     return out;
+}
+
+void App::DrawRecentGames(float W, float H) {
+    const auto& games = registry_.Games();
+    if (games.empty() || H < 780.0f) return;
+    std::vector<size_t> order(games.size());
+    for (size_t i = 0; i < games.size(); ++i) order[i] = i;
+    std::sort(order.begin(), order.end(), [this, &games](size_t a, size_t b) {
+        return runtime_.PlatformState(games[a].packageId).lastPlayedAtUtc >
+               runtime_.PlatformState(games[b].packageId).lastPlayedAtUtc;
+    });
+    DrawTextLine(L"Recent games", 64, 650, 260, 30, false, brushMuted_.Get());
+    const size_t count = std::min<size_t>(4, order.size());
+    const float gap = 14.0f;
+    const float cardW = (W - 128.0f - gap * 3.0f) / 4.0f;
+    for (size_t i = 0; i < count; ++i) {
+        const auto& game = games[order[i]];
+        const float x = 64.0f + i * (cardW + gap);
+        DrawRoundedCard(D2D1::RectF(x, 690, x + cardW, 755), 16, brushCard_.Get());
+        DrawTextLine(Widen(game.title), x + 18, 710, cardW - 36, 30, false);
+    }
+}
+
+void App::DrawOverlay(float W, float H) {
+    if (!overlayVisible_) return;
+    ComPtr<ID2D1SolidColorBrush> veil;
+    ComPtr<ID2D1SolidColorBrush> panel;
+    ComPtr<ID2D1SolidColorBrush> white;
+    target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.62f), veil.GetAddressOf());
+    target_->CreateSolidColorBrush(D2D1::ColorF(0x181818, 0.98f), panel.GetAddressOf());
+    target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
+    target_->FillRectangle(D2D1::RectF(0,0,W,H), veil.Get());
+
+    const float left = W - 470.0f;
+    DrawRoundedCard(D2D1::RectF(left, 40, W - 40, H - 40), 28, panel.Get());
+    DrawTextLine(L"ZERO", left + 34, 75, 250, 48, true, white.Get());
+    DrawTextLine(L"SYSTEM OVERLAY", left + 36, 119, 280, 28, false, brushMuted_.Get());
+
+    std::wstring session = L"No active session";
+    std::wstring playtime = L"0 min";
+    std::wstring achievements = L"0 unlocked";
+    if (runtime_.IsActive() || runtime_.State() == RuntimeState::Running) {
+        session = Widen(runtime_.Info().title);
+        playtime = std::to_wstring(runtime_.PlaytimeSeconds() / 60) + L" min";
+        achievements = std::to_wstring(runtime_.Achievements(runtime_.Info().packageId).size()) + L" unlocked";
+    }
+    DrawTextLine(session, left + 36, 180, 350, 34, false, white.Get());
+    DrawTextLine(L"Playtime   " + playtime, left + 36, 225, 350, 30, false, brushMuted_.Get());
+    DrawTextLine(L"Achievements   " + achievements, left + 36, 263, 350, 30, false, brushMuted_.Get());
+
+    const wchar_t* options[] = {L"Continue Game", L"Achievements", L"Exit Game"};
+    for (size_t i = 0; i < 3; ++i) {
+        const float y = 340.0f + static_cast<float>(i) * 78.0f;
+        if (overlayIndex_ == i) {
+            ComPtr<ID2D1SolidColorBrush> selected;
+            target_->CreateSolidColorBrush(D2D1::ColorF(0x333333), selected.GetAddressOf());
+            DrawRoundedCard(D2D1::RectF(left + 26, y, W - 66, y + 58), 18, selected.Get());
+        }
+        DrawTextLine(options[i], left + 48, y + 15, 300, 30, false, white.Get());
+    }
+    DrawTextLine(L"A Select   B Close", left + 36, H - 92, 320, 30, false, brushMuted_.Get());
 }
 
 void App::Paint() {
@@ -181,17 +261,17 @@ void App::Paint() {
             const auto hero = D2D1::RectF(62,285,W-62,620);
             DrawHeroArtwork(g, hero);
             ComPtr<ID2D1SolidColorBrush> shade;
-            target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.50f), shade.GetAddressOf());
-            target_->FillRectangle(hero, shade.Get());
             ComPtr<ID2D1SolidColorBrush> white;
+            target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.50f), shade.GetAddressOf());
             target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
+            target_->FillRectangle(hero, shade.Get());
             DrawTextLine(Widen(g.title), 108, 334, 760, 60, true, white.Get());
             DrawTextLine(L"Version " + Widen(g.version), 110, 392, 400, 35, false, white.Get());
             const auto resume = g.zeroResume ? resumeStore_.Load(g.packageId) : std::nullopt;
             DrawRoundedCard(D2D1::RectF(108,500,300,556), 20, white.Get());
             DrawTextLine(resume ? L"Resume" : L"Play", 160, 515, 120, 30, false, brushText_.Get());
             if (resume) DrawTextLine(L"Continue: " + Widen(resume->displayLabel), 330, 515, 500, 30, false, white.Get());
-            DrawTextLine(L"A  Select     B  Back     F5  Refresh", 64, H-62, 700, 32, false, brushMuted_.Get());
+            DrawRecentGames(W, H);
         }
     } else if (page_ == Page::Library) {
         DrawTextLine(L"Your Library", 62, 154, 500, 60, true);
@@ -203,21 +283,25 @@ void App::Paint() {
             DrawTextLine(Widen(games[i].title), 92, y+14, 540, 30, false);
             DrawTextLine(Widen(games[i].version), W-250, y+14, 120, 30, false, brushMuted_.Get());
         }
-    } else if (page_ == Page::GameDetail) {
-        if (!games.empty()) {
-            const auto& g = games[std::min(selectedGame_, games.size()-1)];
-            DrawTextLine(Widen(g.title), 62, 154, 700, 60, true);
-            DrawTextLine(Widen(g.packageId), 64, 208, 700, 35, false, brushMuted_.Get());
-            const auto platform = runtime_.PlatformState(g.packageId);
-            DrawTextLine(L"Playtime  " + std::to_wstring(platform.totalPlaytimeSeconds / 60) + L" min", 64, 280, 400, 30, false);
-            DrawTextLine(L"Launches  " + std::to_wstring(platform.launchCount), 64, 320, 400, 30, false);
-            const auto resume = g.zeroResume ? resumeStore_.Load(g.packageId) : std::nullopt;
-            DrawRoundedCard(D2D1::RectF(64,410,264,468), 20, brushAccent_.Get());
-            ComPtr<ID2D1SolidColorBrush> white; target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-            DrawTextLine(resume ? L"Resume" : L"Play", 120, 426, 110, 30, false, white.Get());
-            if (resume) DrawTextLine(L"Resume point: " + Widen(resume->displayLabel), 64, 500, W-130, 40, false, brushMuted_.Get());
-            DrawTextLine(status_, 64, 560, W-130, 60, false, brushMuted_.Get());
+    } else if (page_ == Page::GameDetail && !games.empty()) {
+        const auto& g = games[std::min(selectedGame_, games.size()-1)];
+        DrawTextLine(Widen(g.title), 62, 154, 700, 60, true);
+        DrawTextLine(Widen(g.packageId), 64, 208, 700, 35, false, brushMuted_.Get());
+        const auto platform = runtime_.PlatformState(g.packageId);
+        DrawTextLine(L"Playtime  " + std::to_wstring(platform.totalPlaytimeSeconds / 60) + L" min", 64, 280, 400, 30, false);
+        DrawTextLine(L"Launches  " + std::to_wstring(platform.launchCount), 64, 320, 400, 30, false);
+        const auto resume = g.zeroResume ? resumeStore_.Load(g.packageId) : std::nullopt;
+        ComPtr<ID2D1SolidColorBrush> white;
+        target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
+        DrawRoundedCard(D2D1::RectF(64,410,244,468), 20, preferResume_ && resume ? brushCard_.Get() : brushAccent_.Get());
+        DrawTextLine(L"Play", 118, 426, 90, 30, false, preferResume_ && resume ? brushText_.Get() : white.Get());
+        if (resume) {
+            DrawRoundedCard(D2D1::RectF(264,410,464,468), 20, preferResume_ ? brushAccent_.Get() : brushCard_.Get());
+            DrawTextLine(L"Resume", 318, 426, 110, 30, false, preferResume_ ? white.Get() : brushText_.Get());
+            DrawTextLine(L"Resume point: " + Widen(resume->displayLabel), 64, 500, W-130, 40, false, brushMuted_.Get());
+            DrawTextLine(L"Left/Right chooses Play or Resume", 64, 540, W-130, 34, false, brushMuted_.Get());
         }
+        DrawTextLine(status_, 64, 590, W-130, 60, false, brushMuted_.Get());
     } else if (page_ == Page::Import) {
         DrawTextLine(L"Import a game", 62, 154, 600, 60, true);
         DrawTextLine(L"Add a folder that contains a valid zero.manifest.json and native Windows game executable.",
@@ -238,6 +322,7 @@ void App::Paint() {
     }
 
     if (!status_.empty() && page_ != Page::GameDetail) DrawTextLine(status_, 64, H-110, W-130, 38, false, brushMuted_.Get());
+    DrawOverlay(W, H);
     HRESULT hr = target_->EndDraw();
     if (hr == D2DERR_RECREATE_TARGET) {
         target_.Reset();
@@ -246,10 +331,29 @@ void App::Paint() {
     }
 }
 
+void App::SetOverlayVisible(bool visible) {
+    if (overlayVisible_ == visible) return;
+    overlayVisible_ = visible;
+    overlayIndex_ = 0;
+    runtime_.SetOverlayVisible(visible);
+    if (visible) {
+        SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        ShowWindow(hwnd_, SW_SHOW);
+        SetForegroundWindow(hwnd_);
+    } else {
+        SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    }
+}
+
 void App::Tick() {
     runtime_.Poll();
-    if (runtime_.State() == RuntimeState::Crashed) status_ = L"The game closed unexpectedly. ZERO recorded diagnostics and is still running.";
-    else if (runtime_.State() == RuntimeState::Exited && status_.empty()) status_ = L"Game session ended.";
+    if (runtime_.State() == RuntimeState::Crashed) {
+        status_ = L"The game closed unexpectedly. ZERO recorded diagnostics and is still running.";
+        if (overlayVisible_) SetOverlayVisible(false);
+    } else if (runtime_.State() == RuntimeState::Exited) {
+        if (status_.empty()) status_ = L"Game session ended.";
+        if (overlayVisible_) SetOverlayVisible(false);
+    }
     HandleInput(input_.Poll());
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
@@ -257,24 +361,60 @@ void App::Tick() {
 void App::NavigateTo(Page p) { page_ = p; status_.clear(); }
 
 void App::HandleInput(const InputSnapshot& in) {
-    if (in.left && navIndex_>0) {
-        navIndex_--;
-        NavigateTo(navIndex_==0?Page::Home:navIndex_==1?Page::Library:navIndex_==2?Page::Import:Page::Settings);
+    if (overlayVisible_) {
+        if (in.up && overlayIndex_ > 0) --overlayIndex_;
+        if (in.down && overlayIndex_ < 2) ++overlayIndex_;
+        if (in.menu || in.back) SetOverlayVisible(false);
+        else if (in.select) {
+            if (overlayIndex_ == 0) SetOverlayVisible(false);
+            else if (overlayIndex_ == 1) {
+                const auto count = runtime_.Achievements(runtime_.Info().packageId).size();
+                status_ = L"Achievements unlocked: " + std::to_wstring(count);
+            } else if (overlayIndex_ == 2) {
+                runtime_.Terminate();
+                SetOverlayVisible(false);
+                status_ = L"Game session ended.";
+            }
+        }
+        return;
     }
-    if (in.right && navIndex_<3) {
-        navIndex_++;
-        NavigateTo(navIndex_==0?Page::Home:navIndex_==1?Page::Library:navIndex_==2?Page::Import:Page::Settings);
+
+    if (in.menu && runtime_.IsActive()) {
+        SetOverlayVisible(true);
+        return;
     }
+
     const auto n = registry_.Games().size();
+    if (page_ == Page::GameDetail && n) {
+        const auto& game = registry_.Games()[std::min(selectedGame_, n - 1)];
+        const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
+        if (hasResume && in.left) preferResume_ = false;
+        if (hasResume && in.right) preferResume_ = true;
+    } else {
+        if (in.left && navIndex_>0) {
+            navIndex_--;
+            NavigateTo(navIndex_==0?Page::Home:navIndex_==1?Page::Library:navIndex_==2?Page::Import:Page::Settings);
+        }
+        if (in.right && navIndex_<3) {
+            navIndex_++;
+            NavigateTo(navIndex_==0?Page::Home:navIndex_==1?Page::Library:navIndex_==2?Page::Import:Page::Settings);
+        }
+    }
+
     if (page_ == Page::Library && n) {
         if (in.up && selectedGame_>0) selectedGame_--;
         if (in.down && selectedGame_+1<n) selectedGame_++;
-        if (in.select) NavigateTo(Page::GameDetail);
+        if (in.select) { preferResume_ = true; NavigateTo(Page::GameDetail); }
     } else if (page_ == Page::Import && in.select) {
         ImportGameFolder();
-    } else if ((page_ == Page::Home || page_ == Page::GameDetail) && in.select && n) {
-        LaunchSelected();
+    } else if (page_ == Page::Home && in.select && n) {
+        const auto& game = registry_.Games()[std::min(selectedGame_, n - 1)];
+        const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
+        LaunchSelected(hasResume);
+    } else if (page_ == Page::GameDetail && in.select && n) {
+        LaunchSelected(preferResume_);
     }
+
     if (in.back) {
         if (page_ == Page::GameDetail) NavigateTo(Page::Library);
         else if (page_ != Page::Home) { navIndex_=0; NavigateTo(Page::Home); }
@@ -314,14 +454,15 @@ void App::ImportGameFolder() {
     page_ = Page::Library;
 }
 
-void App::LaunchSelected() {
+void App::LaunchSelected(bool useResume) {
     const auto& games = registry_.Games();
     if (games.empty() || selectedGame_>=games.size()) return;
     const auto& game = games[selectedGame_];
-    const auto resume = game.zeroResume ? resumeStore_.Load(game.packageId) : std::nullopt;
+    std::optional<ResumeMetadata> resume;
+    if (useResume && game.zeroResume) resume = resumeStore_.Load(game.packageId);
     std::wstring error;
-    if (runtime_.Launch(game, error)) {
-        status_ = (resume ? L"Launching resume activity for " : L"Launching ") + Widen(game.title) + L"...";
+    if (runtime_.Launch(game, error, resume)) {
+        status_ = (resume ? L"Resuming " : L"Launching ") + Widen(game.title) + L"...";
     } else status_ = error;
 }
 
@@ -345,6 +486,7 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
             if (wp == VK_F5) { registry_.Refresh(); cachedHero_.Reset(); cachedHeroPath_.clear(); status_=L"Library refreshed."; return 0; }
             if (wp == 'I') { navIndex_=2; NavigateTo(Page::Import); return 0; }
             if (wp == VK_F11) { EnterBorderlessFullscreen(); return 0; }
+            if (wp == VK_F1 && runtime_.IsActive()) { SetOverlayVisible(!overlayVisible_); return 0; }
             if (wp == 'Q' && (GetKeyState(VK_CONTROL)&0x8000)) { DestroyWindow(hwnd_); return 0; }
             return 0;
         case WM_DESTROY: runtime_.Terminate(); PostQuitMessage(0); return 0;
