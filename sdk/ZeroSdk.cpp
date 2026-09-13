@@ -3,19 +3,17 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <thread>
-#include <vector>
 
 namespace zero::sdk {
 namespace {
 
 std::wstring widen(const std::string& s) {
     if (s.empty()) return {};
-    const int n = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
-    if (n <= 0) return std::wstring(s.begin(), s.end());
+    const int n = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s.data(), static_cast<int>(s.size()), nullptr, 0);
+    if (n <= 0) return {};
     std::wstring out(static_cast<size_t>(n), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), n);
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s.data(), static_cast<int>(s.size()), out.data(), n);
     return out;
 }
 
@@ -23,14 +21,11 @@ std::string envUtf8(const wchar_t* key) {
     wchar_t buffer[32768]{};
     DWORD n = GetEnvironmentVariableW(key, buffer, static_cast<DWORD>(std::size(buffer)));
     if (!n || n >= std::size(buffer)) return {};
-    const int bytes = WideCharToMultiByte(CP_UTF8, 0, buffer, static_cast<int>(n), nullptr, 0, nullptr, nullptr);
+    const int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, buffer, static_cast<int>(n), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) return {};
     std::string out(static_cast<size_t>(bytes), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, buffer, static_cast<int>(n), out.data(), bytes, nullptr, nullptr);
+    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, buffer, static_cast<int>(n), out.data(), bytes, nullptr, nullptr);
     return out;
-}
-
-bool safeField(const std::string& value) {
-    return value.find('\t') == std::string::npos && value.find('\n') == std::string::npos && value.find('\r') == std::string::npos;
 }
 
 int hexNibble(char c) {
@@ -50,7 +45,7 @@ bool hexDecode(const std::string& encoded, std::string& out) {
         if (hi < 0 || lo < 0) return false;
         out.push_back(static_cast<char>((hi << 4) | lo));
     }
-    return true;
+    return protocol::IsValidUtf8(out);
 }
 
 } // namespace
@@ -66,15 +61,15 @@ bool Client::Initialize(std::wstring& error, unsigned timeoutMs) {
     Shutdown();
     const auto tempRoot = envUtf8(L"ZERO_TEMP_ROOT");
     if (tempRoot.empty()) {
-        error = L"ZERO_TEMP_ROOT is missing. This process was not launched by ZERO Runtime V3.";
+        error = L"ZERO_TEMP_ROOT is missing. This process was not launched by ZERO Runtime.";
         return false;
     }
 
-    const auto bootstrap = std::filesystem::path(widen(tempRoot)) / L"runtime-v3.bootstrap";
+    const auto bootstrap = std::filesystem::path(widen(tempRoot)) / L"runtime-v4.bootstrap";
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     while (!std::filesystem::exists(bootstrap)) {
         if (std::chrono::steady_clock::now() >= deadline) {
-            error = L"Timed out waiting for ZERO Runtime V3 bootstrap.";
+            error = L"Timed out waiting for ZERO Runtime V4 bootstrap.";
             return false;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(25));
@@ -87,8 +82,8 @@ bool Client::Initialize(std::wstring& error, unsigned timeoutMs) {
     std::getline(f, packageId_);
     std::getline(f, pipeName);
     std::getline(f, token);
-    if (version != "3" || sessionId_.empty() || packageId_.empty() || pipeName.empty() || token.empty()) {
-        error = L"ZERO Runtime V3 bootstrap is invalid.";
+    if (version != "4" || sessionId_.empty() || packageId_.empty() || pipeName.empty() || token.empty()) {
+        error = L"ZERO Runtime V4 bootstrap is invalid.";
         return false;
     }
 
@@ -111,21 +106,28 @@ bool Client::Initialize(std::wstring& error, unsigned timeoutMs) {
     const auto pipeW = widen(pipeName);
     while (true) {
         HANDLE h = CreateFileW(pipeW.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-        if (h != INVALID_HANDLE_VALUE) {
-            pipe_ = h;
-            break;
-        }
+        if (h != INVALID_HANDLE_VALUE) { pipe_ = h; break; }
         if (GetLastError() != ERROR_PIPE_BUSY || std::chrono::steady_clock::now() >= deadline) {
-            error = L"Could not connect to ZERO Runtime V3 IPC.";
+            error = L"Could not connect to ZERO Runtime V4 IPC.";
             return false;
         }
         WaitNamedPipeW(pipeW.c_str(), 100);
     }
 
-    if (!WriteLine("HELLO\t" + token + "\t" + packageId_ + "\t3", error)) return false;
-    std::string response;
-    if (!ReadLine(response, error) || response != "WELCOME\t3") {
-        error = L"ZERO Runtime V3 authentication failed.";
+    protocol::Message hello;
+    hello.type = protocol::MessageType::Hello;
+    hello.requestId = nextRequestId_++;
+    hello.fields = {token, packageId_, "4"};
+    if (!protocol::WriteMessage(static_cast<HANDLE>(pipe_), hello)) {
+        error = L"ZERO SDK IPC authentication write failed.";
+        Shutdown();
+        return false;
+    }
+    protocol::Message response;
+    if (!protocol::ReadMessage(static_cast<HANDLE>(pipe_), response) ||
+        response.type != protocol::MessageType::Welcome ||
+        response.requestId != hello.requestId || response.fields != std::vector<std::string>{"4"}) {
+        error = L"ZERO Runtime V4 authentication failed.";
         Shutdown();
         return false;
     }
@@ -138,69 +140,74 @@ void Client::Shutdown() {
     packageId_.clear();
     sessionId_.clear();
     launchResume_.reset();
+    nextRequestId_ = 1;
 }
 
-bool Client::WriteLine(const std::string& line, std::wstring& error) {
+bool Client::SendRequest(protocol::MessageType type,
+                         std::vector<std::string> fields,
+                         protocol::MessageType expectedType,
+                         const std::string& expectedAck,
+                         std::wstring& error) {
     if (!IsConnected()) { error = L"ZERO SDK is not connected."; return false; }
-    const std::string msg = line + "\n";
-    DWORD written = 0;
-    if (!WriteFile(static_cast<HANDLE>(pipe_), msg.data(), static_cast<DWORD>(msg.size()), &written, nullptr) || written != msg.size()) {
+    protocol::Message request;
+    request.type = type;
+    request.requestId = nextRequestId_++;
+    request.fields = std::move(fields);
+    if (!protocol::WriteMessage(static_cast<HANDLE>(pipe_), request)) {
         error = L"ZERO SDK IPC write failed.";
         return false;
     }
-    return true;
-}
-
-bool Client::ReadLine(std::string& line, std::wstring& error) {
-    line.clear();
-    if (!IsConnected()) { error = L"ZERO SDK is not connected."; return false; }
-    char c = 0;
-    DWORD read = 0;
-    while (true) {
-        if (!ReadFile(static_cast<HANDLE>(pipe_), &c, 1, &read, nullptr) || read != 1) {
-            error = L"ZERO SDK IPC read failed.";
-            return false;
-        }
-        if (c == '\n') break;
-        if (c != '\r') line.push_back(c);
-        if (line.size() > 8192) { error = L"ZERO SDK IPC message exceeded limit."; return false; }
+    protocol::Message response;
+    if (!protocol::ReadMessage(static_cast<HANDLE>(pipe_), response) || response.requestId != request.requestId) {
+        error = L"ZERO SDK IPC response failed.";
+        return false;
+    }
+    if (response.type == protocol::MessageType::Error) {
+        error = L"ZERO Runtime rejected the SDK request.";
+        return false;
+    }
+    if (response.type != expectedType) {
+        error = L"ZERO SDK received an unexpected response type.";
+        return false;
+    }
+    if (!expectedAck.empty() && (response.fields.size() != 1 || response.fields[0] != expectedAck)) {
+        error = L"ZERO SDK received an invalid acknowledgement.";
+        return false;
     }
     return true;
 }
 
 bool Client::ReportReady(std::wstring& error) {
-    if (!WriteLine("READY", error)) return false;
-    std::string response;
-    return ReadLine(response, error) && response == "ACK\tREADY";
+    return SendRequest(protocol::MessageType::Ready, {}, protocol::MessageType::Ack, "READY", error);
 }
 
 bool Client::SetResumeActivity(const ResumeContext& c, std::wstring& error) {
-    if (!safeField(c.activityId) || !safeField(c.displayLabel) || !safeField(c.payload)) {
-        error = L"Resume fields contain characters unsupported by the current protocol.";
+    if (c.activityId.empty() || c.activityId.size() > 256 || c.displayLabel.size() > 512 ||
+        c.payload.size() > 60 * 1024 || !protocol::IsValidUtf8(c.activityId) ||
+        !protocol::IsValidUtf8(c.displayLabel) || !protocol::IsValidUtf8(c.payload)) {
+        error = L"Resume fields are invalid or exceed Protocol V4 limits.";
         return false;
     }
-    if (!WriteLine("RESUME\t" + c.activityId + "\t" + c.displayLabel + "\t" + c.payload, error)) return false;
-    std::string response;
-    return ReadLine(response, error) && response == "ACK\tRESUME";
+    return SendRequest(protocol::MessageType::Resume,
+                       {c.activityId, c.displayLabel, c.payload},
+                       protocol::MessageType::Ack, "RESUME", error);
 }
 
 bool Client::UnlockAchievement(const std::string& achievementId,
                                const std::string& title,
                                std::wstring& error) {
     if (achievementId.empty() || achievementId.size() > 160 || title.empty() || title.size() > 256 ||
-        !safeField(achievementId) || !safeField(title)) {
+        !protocol::IsValidUtf8(achievementId) || !protocol::IsValidUtf8(title)) {
         error = L"Achievement fields are invalid.";
         return false;
     }
-    if (!WriteLine("ACHIEVEMENT\t" + achievementId + "\t" + title, error)) return false;
-    std::string response;
-    return ReadLine(response, error) && response == "ACK\tACHIEVEMENT";
+    return SendRequest(protocol::MessageType::Achievement,
+                       {achievementId, title},
+                       protocol::MessageType::Ack, "ACHIEVEMENT", error);
 }
 
 bool Client::Ping(std::wstring& error) {
-    if (!WriteLine("PING", error)) return false;
-    std::string response;
-    return ReadLine(response, error) && response == "PONG";
+    return SendRequest(protocol::MessageType::Ping, {}, protocol::MessageType::Pong, "", error);
 }
 
 void Client::SetOverlayCallback(std::function<void(bool)> callback) { overlayCallback_ = std::move(callback); }
@@ -212,13 +219,24 @@ bool Client::Poll(std::wstring& error) {
         error = L"ZERO SDK IPC polling failed.";
         return false;
     }
-    if (!available) return true;
-    std::string line;
-    if (!ReadLine(line, error)) return false;
-    if (line == "OVERLAY\t1" || line == "OVERLAY\t0") {
-        const bool visible = line.back() == '1';
+    if (available < 4) return true;
+
+    protocol::Message message;
+    if (!protocol::ReadMessage(static_cast<HANDLE>(pipe_), message)) {
+        error = L"ZERO SDK IPC frame read failed.";
+        return false;
+    }
+    if (message.type == protocol::MessageType::Overlay && message.fields.size() == 1) {
+        const bool visible = message.fields[0] == "1";
         if (overlayCallback_) overlayCallback_(visible);
-        return WriteLine(visible ? "OVERLAY_ACK\t1" : "OVERLAY_ACK\t0", error);
+        protocol::Message ack;
+        ack.type = protocol::MessageType::OverlayAck;
+        ack.requestId = message.requestId;
+        ack.fields = {visible ? "1" : "0"};
+        if (!protocol::WriteMessage(static_cast<HANDLE>(pipe_), ack)) {
+            error = L"ZERO SDK overlay acknowledgement failed.";
+            return false;
+        }
     }
     return true;
 }
