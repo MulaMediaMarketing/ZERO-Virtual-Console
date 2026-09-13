@@ -26,8 +26,8 @@ bool RuntimeV4::Launch(const GameManifest& game, std::wstring& error,
     if (!database_.UpsertGame(game, error)) return false;
 
     v3_.SetAchievementCallback([this](const std::string& id, const std::string& title) {
-        std::wstring ignored;
-        UnlockAchievement(id, title, ignored);
+        std::wstring persistenceError;
+        return UnlockAchievement(id, title, persistenceError);
     });
     if (!v3_.Launch(game, error, launchResume)) return false;
     activePackageId_ = game.packageId;

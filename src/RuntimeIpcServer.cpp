@@ -157,12 +157,14 @@ bool RuntimeIpcServer::HandleMessage(const protocol::Message& message, HANDLE pi
 
         case MessageType::Resume:
             if (message.fields.size() != 3) return Send(pipe, MessageType::Error, message.requestId, {"BAD_RESUME"});
-            if (callbacks_.onResume) callbacks_.onResume(message.fields[0], message.fields[1], message.fields[2]);
+            if (!callbacks_.onResume || !callbacks_.onResume(message.fields[0], message.fields[1], message.fields[2]))
+                return Send(pipe, MessageType::Error, message.requestId, {"RESUME_PERSIST_FAILED"});
             return Send(pipe, MessageType::Ack, message.requestId, {"RESUME"});
 
         case MessageType::Achievement:
             if (message.fields.size() != 2) return Send(pipe, MessageType::Error, message.requestId, {"BAD_ACHIEVEMENT"});
-            if (callbacks_.onAchievement) callbacks_.onAchievement(message.fields[0], message.fields[1]);
+            if (!callbacks_.onAchievement || !callbacks_.onAchievement(message.fields[0], message.fields[1]))
+                return Send(pipe, MessageType::Error, message.requestId, {"ACHIEVEMENT_PERSIST_FAILED"});
             return Send(pipe, MessageType::Ack, message.requestId, {"ACHIEVEMENT"});
 
         case MessageType::OverlayAck:

@@ -102,11 +102,11 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
         metadata.activityId = activityId;
         metadata.displayLabel = displayLabel;
         metadata.payload = payload;
-        std::wstring ignored;
-        resumeStore_.Save(metadata, ignored);
+        std::wstring persistenceError;
+        return resumeStore_.Save(metadata, persistenceError);
     };
     callbacks.onAchievement = [this](const std::string& id, const std::string& title) {
-        if (achievementCallback_) achievementCallback_(id, title);
+        return achievementCallback_ && achievementCallback_(id, title);
     };
 
     if (!ipc_.Start(v2_.Info().sessionId, game.packageId, token, std::move(callbacks), error)) {

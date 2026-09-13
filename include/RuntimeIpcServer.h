@@ -12,8 +12,8 @@ namespace zero {
 
 struct RuntimeIpcCallbacks {
     std::function<void()> onReady;
-    std::function<void(const std::string&, const std::string&, const std::string&)> onResume;
-    std::function<void(const std::string&, const std::string&)> onAchievement;
+    std::function<bool(const std::string&, const std::string&, const std::string&)> onResume;
+    std::function<bool(const std::string&, const std::string&)> onAchievement;
     std::function<void(bool)> onOverlayFocus;
 };
 
