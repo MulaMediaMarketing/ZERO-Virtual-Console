@@ -1,4 +1,5 @@
 #include "RuntimeV4.h"
+#include "PackageIntegrityVerifier.h"
 
 namespace zero {
 namespace {
@@ -23,6 +24,7 @@ const char* outcomeName(RuntimeOutcome outcome) {
 
 bool RuntimeV4::Launch(const GameManifest& game, std::wstring& error,
                        const std::optional<ResumeMetadata>& launchResume) {
+    if (!PackageIntegrityVerifier::Verify(game.root, error)) return false;
     if (!database_.UpsertGame(game, error)) return false;
 
     v3_.SetAchievementCallback([this](const std::string& id, const std::string& title) {
