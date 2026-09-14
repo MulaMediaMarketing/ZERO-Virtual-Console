@@ -9,16 +9,32 @@ void App::NotifyFocusMoved() {
     lastInput_ = std::chrono::steady_clock::now();
 }
 
+bool App::ShellContentOwnsFocus() const noexcept {
+    return launchUxMode_ == LaunchUxMode::Hidden &&
+           !shellUx_.OverlayRenderActive() &&
+           !captureViewerVisible_ &&
+           !captureDeleteConfirm_;
+}
+
+void App::RestoreShellForeground() {
+    if (!hwnd_) return;
+    EnterBorderlessFullscreen();
+    SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    ShowWindow(hwnd_, SW_SHOW);
+    SetForegroundWindow(hwnd_);
+}
+
 void App::DrawFocusRing(const D2D1_RECT_F& bounds, float radius, bool light) {
     if (!target_) return;
 
     ComPtr<ID2D1SolidColorBrush> focus;
     const auto color = light
-        ? D2D1::ColorF(D2D1::ColorF::White, 0.96f)
-        : D2D1::ColorF(0x171717, 0.95f);
+        ? D2D1::ColorF(D2D1::ColorF::White, 0.98f)
+        : D2D1::ColorF(0x111111, 0.98f);
     if (FAILED(target_->CreateSolidColorBrush(color, focus.GetAddressOf()))) return;
 
-    const float inset = shellUx_.ReducedMotion() ? 3.0f : 2.0f;
+    const float inset = shellUx_.ReducedMotion() ? 3.5f : 2.5f;
     const auto ring = D2D1::RoundedRect(
         D2D1::RectF(bounds.left - inset,
                     bounds.top - inset,
