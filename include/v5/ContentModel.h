@@ -71,6 +71,8 @@ struct LaunchDescriptor {
     std::string entitlementToken;
     std::string sessionToken;
     LaunchAuthorityKind authorityKind{LaunchAuthorityKind::ServerManaged};
+    std::string contentId;
+    std::string accountId;
 };
 
 } // namespace zero::v5
