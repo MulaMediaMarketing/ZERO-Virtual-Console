@@ -1,5 +1,5 @@
 #include "App.h"
-#include <shlobj.h>
+#include "PlatformPaths.h"
 #include <shobjidl.h>
 #include <algorithm>
 #include <filesystem>
@@ -7,25 +7,14 @@
 using Microsoft::WRL::ComPtr;
 
 namespace zero {
-namespace {
-std::filesystem::path localRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::current_path() / "ZeroData";
-}
-}
 
 App::App(HINSTANCE instance)
     : instance_(instance),
-      registry_(localRoot() / "Library"),
-      importer_(localRoot() / "Library"),
-      captures_(localRoot() / "Captures"),
-      identity_(localRoot()),
-      settingsStore_(localRoot()) {}
+      registry_(PlatformPaths::LibraryRoot()),
+      importer_(PlatformPaths::LibraryRoot()),
+      captures_(PlatformPaths::CapturesRoot()),
+      identity_(PlatformPaths::DataRoot()),
+      settingsStore_(PlatformPaths::DataRoot()) {}
 
 int App::Run() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
