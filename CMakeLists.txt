@@ -32,6 +32,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/PackageSecurity.cpp
   src/PackageIntegrityVerifier.cpp
   src/PackageTrust.cpp
+  src/CngPublisherTrustProvider.cpp
   src/RuntimeSession.cpp
   src/RuntimeSessionLifecycle.cpp
   src/RuntimeSessionDiagnostics.cpp
@@ -98,8 +99,10 @@ target_link_libraries(ZeroPackageIntegrityAcceptance PRIVATE bcrypt)
 add_executable(ZeroPackageTrustAcceptance
   tools/PackageTrustAcceptance.cpp
   src/PackageTrust.cpp
+  src/CngPublisherTrustProvider.cpp
 )
 target_include_directories(ZeroPackageTrustAcceptance PRIVATE include)
 target_compile_definitions(ZeroPackageTrustAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroPackageTrustAcceptance PRIVATE bcrypt shell32 ole32)
 
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
