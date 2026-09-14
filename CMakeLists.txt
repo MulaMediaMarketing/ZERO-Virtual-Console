@@ -130,6 +130,16 @@ add_executable(ZeroStrictJsonAcceptance tools/StrictJsonAcceptance.cpp)
 target_include_directories(ZeroStrictJsonAcceptance PRIVATE include)
 target_compile_definitions(ZeroStrictJsonAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_executable(ZeroPlatformDatabaseAcceptance
+  tools/PlatformDatabaseAcceptance.cpp
+  src/PlatformDatabase.cpp
+  src/PlatformDatabaseResume.cpp
+  src/PlatformDatabaseReads.cpp
+)
+target_include_directories(ZeroPlatformDatabaseAcceptance PRIVATE include)
+target_compile_definitions(ZeroPlatformDatabaseAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroPlatformDatabaseAcceptance PRIVATE shell32 ole32 winsqlite3)
+
 add_executable(ZeroInputAcceptance
   tools/InputAcceptance.cpp
   src/InputCore.cpp
