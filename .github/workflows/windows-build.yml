@@ -29,6 +29,11 @@ jobs:
         timeout-minutes: 12
         run: ./tools/verify-m1-automated.ps1 -BuildRoot ./build -ReportDir ./build/AcceptanceReports
 
+      - name: Validate RC qualification remains physical-hardware gated
+        shell: pwsh
+        timeout-minutes: 2
+        run: ./tools/run-rc-qualification.ps1 -BuildRoot ./build -EvidenceDir ./build/QualificationEvidence -NonInteractiveValidation
+
       - name: Upload ZERO binaries and acceptance evidence
         uses: actions/upload-artifact@v4
         with:
@@ -44,9 +49,12 @@ jobs:
             build/Release/ZeroPackageRepairAcceptance.exe
             build/Release/ZeroInputAcceptance.exe
             build/Release/ZeroShellUxAcceptance.exe
+            build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
             build/AcceptanceReports/**
+            build/QualificationEvidence/**
             tools/verify-m1-automated.ps1
+            tools/run-rc-qualification.ps1
             tools/verify-rc-build.ps1
             tools/verify-installer-v2.ps1
             docs/RUNTIME_V4_1_RC_GATE.md
