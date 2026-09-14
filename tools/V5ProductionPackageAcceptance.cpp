@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <windows.h>
 
@@ -23,6 +24,24 @@ struct TempTree {
     ~TempTree() {
         std::error_code ec;
         std::filesystem::remove_all(root, ec);
+    }
+};
+
+struct BoundManagedAuthority final : zero::v5::IManagedLaunchAuthorityClient {
+    bool misbind{false};
+    std::optional<zero::v5::LaunchDescriptor> Authorize(const std::string& accountId,
+                                                         const std::string& contentId,
+                                                         std::wstring&) const override {
+        zero::v5::LaunchDescriptor descriptor;
+        descriptor.packageId = "zero.managed.game";
+        descriptor.version = "2.0.0";
+        descriptor.runtimeType = zero::v5::RuntimeType::Streaming;
+        descriptor.entitlementToken = "entitlement-token";
+        descriptor.sessionToken = "session-token";
+        descriptor.authorityKind = zero::v5::LaunchAuthorityKind::ServerManaged;
+        descriptor.contentId = contentId;
+        descriptor.accountId = misbind ? "wrong-account" : accountId;
+        return descriptor;
     }
 };
 
@@ -73,8 +92,8 @@ int main() {
 
     DisconnectedPublisherTrustProvider trust;
     ProductionPackagePlatform packages(library, trust, database);
-    DisconnectedManagedLaunchAuthorityClient managedAuthority;
-    ProductionPlatformKernel kernel(library, trust, managedAuthority);
+    DisconnectedManagedLaunchAuthorityClient disconnectedManaged;
+    ProductionPlatformKernel kernel(library, trust, disconnectedManaged);
 
     PackageOperationRequest import;
     import.operation = PackageOperation::Import;
@@ -100,19 +119,26 @@ int main() {
 
     ProductionLaunchRequest managedRequest;
     managedRequest.mode = LaunchRequestMode::Managed;
-    managedRequest.contentId = "zero.acceptance.game";
+    managedRequest.contentId = "zero.managed.content";
     managedRequest.accountId = "acct-1";
     if (kernel.RequestLaunch(managedRequest).authorized) return 27;
 
-    if (!writeText(imported.installedRoot / L"game.exe", "tampered")) return 28;
-    if (kernel.RequestLaunch(localRequest).authorized) return 29;
+    BoundManagedAuthority boundManaged;
+    ProductionPlatformKernel managedKernel(library, trust, boundManaged);
+    const auto managedLaunch = managedKernel.RequestLaunch(managedRequest);
+    if (!managedLaunch.authorized || managedLaunch.descriptor.accountId != "acct-1") return 28;
+    boundManaged.misbind = true;
+    if (managedKernel.RequestLaunch(managedRequest).authorized) return 29;
+
+    if (!writeText(imported.installedRoot / L"game.exe", "tampered")) return 30;
+    if (kernel.RequestLaunch(localRequest).authorized) return 31;
 
     PackageOperationRequest mismatch;
     mismatch.operation = PackageOperation::Repair;
     mismatch.sourceRoot = wrongSource;
     mismatch.expectedPackageId = "zero.acceptance.game";
     mismatch.trustPolicy = PackageTrustPolicy::AllowLocalUnsigned;
-    if (packages.Execute(mismatch).success) return 30;
+    if (packages.Execute(mismatch).success) return 32;
 
     PackageOperationRequest repair;
     repair.operation = PackageOperation::Repair;
