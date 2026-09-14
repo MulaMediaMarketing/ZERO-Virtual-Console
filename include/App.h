@@ -1,5 +1,6 @@
 #pragma once
 #include "CaptureLibrary.h"
+#include "CapturesExperience.h"
 #include "FriendsExperience.h"
 #include "GameRegistry.h"
 #include "GameImportService.h"
@@ -61,6 +62,7 @@ private:
     Input input_;
     ShellUxState shellUx_;
     FriendsExperienceState friendsUx_{};
+    CaptureExperienceState capturesUx_{};
     Page page_{Page::Home};
     Page achievementsReturnPage_{Page::Home};
     LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
