@@ -52,8 +52,6 @@ InputCore::NavDirection InputCore::ResolveDirection(bool up, bool down, bool lef
     if (vertical && !horizontal) return up ? NavDirection::Up : NavDirection::Down;
     if (!vertical && horizontal) return left ? NavDirection::Left : NavDirection::Right;
 
-    // For diagonals, use the dominant analog axis when available. D-pad ties prefer
-    // the current repeating direction to avoid focus jitter, otherwise vertical.
     if (controller) {
         const int ax = std::abs(static_cast<int>(controller->leftX));
         const int ay = std::abs(static_cast<int>(controller->leftY));
@@ -97,9 +95,20 @@ InputSnapshot InputCore::Update(const std::array<ControllerInputSample, 4>& cont
         repeatingDirection_ = NavDirection::None;
     }
 
-    // Keep the current controller while it remains connected. If none is owned,
-    // first controller with meaningful activity claims navigation; otherwise the
-    // first connected controller is used for stable couch behavior.
+    // An active controller retains ownership while it is being used. If it is idle,
+    // meaningful input from another connected controller transfers ownership. This
+    // avoids controller 0 permanently blocking a second controller on couch setups.
+    if (activeController_ >= 0 && !HasActivity(controllers[static_cast<size_t>(activeController_)])) {
+        for (size_t i = 0; i < controllers.size(); ++i) {
+            if (static_cast<int>(i) == activeController_) continue;
+            if (controllers[i].connected && HasActivity(controllers[i])) {
+                activeController_ = static_cast<int>(i);
+                repeatingDirection_ = NavDirection::None;
+                break;
+            }
+        }
+    }
+
     if (activeController_ < 0) {
         for (size_t i = 0; i < controllers.size(); ++i) {
             if (controllers[i].connected && HasActivity(controllers[i])) {
@@ -126,7 +135,12 @@ InputSnapshot InputCore::Update(const std::array<ControllerInputSample, 4>& cont
         p = &previous_[index];
         latch = analog_[index];
 
-        auto edge = [&](bool nowValue, bool previousValue) { return nowValue && !previousValue; };
+        // A controller that reconnects while a button is already held must not
+        // synthesize a button press into the shell. A real release+press is required.
+        const bool hadPreviousConnection = p->connected;
+        auto edge = [&](bool nowValue, bool previousValue) {
+            return hadPreviousConnection && nowValue && !previousValue;
+        };
         out.select = edge(c->select, p->select);
         out.action = edge(c->action, p->action);
         out.back = edge(c->back, p->back);
