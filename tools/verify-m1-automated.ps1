@@ -41,6 +41,7 @@ $capturesUx=Resolve-RequiredFile "Release\ZeroCapturesExperienceAcceptance.exe"
 $coreShellUx=Resolve-RequiredFile "Release\ZeroCoreShellExperienceAcceptance.exe"
 $storeSettingsFirstBootUx=Resolve-RequiredFile "Release\ZeroStoreSettingsFirstBootAcceptance.exe"
 $firstBootPersistence=Resolve-RequiredFile "Release\ZeroFirstBootPersistenceAcceptance.exe"
+$serverAuthority=Resolve-RequiredFile "Release\ZeroServerAuthorityAcceptance.exe"
 $referenceExe=Resolve-RequiredFile "ReferencePackage\ZeroReferenceGame.exe"
 $referenceManifest=Resolve-RequiredFile "ReferencePackage\zero.manifest.json"
 $referenceIntegrity=Resolve-RequiredFile "ReferencePackage\zero.integrity.sha256"
@@ -68,6 +69,7 @@ Invoke-AcceptanceStep "captures_experience_contract" "production_ux" $capturesUx
 Invoke-AcceptanceStep "core_shell_experience_contract" "production_ux" $coreShellUx
 Invoke-AcceptanceStep "store_settings_firstboot_contract" "production_ux" $storeSettingsFirstBootUx
 Invoke-AcceptanceStep "first_boot_persistence" "persistence" $firstBootPersistence
+Invoke-AcceptanceStep "server_authority_fail_closed" "security" $serverAuthority
 Invoke-AcceptanceStep "installer_update_uninstall" "installation" "pwsh" @("-NoProfile","-File",$installerGate,"-BuildRoot",$BuildRoot)
 Invoke-AcceptanceStep "rc_payload" "release" "pwsh" @("-NoProfile","-File",$rcGate,"-BuildRoot",$BuildRoot)
 
@@ -92,7 +94,7 @@ $hardwareRequirements=@(
  [pscustomobject]@{name="restart_persistence_journey";status="REQUIRED";reason="Final qualification must verify persisted state across a real Windows restart."},
  [pscustomobject]@{name="interactive_first_boot";status="REQUIRED";reason="Controller/display/audio completion remains an interactive hardware acceptance step."}
 )
-$report=[ordered]@{schema=5;generated_at_utc=[DateTime]::UtcNow.ToString("o");zero_milestone="M1 / Runtime V4.1 / Production Architecture";commit=$commit;automated_result=$automatedResult;rc_qualified=$false;rc_qualification_note="Automated PASS does not qualify an RC. Real Windows 11 x64 and physical-controller acceptance is still required.";performance_metrics=[ordered]@{total_acceptance_duration_ms=$totalDurationMs;runtime_budget_ms=$automatedRuntimeBudgetMs;runtime_budget_passed=$runtimeBudgetPassed;slowest_gate=$(if($slowest){$slowest.name}else{"none"});slowest_gate_duration_ms=$(if($slowest){$slowest.duration_ms}else{0})};binaries=[ordered]@{shell=$zeroShell;acceptance=$zeroAcceptance;reference_game=$referenceExe};automated_checks=$results.ToArray();physical_qualification_required=$hardwareRequirements}
+$report=[ordered]@{schema=6;generated_at_utc=[DateTime]::UtcNow.ToString("o");zero_milestone="M1 / Runtime V4.1 / Production Architecture";commit=$commit;automated_result=$automatedResult;rc_qualified=$false;rc_qualification_note="Automated PASS does not qualify an RC. Real Windows 11 x64 and physical-controller acceptance is still required.";performance_metrics=[ordered]@{total_acceptance_duration_ms=$totalDurationMs;runtime_budget_ms=$automatedRuntimeBudgetMs;runtime_budget_passed=$runtimeBudgetPassed;slowest_gate=$(if($slowest){$slowest.name}else{"none"});slowest_gate_duration_ms=$(if($slowest){$slowest.duration_ms}else{0})};binaries=[ordered]@{shell=$zeroShell;acceptance=$zeroAcceptance;reference_game=$referenceExe};automated_checks=$results.ToArray();physical_qualification_required=$hardwareRequirements}
 $jsonPath=Join-Path $ReportDir "m1-automated-acceptance.json";$markdownPath=Join-Path $ReportDir "m1-automated-acceptance.md";$report|ConvertTo-Json -Depth 8|Set-Content $jsonPath -Encoding UTF8
 $lines=New-Object System.Collections.Generic.List[string];$lines.Add("# ZERO M1 Automated Acceptance Report");$lines.Add("");$lines.Add("- Commit: ``$commit``");$lines.Add("- Automated result: **$automatedResult**");$lines.Add("- RC qualified: **NO**");$lines.Add("- Total measured acceptance duration: **$totalDurationMs ms**");$lines.Add("- Acceptance runtime budget: **$automatedRuntimeBudgetMs ms**");$lines.Add("- Slowest gate: **$($report.performance_metrics.slowest_gate)** ($($report.performance_metrics.slowest_gate_duration_ms) ms)");$lines.Add("");$lines.Add("| Gate | Category | Result | Duration (ms) |");$lines.Add("| --- | --- | --- | ---: |")
 foreach($item in $results){$lines.Add("| $($item.name) | $($item.category) | $($item.status) | $($item.duration_ms) |")};$lines.Add("");$lines.Add("## Physical qualification still required");foreach($item in $hardwareRequirements){$lines.Add("- **$($item.name)** — $($item.reason)")};$lines|Set-Content $markdownPath -Encoding UTF8

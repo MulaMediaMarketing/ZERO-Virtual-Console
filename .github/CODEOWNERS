@@ -1,0 +1,14 @@
+# ZERO production ownership
+* @MulaMediaMarketing
+
+# Release/security-critical surfaces
+/.github/workflows/ @MulaMediaMarketing
+/tools/ @MulaMediaMarketing
+/installer/ @MulaMediaMarketing
+/include/ @MulaMediaMarketing
+/src/ @MulaMediaMarketing
+/sdk/ @MulaMediaMarketing
+/docs/PRODUCTION_ARCHITECTURE_STANDARD.md @MulaMediaMarketing
+/docs/SERVER_AUTHORITY_SECURITY.md @MulaMediaMarketing
+/docs/PACKAGE_SECURITY.md @MulaMediaMarketing
+/docs/PACKAGE_TRUST.md @MulaMediaMarketing
