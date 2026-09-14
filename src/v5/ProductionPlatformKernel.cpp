@@ -4,8 +4,18 @@
 #include "PackageIntegrityVerifier.h"
 #include "PackageManifestParser.h"
 #include "Utf8Path.h"
+#include <string>
+#include <utility>
 
 namespace zero::v5 {
+namespace {
+
+std::string pathUtf8(const std::filesystem::path& path) {
+    const auto bytes = path.u8string();
+    return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
+
+} // namespace
 
 std::optional<LaunchDescriptor> DisconnectedManagedLaunchAuthorityClient::Authorize(
     const std::string& accountId,
@@ -87,8 +97,8 @@ ProductionLaunchResult ProductionPlatformKernel::RequestLocalInstalled(const std
     descriptor.packageId = parsed.manifest.packageId;
     descriptor.version = parsed.manifest.version;
     descriptor.runtimeType = RuntimeType::NativeWin32;
-    descriptor.contentRoot = packageRoot.u8string();
-    descriptor.executable = parsed.manifest.executable.u8string();
+    descriptor.contentRoot = pathUtf8(packageRoot);
+    descriptor.executable = pathUtf8(parsed.manifest.executable);
     descriptor.saveNamespace = parsed.manifest.packageId;
     descriptor.authorityKind = LaunchAuthorityKind::LocalPackage;
 
