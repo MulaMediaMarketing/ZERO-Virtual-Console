@@ -5,8 +5,8 @@
 #include "CoreShellExperience.h"
 #include "StoreSettingsFirstBootExperience.h"
 #include "GameRegistry.h"
+#include "GameImportService.h"
 #include "IdentityProvider.h"
-#include "PackageTrust.h"
 #include "ResumeStore.h"
 #include "RuntimeV4.h"
 #include "Settings.h"
@@ -14,7 +14,6 @@
 #include "StoreProvider.h"
 #include "Input.h"
 #include "ProductionUxContract.h"
-#include "v5/ProductionPackagePlatform.h"
 #include <windows.h>
 #include <d2d1.h>
 #include <dwrite.h>
@@ -53,8 +52,7 @@ private:
     std::filesystem::path cachedCapturePath_;
 
     GameRegistry registry_;
-    CngPublisherTrustProvider publisherTrust_;
-    v5::ProductionPackagePlatform packagePlatform_;
+    GameImportService importer_;
     CaptureLibrary captures_;
     LocalIdentityProvider identity_;
     DisconnectedFriendsProvider friends_;
