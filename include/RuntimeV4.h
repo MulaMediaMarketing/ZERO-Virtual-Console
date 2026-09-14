@@ -41,7 +41,7 @@ private:
     AchievementStore achievements_;
     ResumeStore resumeStore_;
     CrashReportStore crashReports_;
-    DisconnectedPublisherTrustProvider trustProvider_;
+    CngPublisherTrustProvider trustProvider_;
     PackageTrustPolicy trustPolicy_{PackageTrustPolicy::AllowLocalUnsigned};
     std::string activePackageId_;
     std::string activeSessionId_;
