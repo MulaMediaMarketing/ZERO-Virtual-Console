@@ -104,4 +104,6 @@ add_executable(ZeroQualificationProbe tools/QualificationProbe.cpp)
 target_compile_definitions(ZeroQualificationProbe PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroQualificationProbe PRIVATE xinput9_1_0)
 
+include(cmake/ZeroV5.cmake)
+
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
