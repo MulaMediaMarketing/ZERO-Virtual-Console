@@ -1,6 +1,7 @@
 #include "GameRegistry.h"
 #include "PlatformDatabase.h"
 #include "StrictJson.h"
+#include "Utf8Path.h"
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -68,7 +69,9 @@ int main() {
     std::filesystem::create_directories(library);
     for(int i=0;i<kCatalogGames;++i){
         const auto id=idFor(i);
-        const auto package=library/std::filesystem::u8path(id);
+        const auto relative=PathFromUtf8(id);
+        if(!relative){std::cerr<<"FAIL: benchmark package id could not convert to a filesystem path\n";return 1;}
+        const auto package=library / *relative;
         std::filesystem::create_directories(package);
         std::ofstream exe(package/L"game.exe",std::ios::binary); exe.put('\0'); exe.close();
         std::ofstream mf(package/L"zero.manifest.json",std::ios::binary);
