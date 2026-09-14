@@ -37,6 +37,8 @@ public:
                     const std::string& value,
                     std::wstring& error) const;
 
+    std::optional<std::string> GetSetting(const std::string& key,
+                                          std::wstring& error) const;
     std::optional<GamePlatformState> LoadGameState(const std::string& packageId,
                                                    std::wstring& error) const;
     std::optional<ResumeMetadata> LoadResume(const std::string& packageId,
