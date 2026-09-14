@@ -59,6 +59,10 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroV5CoreArchitectureAcceptance.exe
 
+      - name: Validate V5 production package migration
+        shell: pwsh
+        run: ./build/Release/ZeroV5ProductionPackageAcceptance.exe
+
       - name: Validate production shell navigation contract
         shell: pwsh
         run: ./build/Release/ZeroProductionUxAcceptance.exe
@@ -133,6 +137,7 @@ jobs:
             build/Release/ZeroFirstBootPersistenceAcceptance.exe
             build/Release/ZeroServerAuthorityAcceptance.exe
             build/Release/ZeroV5CoreArchitectureAcceptance.exe
+            build/Release/ZeroV5ProductionPackageAcceptance.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
             build/DependencyReports/**
