@@ -66,11 +66,7 @@ $manualAllPassed = $true
 foreach ($entry in $manualChecks.GetEnumerator()) {
   if (-not $entry.Value) { $manualAllPassed = $false }
 }
-
-if ($NonInteractiveValidation) {
-  # CI validates report semantics only. It must remain physically unqualified.
-  $manualAllPassed = $false
-}
+if ($NonInteractiveValidation) { $manualAllPassed = $false }
 
 $controllerIdentityPresent = -not [string]::IsNullOrWhiteSpace($ControllerModel)
 $qualified =
@@ -85,6 +81,16 @@ $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
   try { (& git rev-parse HEAD 2>$null).Trim() } catch { "unknown" }
 }
 
+$blockers = New-Object System.Collections.Generic.List[string]
+if (-not $windows11x64) { [void]$blockers.Add("Qualification requires a real Windows 11 x64 machine.") }
+if (-not $physicalControllerDetected) { [void]$blockers.Add("No physical XInput controller was detected.") }
+if (-not $controllerIdentityPresent) { [void]$blockers.Add("Controller make/model was not recorded.") }
+foreach ($entry in $manualChecks.GetEnumerator()) {
+  if (-not $entry.Value) { [void]$blockers.Add("Manual qualification check not passed: $($entry.Key)") }
+}
+if ($NonInteractiveValidation) { [void]$blockers.Add("CI/non-interactive validation can never produce RC qualification.") }
+$blockerArray = [string[]]$blockers
+
 $report = [ordered]@{
   schema = 1
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
@@ -95,7 +101,6 @@ $report = [ordered]@{
   qualification_result = if ($qualified) { "PASS" } else { "PENDING" }
   automated_result = $automated.automated_result
   machine = [ordered]@{
-    name = $probe.machine_name
     windows_11 = [bool]$probe.windows_11
     os_build = [int]$probe.os_build
     architecture = $probe.architecture
@@ -103,7 +108,7 @@ $report = [ordered]@{
   controller = [ordered]@{
     model = $ControllerModel
     xinput_connected_count = [int]$probe.xinput_connected_count
-    xinput_slots = @($probe.xinput_slots)
+    xinput_slots = [bool[]]$probe.xinput_slots
     detected = [bool]$physicalControllerDetected
   }
   manual_checks = $manualChecks
@@ -114,45 +119,35 @@ $report = [ordered]@{
     zero_shell = $zeroShell
     reference_game = $referenceExe
   }
-  blockers = @()
+  blockers = $blockerArray
 }
-
-$blockers = New-Object System.Collections.Generic.List[string]
-if (-not $windows11x64) { $blockers.Add("Qualification requires a real Windows 11 x64 machine.") }
-if (-not $physicalControllerDetected) { $blockers.Add("No physical XInput controller was detected.") }
-if (-not $controllerIdentityPresent) { $blockers.Add("Controller make/model was not recorded.") }
-foreach ($entry in $manualChecks.GetEnumerator()) {
-  if (-not $entry.Value) { $blockers.Add("Manual qualification check not passed: $($entry.Key)") }
-}
-if ($NonInteractiveValidation) { $blockers.Add("CI/non-interactive validation can never produce RC qualification.") }
-$report.blockers = @($blockers)
 
 $jsonPath = Join-Path $EvidenceDir "rc-qualification.json"
 $mdPath = Join-Path $EvidenceDir "rc-qualification.md"
 $report | ConvertTo-Json -Depth 8 | Set-Content -Path $jsonPath -Encoding UTF8
 
 $lines = New-Object System.Collections.Generic.List[string]
-$lines.Add("# ZERO Runtime V4.1 RC Qualification")
-$lines.Add("")
-$lines.Add("- Version: **0.1.0-rc1**")
-$lines.Add("- Commit: ``$commit``")
-$lines.Add("- Qualification result: **$($report.qualification_result)**")
-$lines.Add("- RC qualified: **$(if ($qualified) { 'YES' } else { 'NO' })**")
-$lines.Add("- Windows build: $($probe.os_build) ($($probe.architecture))")
-$lines.Add("- Controller: $(if ($ControllerModel) { $ControllerModel } else { 'not recorded' })")
-$lines.Add("")
-$lines.Add("## Manual qualification checks")
-$lines.Add("")
+[void]$lines.Add("# ZERO Runtime V4.1 RC Qualification")
+[void]$lines.Add("")
+[void]$lines.Add("- Version: **0.1.0-rc1**")
+[void]$lines.Add("- Commit: ``$commit``")
+[void]$lines.Add("- Qualification result: **$($report.qualification_result)**")
+[void]$lines.Add("- RC qualified: **$(if ($qualified) { 'YES' } else { 'NO' })**")
+[void]$lines.Add("- Windows build: $($probe.os_build) ($($probe.architecture))")
+[void]$lines.Add("- Controller: $(if ($ControllerModel) { $ControllerModel } else { 'not recorded' })")
+[void]$lines.Add("")
+[void]$lines.Add("## Manual qualification checks")
+[void]$lines.Add("")
 foreach ($entry in $manualChecks.GetEnumerator()) {
-  $lines.Add("- $($entry.Key): **$(if ($entry.Value) { 'PASS' } else { 'PENDING' })**")
+  [void]$lines.Add("- $($entry.Key): **$(if ($entry.Value) { 'PASS' } else { 'PENDING' })**")
 }
-$lines.Add("")
-$lines.Add("## Blockers")
-$lines.Add("")
+[void]$lines.Add("")
+[void]$lines.Add("## Blockers")
+[void]$lines.Add("")
 if ($blockers.Count -eq 0) {
-  $lines.Add("- None. Qualification evidence is complete.")
+  [void]$lines.Add("- None. Qualification evidence is complete.")
 } else {
-  foreach ($item in $blockers) { $lines.Add("- $item") }
+  foreach ($item in $blockers) { [void]$lines.Add("- $item") }
 }
 $lines | Set-Content -Path $mdPath -Encoding UTF8
 
