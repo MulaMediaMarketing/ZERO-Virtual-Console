@@ -151,6 +151,13 @@ add_executable(ZeroStoreSettingsFirstBootAcceptance tools/StoreSettingsFirstBoot
 target_include_directories(ZeroStoreSettingsFirstBootAcceptance PRIVATE include)
 target_compile_definitions(ZeroStoreSettingsFirstBootAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_executable(ZeroFirstBootPersistenceAcceptance
+  tools/FirstBootPersistenceAcceptance.cpp
+  src/FirstBootService.cpp
+)
+target_include_directories(ZeroFirstBootPersistenceAcceptance PRIVATE include)
+target_compile_definitions(ZeroFirstBootPersistenceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
 add_executable(ZeroQualificationProbe tools/QualificationProbe.cpp)
 target_compile_definitions(ZeroQualificationProbe PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroQualificationProbe PRIVATE xinput9_1_0)
