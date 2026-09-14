@@ -17,17 +17,6 @@ std::filesystem::path localRoot() {
     }
     return std::filesystem::current_path() / "ZeroData";
 }
-
-App::Page pageForNavIndex(size_t index) {
-    switch (index) {
-        case 0: return App::Page::Home;
-        case 1: return App::Page::Library;
-        case 2: return App::Page::Store;
-        case 3: return App::Page::Friends;
-        case 4: return App::Page::Captures;
-        default: return App::Page::Settings;
-    }
-}
 }
 
 App::App(HINSTANCE instance)
@@ -396,11 +385,11 @@ void App::HandleInput(const InputSnapshot& in) {
                 SetOverlayVisible(false);
             } else if (overlayIndex_ == 1) {
                 SetOverlayVisible(false);
-                navIndex_ = 3;
+                navIndex_ = ProductionUxIndex(ProductionUxDestination::Friends);
                 NavigateTo(Page::Friends);
             } else if (overlayIndex_ == 2) {
                 SetOverlayVisible(false);
-                navIndex_ = 4;
+                navIndex_ = ProductionUxIndex(ProductionUxDestination::Captures);
                 NavigateTo(Page::Captures);
             } else if (overlayIndex_ == 3) {
                 OpenAchievements(runtime_.Info().packageId, page_, true);
@@ -450,13 +439,19 @@ void App::HandleInput(const InputSnapshot& in) {
             return;
         }
     } else {
-        if ((in.left || in.shoulderLeft) && navIndex_ > 0) {
-            --navIndex_;
-            NavigateTo(pageForNavIndex(navIndex_));
+        if (in.left || in.shoulderLeft) {
+            const auto next = ProductionUxMoveLeft(navIndex_);
+            if (next != navIndex_) {
+                navIndex_ = next;
+                NavigateTo(ProductionUxPageAt(navIndex_));
+            }
         }
-        if ((in.right || in.shoulderRight) && navIndex_ < 5) {
-            ++navIndex_;
-            NavigateTo(pageForNavIndex(navIndex_));
+        if (in.right || in.shoulderRight) {
+            const auto next = ProductionUxMoveRight(navIndex_);
+            if (next != navIndex_) {
+                navIndex_ = next;
+                NavigateTo(ProductionUxPageAt(navIndex_));
+            }
         }
     }
 
@@ -489,10 +484,10 @@ void App::HandleInput(const InputSnapshot& in) {
 
     if (in.back) {
         if (page_ == Page::GameDetail || page_ == Page::Import) {
-            navIndex_ = 1;
+            navIndex_ = ProductionUxIndex(ProductionUxDestination::Library);
             NavigateTo(Page::Library);
         } else if (page_ != Page::Home) {
-            navIndex_ = 0;
+            navIndex_ = ProductionUxIndex(ProductionUxDestination::Home);
             NavigateTo(Page::Home);
         }
     }
@@ -536,7 +531,7 @@ void App::ImportGameFolder() {
 
     registry_.Refresh();
     selectedGame_ = registry_.Games().empty() ? 0 : registry_.Games().size() - 1;
-    navIndex_ = 1;
+    navIndex_ = ProductionUxIndex(ProductionUxDestination::Library);
     NavigateTo(Page::Library);
     status_ = L"Game imported successfully.";
 }
