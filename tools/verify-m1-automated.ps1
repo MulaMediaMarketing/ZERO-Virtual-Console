@@ -77,11 +77,13 @@ $payloadContractPassed=$manifest.package_id -eq "zero.system.reference" -and $ma
 $referenceStatus=if($payloadContractPassed){"PASS"}else{"FAIL"};$referenceTimestamp=[DateTime]::UtcNow.ToString("o")
 $results.Add([pscustomobject]@{name="reference_package_contract";category="reference_package";status=$referenceStatus;exit_code=$(if($payloadContractPassed){0}else{2});started_at_utc=$referenceTimestamp;ended_at_utc=$referenceTimestamp;duration_ms=0;output=$(if($payloadContractPassed){"Reference package manifest and integrity contract are locked."}else{"Reference package contract does not match M1 requirements."})})
 
-$measuredChecks=@($results);$totalDurationMs=[int64](($measuredChecks|Measure-Object -Property duration_ms -Sum).Sum);$slowest=$measuredChecks|Sort-Object duration_ms -Descending|Select-Object -First 1
+$measuredChecks=$results.ToArray()
+$totalDurationMs=[int64](($measuredChecks|Measure-Object -Property duration_ms -Sum).Sum)
+$slowest=$measuredChecks|Sort-Object duration_ms -Descending|Select-Object -First 1
 $runtimeBudgetPassed=$totalDurationMs -le $automatedRuntimeBudgetMs;$budgetTimestamp=[DateTime]::UtcNow.ToString("o")
 $results.Add([pscustomobject]@{name="automated_runtime_budget";category="performance";status=$(if($runtimeBudgetPassed){"PASS"}else{"FAIL"});exit_code=$(if($runtimeBudgetPassed){0}else{2});started_at_utc=$budgetTimestamp;ended_at_utc=$budgetTimestamp;duration_ms=0;output="Measured acceptance duration: $totalDurationMs ms; budget: $automatedRuntimeBudgetMs ms."})
 
-$failedCount=@($results|Where-Object{$_.status -ne "PASS"}).Count;$allAutomatedPassed=$failedCount -eq 0
+$failedCount=($results|Where-Object{$_.status -ne "PASS"}|Measure-Object).Count;$allAutomatedPassed=$failedCount -eq 0
 $commit=if($env:GITHUB_SHA){$env:GITHUB_SHA}else{try{(& git rev-parse HEAD 2>$null).Trim()}catch{"unknown"}};$automatedResult=if($allAutomatedPassed){"PASS"}else{"FAIL"}
 $hardwareRequirements=@(
  [pscustomobject]@{name="windows_11_x64_real_machine";status="REQUIRED";reason="GitHub Actions cannot qualify the supported client hardware path."},
