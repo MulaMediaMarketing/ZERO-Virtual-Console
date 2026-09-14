@@ -46,13 +46,27 @@ public:
                                       const std::string& signedPayload) const = 0;
 };
 
-// MVP provider: deliberately performs no publisher authentication. It preserves
-// the provider boundary so a future ZERO Store/PKI provider can be substituted
-// without changing package parsing, shell UX, or RuntimeV4 launch policy.
 class DisconnectedPublisherTrustProvider final : public IPublisherTrustProvider {
 public:
     PackageTrustResult Verify(const PackageSignatureEnvelope& envelope,
                               const std::string& signedPayload) const override;
+};
+
+// Verifies ECDSA P-256 / SHA-256 signatures with public keys provisioned under
+// %LOCALAPPDATA%\ZERO\Trust\Publishers. The client contains public keys only;
+// publisher private signing keys never belong in ZERO.
+class CngPublisherTrustProvider final : public IPublisherTrustProvider {
+public:
+    explicit CngPublisherTrustProvider(std::filesystem::path trustRoot = {});
+
+    PackageTrustResult Verify(const PackageSignatureEnvelope& envelope,
+                              const std::string& signedPayload) const override;
+
+    const std::filesystem::path& TrustRoot() const noexcept { return trustRoot_; }
+    static std::filesystem::path DefaultTrustRoot();
+
+private:
+    std::filesystem::path trustRoot_;
 };
 
 class PackageTrustService {
