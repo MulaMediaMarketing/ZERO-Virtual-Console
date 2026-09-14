@@ -30,6 +30,14 @@ public:
         }
     }
 
+    bool OverlayRequestedVisible() const noexcept { return overlayVisible_; }
+    bool OverlayRenderActive() const noexcept {
+        return overlayVisible_ || overlayTransition_ > 0.001f;
+    }
+    bool OverlayClosing() const noexcept {
+        return !overlayVisible_ && overlayTransition_ > 0.001f;
+    }
+
     void NotifyFocusMoved() noexcept {
         focusPulse_ = reducedMotion_ ? 1.0f : 0.0f;
     }
@@ -68,9 +76,9 @@ public:
     }
 
     float FocusThickness() const noexcept {
-        if (reducedMotion_) return 3.0f;
+        if (reducedMotion_) return 3.5f;
         const float t = EaseOutCubic(focusPulse_);
-        return 4.5f - (1.5f * t);
+        return 5.0f - (1.5f * t);
     }
 
 private:

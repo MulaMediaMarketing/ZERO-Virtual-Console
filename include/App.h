@@ -72,6 +72,7 @@ private:
     size_t navIndex_{0};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
+    bool overlayClosing_{false};
     bool preferResume_{true};
     bool captureViewerVisible_{false};
     bool captureDeleteConfirm_{false};
@@ -126,7 +127,9 @@ private:
     void OpenSettingsLocation(bool diagnosticsOnly);
     void ImportGameFolder();
     void EnterBorderlessFullscreen();
+    void RestoreShellForeground();
     void SetOverlayVisible(bool visible);
+    bool ShellContentOwnsFocus() const noexcept;
     void ClampCaptureSelection();
     void NotifyFocusMoved();
     Microsoft::WRL::ComPtr<ID2D1Bitmap> LoadBitmap(const std::filesystem::path& path);

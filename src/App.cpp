@@ -209,18 +209,30 @@ void App::ClampCaptureSelection() {
 }
 
 void App::SetOverlayVisible(bool visible) {
-    if (overlayVisible_ == visible) return;
-    overlayVisible_ = visible;
-    overlayIndex_ = 0;
-    if (!visible) achievementsFromOverlay_ = false;
-    shellUx_.SetOverlayVisible(visible);
-    NotifyFocusMoved();
-    runtime_.SetOverlayVisible(visible);
     if (visible) {
+        if (overlayVisible_ && !overlayClosing_) return;
+        overlayVisible_ = true;
+        overlayClosing_ = false;
+        overlayIndex_ = 0;
+        shellUx_.SetOverlayVisible(true);
+        NotifyFocusMoved();
+        runtime_.SetOverlayVisible(true);
         SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
         ShowWindow(hwnd_, SW_SHOW);
         SetForegroundWindow(hwnd_);
-    } else {
+        return;
+    }
+
+    if (!overlayVisible_ || overlayClosing_) return;
+    overlayClosing_ = true;
+    shellUx_.SetOverlayVisible(false);
+    runtime_.SetOverlayVisible(false);
+    NotifyFocusMoved();
+
+    if (shellUx_.ReducedMotion()) {
+        overlayClosing_ = false;
+        overlayVisible_ = false;
+        achievementsFromOverlay_ = false;
         SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     }
 }
@@ -231,9 +243,17 @@ void App::Tick() {
     lastTick_ = now;
     shellUx_.Advance(std::chrono::duration<float>(delta));
 
+    if (overlayClosing_ && !shellUx_.OverlayRenderActive()) {
+        overlayClosing_ = false;
+        overlayVisible_ = false;
+        achievementsFromOverlay_ = false;
+        SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    }
+
     runtime_.Poll();
     UpdateLaunchUx();
-    HandleInput(input_.Poll());
+    if (!overlayClosing_) HandleInput(input_.Poll());
+    else input_.Poll();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -610,7 +630,7 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
                 return 0;
             }
             if (wp == VK_F1 && runtime_.IsActive()) {
-                SetOverlayVisible(!overlayVisible_);
+                SetOverlayVisible(!overlayVisible_ || overlayClosing_);
                 return 0;
             }
             if (wp == 'Q' && (GetKeyState(VK_CONTROL) & 0x8000)) {

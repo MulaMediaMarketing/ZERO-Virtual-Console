@@ -49,6 +49,11 @@ jobs:
         timeout-minutes: 2
         run: ./build/Release/ZeroInputAcceptance.exe
 
+      - name: Verify shell overlay production polish
+        shell: pwsh
+        timeout-minutes: 2
+        run: ./build/Release/ZeroShellUxAcceptance.exe
+
       - name: Verify installer update uninstall V2
         shell: pwsh
         timeout-minutes: 3
@@ -72,6 +77,7 @@ jobs:
             build/Release/ZeroPackageTrustAcceptance.exe
             build/Release/ZeroPackageRepairAcceptance.exe
             build/Release/ZeroInputAcceptance.exe
+            build/Release/ZeroShellUxAcceptance.exe
             build/ReferencePackage/**
             tools/verify-rc-build.ps1
             tools/verify-installer-v2.ps1
