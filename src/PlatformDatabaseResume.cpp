@@ -1,7 +1,5 @@
 #include "PlatformDatabase.h"
-#include "PlatformPaths.h"
 #include <winsqlite/winsqlite3.h>
-#include <filesystem>
 
 namespace zero {
 
@@ -9,8 +7,7 @@ bool PlatformDatabase::ClearResume(const std::string& packageId, std::wstring& e
     if (!Initialize(error)) return false;
 
     sqlite3* db = nullptr;
-    const auto path = PlatformPaths::DataStoreRoot() / L"zero.db";
-    if (sqlite3_open16(path.c_str(), &db) != SQLITE_OK) {
+    if (sqlite3_open16(databasePath_.c_str(), &db) != SQLITE_OK) {
         if (db) sqlite3_close(db);
         error = L"ZERO could not open the platform database to clear Resume metadata.";
         return false;
