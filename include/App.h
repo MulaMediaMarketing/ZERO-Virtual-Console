@@ -10,6 +10,7 @@
 #include "ShellUxState.h"
 #include "StoreProvider.h"
 #include "Input.h"
+#include "ProductionUxContract.h"
 #include <windows.h>
 #include <d2d1.h>
 #include <dwrite.h>
@@ -23,7 +24,7 @@
 namespace zero {
 class App {
 public:
-    enum class Page { Home, Library, Store, Friends, Captures, Settings, GameDetail, Import, Achievements };
+    using Page = ProductionUxPage;
     enum class LaunchUxMode { Hidden, Starting, Failed, Ended };
 
     App(HINSTANCE instance);
