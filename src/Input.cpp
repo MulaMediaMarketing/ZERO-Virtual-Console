@@ -1,75 +1,44 @@
 #include "Input.h"
 #include <Xinput.h>
+#include <array>
 
 namespace zero {
 
-bool Input::RepeatNavigation(NavDirection direction, bool held,
-                             std::chrono::steady_clock::time_point now) {
-    using namespace std::chrono_literals;
-    if (!held) {
-        if (repeatingDirection_ == direction) repeatingDirection_ = NavDirection::None;
-        return false;
-    }
-
-    if (repeatingDirection_ != direction) {
-        repeatingDirection_ = direction;
-        repeatStartedAt_ = now;
-        lastRepeatAt_ = now;
-        return true;
-    }
-
-    if (now - repeatStartedAt_ < 330ms) return false;
-    if (now - lastRepeatAt_ < 95ms) return false;
-    lastRepeatAt_ = now;
-    return true;
-}
-
 InputSnapshot Input::Poll() {
-    InputSnapshot out{};
-    const auto now = std::chrono::steady_clock::now();
-
-    bool heldUp = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
-    bool heldDown = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
-    bool heldLeft = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-    bool heldRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
-
-    XINPUT_STATE state{};
-    if (XInputGetState(0, &state) == ERROR_SUCCESS) {
+    std::array<ControllerInputSample, 4> controllers{};
+    for (DWORD i = 0; i < controllers.size(); ++i) {
+        XINPUT_STATE state{};
+        if (XInputGetState(i, &state) != ERROR_SUCCESS) continue;
+        auto& out = controllers[i];
+        out.connected = true;
         const WORD b = state.Gamepad.wButtons;
-        auto pressed = [&](WORD mask){ return (b & mask) && !(previousButtons_ & mask); };
-
-        const int threshold = 18000;
-        heldUp |= (b & XINPUT_GAMEPAD_DPAD_UP) != 0 || state.Gamepad.sThumbLY > threshold;
-        heldDown |= (b & XINPUT_GAMEPAD_DPAD_DOWN) != 0 || state.Gamepad.sThumbLY < -threshold;
-        heldLeft |= (b & XINPUT_GAMEPAD_DPAD_LEFT) != 0 || state.Gamepad.sThumbLX < -threshold;
-        heldRight |= (b & XINPUT_GAMEPAD_DPAD_RIGHT) != 0 || state.Gamepad.sThumbLX > threshold;
-
-        out.select = pressed(XINPUT_GAMEPAD_A);
-        out.action = pressed(XINPUT_GAMEPAD_X);
-        out.back = pressed(XINPUT_GAMEPAD_B);
-        out.menu = pressed(XINPUT_GAMEPAD_START);
-        out.shoulderLeft = pressed(XINPUT_GAMEPAD_LEFT_SHOULDER);
-        out.shoulderRight = pressed(XINPUT_GAMEPAD_RIGHT_SHOULDER);
-
-        previousButtons_ = b;
-        previousLX_ = state.Gamepad.sThumbLX;
-        previousLY_ = state.Gamepad.sThumbLY;
+        out.dpadUp = (b & XINPUT_GAMEPAD_DPAD_UP) != 0;
+        out.dpadDown = (b & XINPUT_GAMEPAD_DPAD_DOWN) != 0;
+        out.dpadLeft = (b & XINPUT_GAMEPAD_DPAD_LEFT) != 0;
+        out.dpadRight = (b & XINPUT_GAMEPAD_DPAD_RIGHT) != 0;
+        out.select = (b & XINPUT_GAMEPAD_A) != 0;
+        out.action = (b & XINPUT_GAMEPAD_X) != 0;
+        out.back = (b & XINPUT_GAMEPAD_B) != 0;
+        out.menu = (b & XINPUT_GAMEPAD_START) != 0;
+        out.shoulderLeft = (b & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0;
+        out.shoulderRight = (b & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0;
+        out.leftX = state.Gamepad.sThumbLX;
+        out.leftY = state.Gamepad.sThumbLY;
     }
 
-    if (heldUp) out.up = RepeatNavigation(NavDirection::Up, true, now);
-    else RepeatNavigation(NavDirection::Up, false, now);
-    if (heldDown) out.down = RepeatNavigation(NavDirection::Down, true, now);
-    else RepeatNavigation(NavDirection::Down, false, now);
-    if (heldLeft) out.left = RepeatNavigation(NavDirection::Left, true, now);
-    else RepeatNavigation(NavDirection::Left, false, now);
-    if (heldRight) out.right = RepeatNavigation(NavDirection::Right, true, now);
-    else RepeatNavigation(NavDirection::Right, false, now);
+    KeyboardInputSample keyboard{};
+    keyboard.upHeld = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
+    keyboard.downHeld = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
+    keyboard.leftHeld = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+    keyboard.rightHeld = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+    keyboard.selectPressed = (GetAsyncKeyState(VK_RETURN) & 1) != 0;
+    keyboard.actionPressed = (GetAsyncKeyState('X') & 1) != 0;
+    keyboard.backPressed = (GetAsyncKeyState(VK_ESCAPE) & 1) != 0;
+    keyboard.menuPressed = (GetAsyncKeyState(VK_F1) & 1) != 0;
+    keyboard.shoulderLeftPressed = (GetAsyncKeyState(VK_PRIOR) & 1) != 0;
+    keyboard.shoulderRightPressed = (GetAsyncKeyState(VK_NEXT) & 1) != 0;
 
-    out.select |= (GetAsyncKeyState(VK_RETURN) & 1) != 0;
-    out.action |= (GetAsyncKeyState('X') & 1) != 0;
-    out.back |= (GetAsyncKeyState(VK_ESCAPE) & 1) != 0;
-    out.shoulderLeft |= (GetAsyncKeyState(VK_PRIOR) & 1) != 0;
-    out.shoulderRight |= (GetAsyncKeyState(VK_NEXT) & 1) != 0;
-    return out;
+    return core_.Update(controllers, keyboard, InputCore::Clock::now());
 }
-}
+
+} // namespace zero
