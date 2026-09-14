@@ -103,7 +103,7 @@ if(-not(Test-Path $shell -PathType Leaf)){Violate "release_shell_present" $shell
 }
 
 $commit=if($env:GITHUB_SHA){$env:GITHUB_SHA}else{try{(& git rev-parse HEAD 2>$null).Trim()}catch{"unknown"}}
-$failed=@($violations).Count; $status=if($failed -eq 0){"PASS"}else{"FAIL"}
+$failed=$violations.Count; $status=if($failed -eq 0){"PASS"}else{"FAIL"}
 $report=[ordered]@{
   schema=4;generated_at_utc=[DateTime]::UtcNow.ToString("o");commit=$commit;result=$status
   policy=[ordered]@{max_source_lines=1000;minimum_acceptance_contracts=$minimumContracts;shell_binary_max_bytes=67108864;current_runtime="V4.1";publisher_signature_algorithm="ecdsa-p256-sha256";navigation_authority="ProductionUxContract";platform_path_authority="PlatformPaths";compiler_warnings="fatal";package_json_parser="StrictJson/PackageManifestParser"}
