@@ -69,18 +69,14 @@ void App::UpdateLaunchUx() {
         case RuntimeOutcome::Crash:
             launchUxMode_ = LaunchUxMode::Failed;
             if (overlayVisible_) SetOverlayVisible(false);
-            SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-            ShowWindow(hwnd_, SW_SHOW);
-            SetForegroundWindow(hwnd_);
+            RestoreShellForeground();
             NotifyFocusMoved();
             break;
         case RuntimeOutcome::CleanExit:
         case RuntimeOutcome::UserTermination:
             launchUxMode_ = LaunchUxMode::Ended;
             if (overlayVisible_) SetOverlayVisible(false);
-            SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-            ShowWindow(hwnd_, SW_SHOW);
-            SetForegroundWindow(hwnd_);
+            RestoreShellForeground();
             NotifyFocusMoved();
             break;
         default:
@@ -116,11 +112,13 @@ void App::ReturnFromLaunchUx(bool toGameDetail) {
             selectedGame_ = static_cast<size_t>(std::distance(games.begin(), it));
             navIndex_ = 1;
             NavigateTo(Page::GameDetail);
+            RestoreShellForeground();
             return;
         }
     }
     navIndex_ = 0;
     NavigateTo(Page::Home);
+    RestoreShellForeground();
 }
 
 void App::HandleLaunchRecoveryInput(const InputSnapshot& in) {
@@ -170,7 +168,6 @@ void App::DrawLaunchRecovery(float width, float height) {
 
     if (launchUxMode_ == LaunchUxMode::Starting) {
         DrawTextLine(launchUsedResume_ ? L"Resuming game" : L"Starting game", left + 52, top + 170, panelWidth - 104, 58, true, white.Get());
-        const auto outcome = runtime_.Outcome();
         std::wstring phase = L"Preparing secure runtime session…";
         if (runtime_.State() == RuntimeState::Launching) phase = L"Starting process and waiting for game READY…";
         DrawTextLine(phase, left + 54, top + 242, panelWidth - 108, 60, false, brushMuted_.Get());
