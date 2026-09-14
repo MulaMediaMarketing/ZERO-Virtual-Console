@@ -1,4 +1,5 @@
 #include "FirstBootService.h"
+#include <windows.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
