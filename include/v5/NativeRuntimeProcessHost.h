@@ -10,12 +10,16 @@ namespace zero::v5 {
 
 class NativeRuntimeProcessHost final : public IRuntimeProcessHost {
 public:
+    explicit NativeRuntimeProcessHost(zero::RuntimeIpcCallbacks callbacks = {})
+        : callbacks_(std::move(callbacks)) {}
+
     bool Start(const LaunchDescriptor& launch,
                const RuntimeSessionGrant& grant,
                std::string& error) override;
     RuntimeProcessStatus Poll() override;
     void Terminate() override;
 
+    void SetCallbacks(zero::RuntimeIpcCallbacks callbacks) { callbacks_ = std::move(callbacks); }
     bool ClientAuthenticated() const noexcept { return ipc_.ClientAuthenticated(); }
     bool ReadyReceived() const noexcept { return ipc_.ReadyReceived(); }
     const std::wstring& PipeName() const noexcept { return ipc_.PipeName(); }
@@ -23,6 +27,7 @@ public:
 private:
     zero::RuntimeSession process_;
     zero::RuntimeIpcServer ipc_;
+    zero::RuntimeIpcCallbacks callbacks_{};
     RuntimeSessionGrant activeGrant_{};
     bool started_{false};
 
