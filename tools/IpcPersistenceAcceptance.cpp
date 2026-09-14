@@ -126,9 +126,15 @@ int wmain() {
         allPassed &= achievementSucceeded;
     }
 
-    // Stop the server first so its pipe disconnect unblocks the SDK receiver's synchronous read.
-    server.Stop();
+    const auto shutdownStarted = std::chrono::steady_clock::now();
     client.Shutdown();
+    const auto shutdownMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - shutdownStarted).count();
+    const bool shutdownPassed = shutdownMs < 3000;
+    printCheck(shutdownPassed, "sdk_shutdown_is_bounded");
+    allPassed &= shutdownPassed;
+
+    server.Stop();
     SetEnvironmentVariableW(L"ZERO_TEMP_ROOT", nullptr);
     std::error_code ec;
     std::filesystem::remove_all(tempRoot, ec);
