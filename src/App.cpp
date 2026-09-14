@@ -526,6 +526,15 @@ void App::LaunchSelected(bool useResume) {
     if (games.empty() || selectedGame_ >= games.size()) return;
     const auto& game = games[selectedGame_];
 
+    const auto trust = runtime_.PackageTrust(game);
+    if (!trust.launchAllowed) {
+        status_ = trust.detail.empty() ? L"ZERO blocked launch because package trust validation failed." : trust.detail;
+        launchError_.clear();
+        launchUxMode_ = LaunchUxMode::Hidden;
+        NotifyFocusMoved();
+        return;
+    }
+
     launchPackageId_ = game.packageId;
     launchTitle_ = Widen(game.title);
     launchUsedResume_ = false;
