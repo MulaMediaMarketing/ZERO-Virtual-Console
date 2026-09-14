@@ -120,5 +120,8 @@ if($violations.Count -eq 0){$lines.Add("None.")}else{foreach($item in $violation
 $lines|Set-Content $mdPath -Encoding UTF8
 Write-Host "ZERO production architecture result: $status"
 Write-Host "ZERO production architecture report: $jsonPath"
+if($violations.Count -gt 0){
+  foreach($item in $violations){Write-Host ("ARCHITECTURE VIOLATION: {0} | {1} | {2}" -f $item.rule,$item.path,$item.detail)}
+}
 if($failed -gt 0){exit 2}
 exit 0
