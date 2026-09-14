@@ -11,14 +11,17 @@ namespace {
 using namespace zero::v5;
 
 struct Identity final : IIdentityService {
+    bool authenticated{true};
     std::optional<AccountSession> CurrentSession() const override {
+        if (!authenticated) return std::nullopt;
         return AccountSession{"acct-1", "session-1", "ZERO_KING", true};
     }
 };
 
 struct Catalog final : ICatalogService {
     CatalogItem item{{"content-1", "pkg.game", "publisher.zero", ContentClass::FreeToPlay},
-                     "Test Experience", "1.0.0", true, true};
+                     "Test Experience", "1.0.0", true, true,
+                     LaunchAuthorityRequirement::ZeroService};
     std::vector<CatalogItem> Discover() const override { return {item}; }
     std::optional<CatalogItem> FindByContentId(const std::string& id) const override {
         return id == item.identity.contentId ? std::optional<CatalogItem>{item} : std::nullopt;
@@ -26,19 +29,30 @@ struct Catalog final : ICatalogService {
 };
 
 struct Entitlements final : IEntitlementService {
-    bool authoritative{true};
+    AuthoritySource authority{AuthoritySource::ZeroService};
+    std::string accountOverride;
+    std::string contentOverride;
+    bool available{true};
+
     std::optional<EntitlementGrant> GetLaunchEntitlement(const std::string& accountId,
                                                           const std::string& contentId) const override {
-        return EntitlementGrant{"ent-1", accountId, contentId, EntitlementType::Free,
-                                "authority-v1", {}, authoritative};
+        if (!available) return std::nullopt;
+        return EntitlementGrant{"ent-1",
+                                accountOverride.empty() ? accountId : accountOverride,
+                                contentOverride.empty() ? contentId : contentOverride,
+                                EntitlementType::Free,
+                                authority,
+                                "authority-v1",
+                                {}};
     }
 };
 
 struct LaunchAuthority final : ILaunchAuthority {
+    bool allow{true};
     std::optional<LaunchDescriptor> Authorize(const AccountSession& session,
                                                const CatalogItem& item,
                                                const EntitlementGrant& entitlement) const override {
-        if (!session.authenticated || !entitlement.authoritative) return std::nullopt;
+        if (!allow || !session.authenticated || entitlement.authority == AuthoritySource::None) return std::nullopt;
         LaunchDescriptor descriptor;
         descriptor.packageId = item.identity.packageId;
         descriptor.version = item.version;
@@ -120,12 +134,28 @@ int main() {
     PlatformKernel kernel(identity, catalog, entitlements, authority);
 
     const auto launch = kernel.RequestLaunch("content-1");
-    if (!launch) return 10;
-    if (launch->packageId != "pkg.game") return 11;
+    if (!launch.Allowed() || !launch.descriptor) return 10;
+    if (launch.descriptor->packageId != "pkg.game") return 11;
 
-    entitlements.authoritative = false;
-    if (kernel.RequestLaunch("content-1")) return 12;
-    entitlements.authoritative = true;
+    entitlements.authority = AuthoritySource::LocalPackage;
+    if (kernel.RequestLaunch("content-1").failure != LaunchFailure::WrongAuthority) return 12;
+    entitlements.authority = AuthoritySource::ZeroService;
+
+    entitlements.accountOverride = "other-account";
+    if (kernel.RequestLaunch("content-1").failure != LaunchFailure::WrongAccount) return 13;
+    entitlements.accountOverride.clear();
+
+    entitlements.contentOverride = "other-content";
+    if (kernel.RequestLaunch("content-1").failure != LaunchFailure::WrongContent) return 14;
+    entitlements.contentOverride.clear();
+
+    entitlements.available = false;
+    if (kernel.RequestLaunch("content-1").failure != LaunchFailure::EntitlementUnavailable) return 15;
+    entitlements.available = true;
+
+    identity.authenticated = false;
+    if (kernel.RequestLaunch("content-1").failure != LaunchFailure::NoAuthenticatedSession) return 16;
+    identity.authenticated = true;
 
     Validator validator;
     Trust trust;
@@ -146,8 +176,8 @@ int main() {
     Process process;
     RuntimeCore runtime(policy, capabilities, process);
     RuntimeSessionRequest request;
-    request.launch = *launch;
-    request.identity = {"runtime-session-1", launch->packageId, "acct-1"};
+    request.launch = *launch.descriptor;
+    request.identity = {"runtime-session-1", launch.descriptor->packageId, "acct-1"};
     request.requestedCapabilities = {RuntimeCapability::SaveRead,
                                      RuntimeCapability::SaveWrite,
                                      RuntimeCapability::Achievements,
