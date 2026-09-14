@@ -14,7 +14,8 @@ $required = @(
   (Join-Path $BuildRoot "ReferencePackage\Assets\icon.png"),
   (Join-Path $BuildRoot "ReferencePackage\Assets\logo.png"),
   "./installer/install-zero.ps1",
-  "./installer/uninstall-zero.ps1"
+  "./installer/uninstall-zero.ps1",
+  "./tools/verify-installer-v2.ps1"
 )
 
 $missing = @()
