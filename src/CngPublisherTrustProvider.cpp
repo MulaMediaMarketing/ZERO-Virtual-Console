@@ -5,8 +5,11 @@
 #include <bcrypt.h>
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
+#include <string_view>
+#include <utility>
 #include <vector>
 #pragma comment(lib, "bcrypt.lib")
 
@@ -49,32 +52,60 @@ bool hexToBytes(const std::string& text, std::vector<unsigned char>& out) {
     return true;
 }
 
+int base64Value(char c) noexcept {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
 bool base64Decode(const std::string& text, std::vector<unsigned char>& out) {
-    static constexpr char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    out.clear();
-    int val = 0;
-    int bits = -8;
-    bool sawPadding = false;
+    std::string clean;
+    clean.reserve(text.size());
     for (unsigned char c : text) {
         if (std::isspace(c)) continue;
-        if (c == '=') {
-            sawPadding = true;
+        clean.push_back(static_cast<char>(c));
+    }
+    if (clean.empty() || clean.size() % 4 != 0) return false;
+
+    out.clear();
+    out.reserve((clean.size() / 4) * 3);
+    for (size_t i = 0; i < clean.size(); i += 4) {
+        const bool last = i + 4 == clean.size();
+        const char c0 = clean[i];
+        const char c1 = clean[i + 1];
+        const char c2 = clean[i + 2];
+        const char c3 = clean[i + 3];
+        const int a = base64Value(c0);
+        const int b = base64Value(c1);
+        if (a < 0 || b < 0) return false;
+
+        if (c2 == '=') {
+            if (!last || c3 != '=' || (b & 0x0F) != 0) return false;
+            out.push_back(static_cast<unsigned char>((static_cast<uint32_t>(a) << 2) | (static_cast<uint32_t>(b) >> 4)));
             continue;
         }
-        if (sawPadding) return false;
-        const char* p = std::find(std::begin(alphabet), std::end(alphabet) - 1, static_cast<char>(c));
-        if (p == std::end(alphabet) - 1) return false;
-        val = (val << 6) + static_cast<int>(p - alphabet);
-        bits += 6;
-        if (bits >= 0) {
-            out.push_back(static_cast<unsigned char>((val >> bits) & 0xFF));
-            bits -= 8;
+
+        const int c = base64Value(c2);
+        if (c < 0) return false;
+        out.push_back(static_cast<unsigned char>((static_cast<uint32_t>(a) << 2) | (static_cast<uint32_t>(b) >> 4)));
+        out.push_back(static_cast<unsigned char>(((static_cast<uint32_t>(b) & 0x0F) << 4) | (static_cast<uint32_t>(c) >> 2)));
+
+        if (c3 == '=') {
+            if (!last || (c & 0x03) != 0) return false;
+            continue;
         }
+        const int d = base64Value(c3);
+        if (d < 0) return false;
+        out.push_back(static_cast<unsigned char>(((static_cast<uint32_t>(c) & 0x03) << 6) | static_cast<uint32_t>(d)));
     }
     return !out.empty();
 }
 
 bool sha256(const std::string& payload, std::vector<unsigned char>& digest) {
+    if (payload.size() > static_cast<size_t>(std::numeric_limits<ULONG>::max())) return false;
     BCRYPT_ALG_HANDLE alg = nullptr;
     BCRYPT_HASH_HANDLE hash = nullptr;
     DWORD objectBytes = 0;
@@ -100,19 +131,11 @@ bool sha256(const std::string& payload, std::vector<unsigned char>& digest) {
     return finish == 0;
 }
 
-std::filesystem::path keyPath(const std::filesystem::path& root,
-                              const std::string& publisherId,
-                              const std::string& keyId) {
+std::filesystem::path keyPath(const std::filesystem::path& root, const std::string& publisherId, const std::string& keyId) {
     return root / std::filesystem::u8path(publisherId + "__" + keyId + ".json");
 }
 
-struct TrustedKeyRecord {
-    std::string publisherId;
-    std::string keyId;
-    std::string algorithm;
-    std::string x;
-    std::string y;
-};
+struct TrustedKeyRecord { std::string publisherId; std::string keyId; std::string algorithm; std::string x; std::string y; };
 
 bool parseTrustedKey(const std::string& text, TrustedKeyRecord& record) {
     const auto parsed = json::Parse(text);
@@ -124,8 +147,7 @@ bool parseTrustedKey(const std::string& text, TrustedKeyRecord& record) {
     const auto* x = json::String(*object, "x");
     const auto* y = json::String(*object, "y");
     if (!publisherId || !keyId || !algorithm || !x || !y) return false;
-    if (!safeIdentifier(*publisherId) || !safeIdentifier(*keyId) || algorithm->size() > 64 || x->size() > 128 || y->size() > 128)
-        return false;
+    if (!safeIdentifier(*publisherId) || !safeIdentifier(*keyId) || algorithm->size() > 64 || x->size() > 128 || y->size() > 128) return false;
     record = {*publisherId, *keyId, *algorithm, *x, *y};
     return true;
 }
@@ -135,18 +157,14 @@ bool parseTrustedKey(const std::string& text, TrustedKeyRecord& record) {
 CngPublisherTrustProvider::CngPublisherTrustProvider(std::filesystem::path trustRoot)
     : trustRoot_(trustRoot.empty() ? DefaultTrustRoot() : std::move(trustRoot)) {}
 
-std::filesystem::path CngPublisherTrustProvider::DefaultTrustRoot() {
-    return PlatformPaths::PublisherTrustRoot();
-}
+std::filesystem::path CngPublisherTrustProvider::DefaultTrustRoot() { return PlatformPaths::PublisherTrustRoot(); }
 
-PackageTrustResult CngPublisherTrustProvider::Verify(const PackageSignatureEnvelope& envelope,
-                                                     const std::string& signedPayload) const {
+PackageTrustResult CngPublisherTrustProvider::Verify(const PackageSignatureEnvelope& envelope, const std::string& signedPayload) const {
     PackageTrustResult result;
     result.signaturePresent = true;
     result.publisherId = envelope.publisherId;
     result.keyId = envelope.keyId;
     result.algorithm = envelope.algorithm;
-
     if (envelope.algorithm != "ecdsa-p256-sha256") {
         result.state = PackageTrustState::UnsupportedAlgorithm;
         result.detail = L"ZERO does not support the package signature algorithm.";
@@ -157,7 +175,6 @@ PackageTrustResult CngPublisherTrustProvider::Verify(const PackageSignatureEnvel
         result.detail = L"ZERO rejected an unsafe publisher or key identifier.";
         return result;
     }
-
     const auto keyFile = keyPath(trustRoot_, envelope.publisherId, envelope.keyId);
     const auto text = readAllBounded(keyFile, 64 * 1024);
     if (text.empty()) {
@@ -165,65 +182,32 @@ PackageTrustResult CngPublisherTrustProvider::Verify(const PackageSignatureEnvel
         result.detail = L"The package is signed, but its publisher key is not trusted on this ZERO installation.";
         return result;
     }
-
     TrustedKeyRecord record;
-    if (!parseTrustedKey(text, record) ||
-        record.publisherId != envelope.publisherId ||
-        record.keyId != envelope.keyId ||
-        record.algorithm != envelope.algorithm) {
+    if (!parseTrustedKey(text, record) || record.publisherId != envelope.publisherId || record.keyId != envelope.keyId || record.algorithm != envelope.algorithm) {
         result.state = PackageTrustState::UntrustedPublisher;
         result.detail = L"The trusted publisher key record is malformed, duplicated, or does not match the package signer.";
         return result;
     }
 
-    std::vector<unsigned char> x;
-    std::vector<unsigned char> y;
-    std::vector<unsigned char> signature;
-    std::vector<unsigned char> digest;
-    if (!hexToBytes(record.x, x) || !hexToBytes(record.y, y) ||
-        x.size() != 32 || y.size() != 32 ||
-        !base64Decode(envelope.signatureBase64, signature) || signature.size() != 64 ||
-        !sha256(signedPayload, digest)) {
+    std::vector<unsigned char> x,y,signature,digest;
+    if (!hexToBytes(record.x,x) || !hexToBytes(record.y,y) || x.size()!=32 || y.size()!=32 || !base64Decode(envelope.signatureBase64,signature) || signature.size()!=64 || !sha256(signedPayload,digest)) {
         result.state = PackageTrustState::InvalidSignature;
         result.detail = L"ZERO could not decode or validate the publisher signature material.";
         return result;
     }
 
-    struct PublicBlob {
-        BCRYPT_ECCKEY_BLOB header;
-        unsigned char data[64];
-    } blob{};
-    blob.header.dwMagic = BCRYPT_ECDSA_PUBLIC_P256_MAGIC;
-    blob.header.cbKey = 32;
-    std::copy(x.begin(), x.end(), blob.data);
-    std::copy(y.begin(), y.end(), blob.data + 32);
-
-    BCRYPT_ALG_HANDLE alg = nullptr;
-    BCRYPT_KEY_HANDLE key = nullptr;
-    if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_ECDSA_P256_ALGORITHM, nullptr, 0) != 0 ||
-        BCryptImportKeyPair(alg, nullptr, BCRYPT_ECCPUBLIC_BLOB, &key,
-                            reinterpret_cast<PUCHAR>(&blob), sizeof(blob), 0) != 0) {
-        if (key) BCryptDestroyKey(key);
-        if (alg) BCryptCloseAlgorithmProvider(alg, 0);
-        result.state = PackageTrustState::InvalidSignature;
-        result.detail = L"ZERO could not import the trusted publisher public key.";
-        return result;
+    struct PublicBlob { BCRYPT_ECCKEY_BLOB header; unsigned char data[64]; } blob{};
+    blob.header.dwMagic=BCRYPT_ECDSA_PUBLIC_P256_MAGIC; blob.header.cbKey=32;
+    std::copy(x.begin(),x.end(),blob.data); std::copy(y.begin(),y.end(),blob.data+32);
+    BCRYPT_ALG_HANDLE alg=nullptr; BCRYPT_KEY_HANDLE key=nullptr;
+    if(BCryptOpenAlgorithmProvider(&alg,BCRYPT_ECDSA_P256_ALGORITHM,nullptr,0)!=0 || BCryptImportKeyPair(alg,nullptr,BCRYPT_ECCPUBLIC_BLOB,&key,reinterpret_cast<PUCHAR>(&blob),sizeof(blob),0)!=0){
+        if(key)BCryptDestroyKey(key);if(alg)BCryptCloseAlgorithmProvider(alg,0);
+        result.state=PackageTrustState::InvalidSignature;result.detail=L"ZERO could not import the trusted publisher public key.";return result;
     }
-
-    const NTSTATUS verified = BCryptVerifySignature(key, nullptr, digest.data(), static_cast<ULONG>(digest.size()),
-                                                     signature.data(), static_cast<ULONG>(signature.size()), 0);
-    BCryptDestroyKey(key);
-    BCryptCloseAlgorithmProvider(alg, 0);
-    if (verified != 0) {
-        result.state = PackageTrustState::InvalidSignature;
-        result.detail = L"The package publisher signature is invalid.";
-        return result;
-    }
-
-    result.state = PackageTrustState::TrustedPublisher;
-    result.identityVerified = true;
-    result.detail = L"Publisher signature verified with a trusted ZERO public key.";
-    return result;
+    const NTSTATUS verified=BCryptVerifySignature(key,nullptr,digest.data(),static_cast<ULONG>(digest.size()),signature.data(),static_cast<ULONG>(signature.size()),0);
+    BCryptDestroyKey(key);BCryptCloseAlgorithmProvider(alg,0);
+    if(verified!=0){result.state=PackageTrustState::InvalidSignature;result.detail=L"The package publisher signature is invalid.";return result;}
+    result.state=PackageTrustState::TrustedPublisher;result.identityVerified=true;result.detail=L"Publisher signature verified with a trusted ZERO public key.";return result;
 }
 
 } // namespace zero
