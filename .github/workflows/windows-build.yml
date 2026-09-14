@@ -6,13 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-2022
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Configure
         run: cmake -S . -B build -A x64
@@ -82,12 +85,16 @@ jobs:
         timeout-minutes: 2
         run: ./tools/run-rc-qualification.ps1 -BuildRoot ./build -EvidenceDir ./build/QualificationEvidence -NonInteractiveValidation
 
+      - name: Generate SPDX SBOM
+        shell: pwsh
+        run: ./tools/generate-sbom.ps1 -BuildRoot ./build -OutputPath ./build/SBOM/zero-virtual-console.spdx.json
+
       - name: Build deterministic RC release bundle
         shell: pwsh
         run: ./tools/package-release.ps1 -BuildRoot ./build -OutputDir ./build/ReleaseBundle
 
       - name: Upload ZERO binaries and acceptance evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ZERO-Virtual-Console-Windows-x64
           path: |
@@ -117,6 +124,7 @@ jobs:
             build/ArchitectureReports/**
             build/AcceptanceReports/**
             build/QualificationEvidence/**
+            build/SBOM/**
             build/ReleaseBundle/**
             build/ZERO-Virtual-Console-Windows-x64-RC.zip
             tools/verify-dependency-surface.ps1
@@ -125,7 +133,10 @@ jobs:
             tools/run-rc-qualification.ps1
             tools/verify-rc-build.ps1
             tools/verify-installer-v2.ps1
+            tools/generate-sbom.ps1
+            tools/verify-authenticode.ps1
             tools/package-release.ps1
+            tools/package-production-release.ps1
             docs/PRODUCTION_ARCHITECTURE_STANDARD.md
             docs/RUNTIME_V4_1_RC_GATE.md
             installer/install-zero.ps1
