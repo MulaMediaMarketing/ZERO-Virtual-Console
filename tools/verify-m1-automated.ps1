@@ -9,6 +9,7 @@ Set-StrictMode -Version Latest
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 
 $results = New-Object System.Collections.Generic.List[object]
+$automatedRuntimeBudgetMs = 600000
 
 function Resolve-RequiredFile([string]$RelativePath) {
   $path = Join-Path $BuildRoot $RelativePath
@@ -70,6 +71,7 @@ $friendsUx = Resolve-RequiredFile "Release\ZeroFriendsExperienceAcceptance.exe"
 $capturesUx = Resolve-RequiredFile "Release\ZeroCapturesExperienceAcceptance.exe"
 $coreShellUx = Resolve-RequiredFile "Release\ZeroCoreShellExperienceAcceptance.exe"
 $storeSettingsFirstBootUx = Resolve-RequiredFile "Release\ZeroStoreSettingsFirstBootAcceptance.exe"
+$firstBootPersistence = Resolve-RequiredFile "Release\ZeroFirstBootPersistenceAcceptance.exe"
 $referenceExe = Resolve-RequiredFile "ReferencePackage\ZeroReferenceGame.exe"
 $referenceManifest = Resolve-RequiredFile "ReferencePackage\zero.manifest.json"
 $referenceIntegrity = Resolve-RequiredFile "ReferencePackage\zero.integrity.sha256"
@@ -91,6 +93,7 @@ Invoke-AcceptanceStep -Name "friends_experience_contract" -Category "production_
 Invoke-AcceptanceStep -Name "captures_experience_contract" -Category "production_ux" -Command $capturesUx
 Invoke-AcceptanceStep -Name "core_shell_experience_contract" -Category "production_ux" -Command $coreShellUx
 Invoke-AcceptanceStep -Name "store_settings_firstboot_contract" -Category "production_ux" -Command $storeSettingsFirstBootUx
+Invoke-AcceptanceStep -Name "first_boot_persistence" -Category "persistence" -Command $firstBootPersistence
 Invoke-AcceptanceStep -Name "installer_update_uninstall" -Category "installation" -Command "pwsh" -Arguments @("-NoProfile", "-File", $installerGate, "-BuildRoot", $BuildRoot)
 Invoke-AcceptanceStep -Name "rc_payload" -Category "release" -Command "pwsh" -Arguments @("-NoProfile", "-File", $rcGate, "-BuildRoot", $BuildRoot)
 
@@ -124,6 +127,23 @@ $results.Add([pscustomobject]@{
 })
 Write-Host ("[{0}] reference_package_contract" -f $referenceStatus)
 
+$measuredChecks = @($results)
+$totalDurationMs = [int64](($measuredChecks | Measure-Object -Property duration_ms -Sum).Sum)
+$slowest = $measuredChecks | Sort-Object duration_ms -Descending | Select-Object -First 1
+$runtimeBudgetPassed = $totalDurationMs -le $automatedRuntimeBudgetMs
+$budgetTimestamp = [DateTime]::UtcNow.ToString("o")
+$results.Add([pscustomobject]@{
+  name = "automated_runtime_budget"
+  category = "performance"
+  status = if ($runtimeBudgetPassed) { "PASS" } else { "FAIL" }
+  exit_code = if ($runtimeBudgetPassed) { 0 } else { 2 }
+  started_at_utc = $budgetTimestamp
+  ended_at_utc = $budgetTimestamp
+  duration_ms = 0
+  output = "Measured acceptance duration: $totalDurationMs ms; budget: $automatedRuntimeBudgetMs ms."
+})
+Write-Host ("[{0}] automated_runtime_budget ({1} ms / {2} ms)" -f $(if ($runtimeBudgetPassed) { "PASS" } else { "FAIL" }), $totalDurationMs, $automatedRuntimeBudgetMs)
+
 $failedCount = @($results | Where-Object { $_.status -ne "PASS" }).Count
 $allAutomatedPassed = $failedCount -eq 0
 $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
@@ -140,13 +160,20 @@ $hardwareRequirements = @(
 )
 
 $report = [ordered]@{
-  schema = 2
+  schema = 3
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
-  zero_milestone = "M1 / Runtime V4.1 / Production UX"
+  zero_milestone = "M1 / Runtime V4.1 / Production Architecture"
   commit = $commit
   automated_result = $automatedResult
   rc_qualified = $false
   rc_qualification_note = "Automated PASS does not qualify an RC. Real Windows 11 x64 and physical-controller acceptance is still required."
+  performance_metrics = [ordered]@{
+    total_acceptance_duration_ms = $totalDurationMs
+    runtime_budget_ms = $automatedRuntimeBudgetMs
+    runtime_budget_passed = $runtimeBudgetPassed
+    slowest_gate = if ($slowest) { $slowest.name } else { "none" }
+    slowest_gate_duration_ms = if ($slowest) { $slowest.duration_ms } else { 0 }
+  }
   binaries = [ordered]@{
     shell = $zeroShell
     acceptance = $zeroAcceptance
@@ -167,13 +194,16 @@ $lines.Add("- Commit: ``$commit``")
 $lines.Add("- Automated result: **$automatedResult**")
 $lines.Add("- RC qualified: **NO**")
 $lines.Add("- Generated: $($report.generated_at_utc)")
+$lines.Add("- Total measured acceptance duration: **$totalDurationMs ms**")
+$lines.Add("- Acceptance runtime budget: **$automatedRuntimeBudgetMs ms**")
+$lines.Add("- Slowest gate: **$($report.performance_metrics.slowest_gate)** ($($report.performance_metrics.slowest_gate_duration_ms) ms)")
 $lines.Add("")
 $lines.Add("## Automated gates")
 $lines.Add("")
-$lines.Add("| Gate | Category | Result |")
-$lines.Add("| --- | --- | --- |")
+$lines.Add("| Gate | Category | Result | Duration (ms) |")
+$lines.Add("| --- | --- | --- | ---: |")
 foreach ($item in $results) {
-  $lines.Add("| $($item.name) | $($item.category) | $($item.status) |")
+  $lines.Add("| $($item.name) | $($item.category) | $($item.status) | $($item.duration_ms) |")
 }
 $lines.Add("")
 $lines.Add("## Physical qualification still required")
