@@ -2,6 +2,7 @@
 #include "PlatformDatabase.h"
 #include "StrictJson.h"
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -60,7 +61,7 @@ int main() {
     const auto dbMs=millis(dbStart,Clock::now());
     ok &= expect(dbMs<=10000,"250 FULL-synchronous SQLite session transactions exceeded 10 second CI budget");
     const auto state=db.LoadGameState(game.packageId,error);
-    ok &= expect(state && state->launchCount==kTransactions,"benchmark database state must remain correct");
+    ok &= expect(state && state->launchCount==static_cast<uint64_t>(kTransactions),"benchmark database state must remain correct");
 
     constexpr int kCatalogGames=1000;
     const auto library=root/L"Library";
@@ -79,13 +80,13 @@ int main() {
     const auto registryStart=Clock::now();
     registry.Refresh();
     const auto registryMs=millis(registryStart,Clock::now());
-    ok &= expect(registry.Games().size()==kCatalogGames,"1,000-game registry must discover every valid package");
+    ok &= expect(registry.Games().size()==static_cast<size_t>(kCatalogGames),"1,000-game registry must discover every valid package");
     ok &= expect(registryMs<=10000,"1,000-game registry refresh exceeded 10 second CI budget");
 
     std::error_code ec; std::filesystem::remove_all(root,ec);
     std::cout << "METRIC strict_json_50000_ms=" << jsonMs << '\n';
     std::cout << "METRIC sqlite_full_250_sessions_ms=" << dbMs << '\n';
-    std::cout << "METRIC sqlite_sessions_per_second=" << (dbMs>0?(kTransactions*1000LL/dbMs):kTransactions*1000LL) << '\n';
+    std::cout << "METRIC sqlite_sessions_per_second=" << (dbMs>0?(static_cast<long long>(kTransactions)*1000LL/dbMs):static_cast<long long>(kTransactions)*1000LL) << '\n';
     std::cout << "METRIC registry_1000_games_ms=" << registryMs << '\n';
     if(!ok)return 1;
     std::cout << "PASS: ZERO production core performance and 1000-game scale benchmark\n";
