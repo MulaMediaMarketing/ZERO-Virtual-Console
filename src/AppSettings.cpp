@@ -1,6 +1,6 @@
 #include "App.h"
+#include "PlatformPaths.h"
 #include <Xinput.h>
-#include <shlobj.h>
 #include <shellapi.h>
 #include <algorithm>
 #include <filesystem>
@@ -9,16 +9,6 @@ using Microsoft::WRL::ComPtr;
 
 namespace zero {
 namespace {
-std::filesystem::path LocalRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::current_path() / "ZeroData";
-}
-
 std::wstring BytesLabel(uint64_t bytes) {
     constexpr uint64_t GiB = 1024ull * 1024ull * 1024ull;
     constexpr uint64_t MiB = 1024ull * 1024ull;
@@ -66,9 +56,9 @@ void App::RefreshSettingsTelemetry() {
     settingsDisplayWidth_ = static_cast<unsigned>(std::max<LONG>(0, rc.right - rc.left));
     settingsDisplayHeight_ = static_cast<unsigned>(std::max<LONG>(0, rc.bottom - rc.top));
 
-    const auto root = LocalRoot();
+    const auto root = PlatformPaths::DataRoot();
     settingsStorageBytes_ = DirectorySize(root);
-    settingsCrashReportCount_ = CountJsonReports(root / "CrashReports");
+    settingsCrashReportCount_ = CountJsonReports(PlatformPaths::CrashReportsRoot());
 
     std::error_code ec;
     const auto space = std::filesystem::space(root, ec);
@@ -76,7 +66,7 @@ void App::RefreshSettingsTelemetry() {
 }
 
 void App::OpenSettingsLocation(bool diagnosticsOnly) {
-    const auto target = diagnosticsOnly ? (LocalRoot() / "CrashReports") : LocalRoot();
+    const auto target = diagnosticsOnly ? PlatformPaths::CrashReportsRoot() : PlatformPaths::DataRoot();
     std::error_code ec;
     std::filesystem::create_directories(target, ec);
     if (ec) {
