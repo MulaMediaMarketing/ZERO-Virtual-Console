@@ -20,6 +20,10 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Validate production architecture and collect benchmarks
+        shell: pwsh
+        run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
+
       - name: Validate production shell navigation contract
         shell: pwsh
         run: ./build/Release/ZeroProductionUxAcceptance.exe
@@ -80,15 +84,18 @@ jobs:
             build/Release/ZeroStoreSettingsFirstBootAcceptance.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
+            build/ArchitectureReports/**
             build/AcceptanceReports/**
             build/QualificationEvidence/**
             build/ReleaseBundle/**
             build/ZERO-Virtual-Console-Windows-x64-RC.zip
+            tools/verify-production-architecture.ps1
             tools/verify-m1-automated.ps1
             tools/run-rc-qualification.ps1
             tools/verify-rc-build.ps1
             tools/verify-installer-v2.ps1
             tools/package-release.ps1
+            docs/PRODUCTION_ARCHITECTURE_STANDARD.md
             docs/RUNTIME_V4_1_RC_GATE.md
             installer/install-zero.ps1
             installer/uninstall-zero.ps1
