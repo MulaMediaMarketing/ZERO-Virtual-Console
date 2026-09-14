@@ -1,73 +1,78 @@
 # ZERO Virtual Console
 
-Native Windows foundation for **ZERO Virtual Console**, a standalone software-defined game console platform for PC.
+Native Windows foundation for **ZERO Virtual Console**, a standalone, game-agnostic software-defined game console platform for PC.
 
 > The PC is the hardware. ZERO is the console layer.
 
-ZERO is game-agnostic. It is designed to host many current and future games; no individual title owns or defines the platform architecture.
+ZERO is designed to host many current and future games. No individual title owns, defines, or is hardcoded into the platform architecture.
 
-## Runtime V2 architecture
+## Runtime V4.1 architecture
 
-`Windows -> ZERO Shell -> Game Manifest -> ZERO Runtime V2 -> native Game.exe`
+`Windows 11 x64 -> ZERO Shell -> Game Manifest -> Runtime V4.1 -> native Game.exe`
 
-Games are discovered through `zero.manifest.json` files placed in:
+Runtime V4.1 provides:
 
-`%LOCALAPPDATA%\\ZERO\\Library\\<GameName>\\`
+- manifest-driven game discovery and strict package validation;
+- native Windows `.exe` launch through suspended creation and Windows Job Object containment;
+- authenticated local Runtime/SDK session plumbing and READY lifecycle;
+- per-game Saves/Cache/Temp isolation;
+- canonical local game/session statistics, Resume, achievements, and diagnostics;
+- SHA-256 package integrity verification before launch;
+- local trusted-publisher verification using ECDSA P-256/SHA-256 through Windows CNG;
+- safe package repair/re-import and transactional installer/update rollback;
+- four-slot XInput arbitration plus keyboard fallback;
+- production shell navigation, overlay lifecycle, launch recovery, First Boot, Settings, Friends, Captures, Store provider boundaries, and accessibility state;
+- automated M1 acceptance, architecture-policy measurement, deterministic release packaging, and physical RC qualification tooling.
 
-Runtime V2 currently provides:
+Games are discovered under:
 
-- manifest-driven game discovery
-- native Windows `.exe` launching
-- unique runtime sessions
-- Windows Job Object process containment
-- suspended creation -> containment -> resume launch sequence
-- controlled graceful/forced shutdown
-- crash-vs-clean-exit detection
-- per-game save/cache/temp isolation
-- persistent runtime session diagnostics
-- controller/keyboard shell navigation
-- game-agnostic runtime contracts
+`%LOCALAPPDATA%\\ZERO\\Library\\<GameName>\\zero.manifest.json`
 
-## Build with VS Code on Windows
+Player/runtime data remains under `%LOCALAPPDATA%\\ZERO` and is separated from replaceable program files.
+
+## Build
 
 Requirements:
 
 - Windows 11 x64
-- VS Code
-- CMake Tools extension
-- Microsoft C/C++ extension
-- Visual Studio Build Tools 2022 with **Desktop development with C++**
+- Visual Studio Build Tools 2022 with Desktop development with C++
 - Windows 11 SDK
 - CMake 3.24+
 
-From the VS Code terminal:
-
 ```powershell
 cmake -S . -B build -A x64
-cmake --build build --config Release
+cmake --build build --config Release --parallel
 ```
 
-Build outputs include `ZeroVirtualConsole.exe` and `ZeroTestGame.exe`.
+## Production verification
 
-## Register the validation game
+A candidate is not accepted because it compiles. Production verification is evidence-driven:
 
-1. Create `%LOCALAPPDATA%\\ZERO\\Library\\ZeroRuntimeTest`.
-2. Copy `ZeroTestGame.exe` into that folder.
-3. Copy `sample_game\\zero.manifest.json` beside it.
-4. Launch `ZeroVirtualConsole.exe`.
-5. Press F5 to refresh if ZERO is already open.
+```powershell
+./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
+./tools/verify-m1-automated.ps1 -BuildRoot ./build -ReportDir ./build/AcceptanceReports
+./tools/run-rc-qualification.ps1 -BuildRoot ./build -EvidenceDir ./build/QualificationEvidence -NonInteractiveValidation
+./tools/package-release.ps1 -BuildRoot ./build -OutputDir ./build/ReleaseBundle
+```
 
-The validation game is only a test harness. Runtime code must never depend on its package ID, title, executable name, content, or behavior.
+The architecture report measures source size, acceptance coverage, binary hashes, documentation alignment, and policy violations. CI may produce an automated PASS, but **CI can never qualify the RC**. Final qualification requires the documented real Windows 11 x64 + physical XInput controller journey for the exact candidate commit.
 
-## Controls
+See:
 
-- Left/Right: top navigation
-- Up/Down: Library selection
-- A / Enter: select / launch
-- B / Escape: back
-- F5: refresh Library
-- Ctrl+Q: exit ZERO
+- `docs/ARCHITECTURE.md`
+- `docs/PRODUCTION_ARCHITECTURE_STANDARD.md`
+- `docs/RUNTIME_V4_1_RC_GATE.md`
+- `docs/PACKAGE_SECURITY.md`
+- `docs/PACKAGE_TRUST.md`
 
-## MVP boundary
+## Permanent shell destinations
 
-This repository is the coded platform foundation, not a claim that the entire commercial ecosystem is complete. Store, payments, production Zero ID, Cloud, Link/social, public SDK distribution, DRM, and other post-MVP services remain intentionally outside the current runtime slice.
+The production shell contract exposes exactly six permanent top-level destinations:
+
+**Home · Library · Store · Friends · Captures · Settings**
+
+Game Detail, Import, and Achievements are secondary pages and do not redefine top-level navigation.
+
+## Platform boundary
+
+The Runtime V4.1/local-console foundation does not falsely claim completion of the entire online commercial ecosystem. Production Store commerce, cloud Zero ID, Zero Link backend, DRM, anti-cheat, native video capture/encoding, public publisher PKI/portal, public SDK distribution, ARM64, HDR certification, and non-Windows targets remain separate milestones until implemented.
