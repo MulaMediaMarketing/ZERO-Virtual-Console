@@ -1,0 +1,125 @@
+name: Production Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ZERO_TIMESTAMP_URL: https://timestamp.digicert.com
+
+jobs:
+  production:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    environment: production
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact main candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact main branch
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -ne "refs/heads/main") { throw "Production release is allowed only from main." }
+          $remoteMain = (git rev-parse origin/main).Trim()
+          if ($remoteMain -ne "${{ github.sha }}") { throw "Production candidate is not the current main SHA." }
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build Release
+        run: cmake --build build --config Release --parallel
+
+      - name: Validate strict JSON hostile-input contract
+        shell: pwsh
+        run: ./build/Release/ZeroStrictJsonAcceptance.exe
+
+      - name: Validate canonical platform database contract
+        shell: pwsh
+        run: ./build/Release/ZeroPlatformDatabaseAcceptance.exe
+
+      - name: Validate local storage fault injection
+        shell: pwsh
+        run: ./build/Release/ZeroFaultInjectionAcceptance.exe
+
+      - name: Validate production core performance budgets
+        shell: pwsh
+        run: ./build/Release/ZeroProductionBenchmarkAcceptance.exe
+
+      - name: Validate dependency surface
+        shell: pwsh
+        run: ./tools/verify-dependency-surface.ps1 -ReportDir ./build/DependencyReports
+
+      - name: Validate production architecture
+        shell: pwsh
+        run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
+
+      - name: Build ZERO reference package
+        shell: pwsh
+        run: ./sample_game/reference/build-reference-package.ps1 -ReferenceExe ./build/Release/ZeroReferenceGame.exe -Output ./build/ReferencePackage
+
+      - name: Run full automated M1 acceptance
+        shell: pwsh
+        timeout-minutes: 12
+        run: ./tools/verify-m1-automated.ps1 -BuildRoot ./build -ReportDir ./build/AcceptanceReports
+
+      - name: Materialize physical qualification evidence
+        shell: pwsh
+        env:
+          ZERO_PHYSICAL_QUALIFICATION_B64: ${{ secrets.ZERO_PHYSICAL_QUALIFICATION_B64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ZERO_PHYSICAL_QUALIFICATION_B64)) { throw "Missing physical qualification evidence secret." }
+          New-Item -ItemType Directory -Force -Path ./build/QualificationEvidence | Out-Null
+          [IO.File]::WriteAllBytes("./build/QualificationEvidence/rc-qualification.json", [Convert]::FromBase64String($env:ZERO_PHYSICAL_QUALIFICATION_B64))
+          $q = Get-Content ./build/QualificationEvidence/rc-qualification.json -Raw | ConvertFrom-Json
+          if ($q.rc_qualified -ne $true) { throw "Physical qualification evidence is not qualified." }
+          $qualifiedCommit = if ($q.PSObject.Properties.Name -contains 'commit') { [string]$q.commit } elseif ($q.PSObject.Properties.Name -contains 'candidate_commit') { [string]$q.candidate_commit } else { '' }
+          if ($qualifiedCommit -ne "${{ github.sha }}") { throw "Physical qualification evidence is not for exact candidate SHA." }
+
+      - name: Generate SPDX SBOM
+        shell: pwsh
+        run: ./tools/generate-sbom.ps1 -BuildRoot ./build -OutputPath ./build/SBOM/zero-virtual-console.spdx.json
+
+      - name: Import production code-signing certificate
+        shell: pwsh
+        env:
+          ZERO_SIGNING_PFX_BASE64: ${{ secrets.ZERO_SIGNING_PFX_BASE64 }}
+          ZERO_SIGNING_PFX_PASSWORD: ${{ secrets.ZERO_SIGNING_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ZERO_SIGNING_PFX_BASE64)) { throw "Missing production code-signing certificate." }
+          if ([string]::IsNullOrWhiteSpace($env:ZERO_SIGNING_PFX_PASSWORD)) { throw "Missing production code-signing certificate password." }
+          $pfx = Join-Path $env:RUNNER_TEMP "zero-production-signing.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:ZERO_SIGNING_PFX_BASE64))
+          "ZERO_SIGNING_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Sign shipping executable
+        shell: pwsh
+        env:
+          ZERO_SIGNING_PFX_PASSWORD: ${{ secrets.ZERO_SIGNING_PFX_PASSWORD }}
+        run: |
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found." }
+          & $signtool.FullName sign /fd SHA256 /td SHA256 /tr $env:ZERO_TIMESTAMP_URL /f $env:ZERO_SIGNING_PFX /p $env:ZERO_SIGNING_PFX_PASSWORD ./build/Release/ZeroVirtualConsole.exe
+          if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed." }
+
+      - name: Verify Authenticode signature
+        shell: pwsh
+        run: ./tools/verify-authenticode.ps1 -Paths ./build/Release/ZeroVirtualConsole.exe -ReportPath ./build/SigningReports/authenticode.json
+
+      - name: Build production release bundle
+        shell: pwsh
+        run: ./tools/package-production-release.ps1 -BuildRoot ./build -OutputDir ./build/ProductionRelease -QualificationEvidence ./build/QualificationEvidence/rc-qualification.json -SbomPath ./build/SBOM/zero-virtual-console.spdx.json -SigningReport ./build/SigningReports/authenticode.json
+
+      - name: Upload signed production release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ZERO-Virtual-Console-Windows-x64-Production-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            build/ZERO-Virtual-Console-Windows-x64-Production.zip
+            build/ProductionRelease/**
