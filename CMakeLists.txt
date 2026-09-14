@@ -30,6 +30,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/GameImportService.cpp
   src/ManifestValidator.cpp
   src/PackageSecurity.cpp
+  src/PackageIntegrityVerifier.cpp
   src/RuntimeSession.cpp
   src/RuntimeSessionLifecycle.cpp
   src/RuntimeSessionDiagnostics.cpp
@@ -83,5 +84,14 @@ add_executable(ZeroIpcPersistenceAcceptance
 target_include_directories(ZeroIpcPersistenceAcceptance PRIVATE sdk include)
 target_compile_definitions(ZeroIpcPersistenceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroIpcPersistenceAcceptance PRIVATE ZeroSdk advapi32)
+
+add_executable(ZeroPackageIntegrityAcceptance
+  tools/PackageIntegrityAcceptance.cpp
+  src/PackageSecurity.cpp
+  src/PackageIntegrityVerifier.cpp
+)
+target_include_directories(ZeroPackageIntegrityAcceptance PRIVATE include)
+target_compile_definitions(ZeroPackageIntegrityAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroPackageIntegrityAcceptance PRIVATE bcrypt)
 
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
