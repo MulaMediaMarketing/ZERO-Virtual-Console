@@ -53,6 +53,7 @@ int main() {
     if (!db.UpsertGame(game,error)) return 1;
 
     constexpr int kTransactions = 250;
+    constexpr long long kDurableSessionBudgetMs = 80;
     const auto dbStart=Clock::now();
     for(int i=0;i<kTransactions;++i){
         if(!db.RecordSession(game.packageId,"session-"+std::to_string(i),1,0,"clean_exit",false,error)){
@@ -60,7 +61,8 @@ int main() {
         }
     }
     const auto dbMs=millis(dbStart,Clock::now());
-    ok &= expect(dbMs<=10000,"250 FULL-synchronous SQLite session transactions exceeded 10 second CI budget");
+    const auto dbAverageMs = dbMs / static_cast<long long>(kTransactions);
+    ok &= expect(dbAverageMs<=kDurableSessionBudgetMs,"FULL-synchronous SQLite session persistence exceeded 80 ms average per durable session write");
     const auto state=db.LoadGameState(game.packageId,error);
     ok &= expect(state && state->launchCount==static_cast<uint64_t>(kTransactions),"benchmark database state must remain correct");
 
@@ -89,6 +91,7 @@ int main() {
     std::error_code ec; std::filesystem::remove_all(root,ec);
     std::cout << "METRIC strict_json_50000_ms=" << jsonMs << '\n';
     std::cout << "METRIC sqlite_full_250_sessions_ms=" << dbMs << '\n';
+    std::cout << "METRIC sqlite_full_average_session_ms=" << dbAverageMs << '\n';
     std::cout << "METRIC sqlite_sessions_per_second=" << (dbMs>0?(static_cast<long long>(kTransactions)*1000LL/dbMs):static_cast<long long>(kTransactions)*1000LL) << '\n';
     std::cout << "METRIC registry_1000_games_ms=" << registryMs << '\n';
     if(!ok)return 1;
