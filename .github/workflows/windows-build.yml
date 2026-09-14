@@ -20,50 +20,16 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
-      - name: Verify persistence ACK failure handling
-        shell: pwsh
-        timeout-minutes: 2
-        run: ./build/Release/ZeroIpcPersistenceAcceptance.exe
-
       - name: Build ZERO reference package
         shell: pwsh
         run: ./sample_game/reference/build-reference-package.ps1 -ReferenceExe ./build/Release/ZeroReferenceGame.exe -Output ./build/ReferencePackage
 
-      - name: Verify launch-time package integrity
+      - name: Run full automated M1 acceptance
         shell: pwsh
-        timeout-minutes: 3
-        run: ./build/Release/ZeroPackageIntegrityAcceptance.exe ./build/ReferencePackage
+        timeout-minutes: 12
+        run: ./tools/verify-m1-automated.ps1 -BuildRoot ./build -ReportDir ./build/AcceptanceReports
 
-      - name: Verify package trust architecture
-        shell: pwsh
-        timeout-minutes: 2
-        run: ./build/Release/ZeroPackageTrustAcceptance.exe
-
-      - name: Verify installed package repair flow
-        shell: pwsh
-        timeout-minutes: 3
-        run: ./build/Release/ZeroPackageRepairAcceptance.exe
-
-      - name: Verify ZERO input finalization
-        shell: pwsh
-        timeout-minutes: 2
-        run: ./build/Release/ZeroInputAcceptance.exe
-
-      - name: Verify shell overlay production polish
-        shell: pwsh
-        timeout-minutes: 2
-        run: ./build/Release/ZeroShellUxAcceptance.exe
-
-      - name: Verify installer update uninstall V2
-        shell: pwsh
-        timeout-minutes: 3
-        run: ./tools/verify-installer-v2.ps1 -BuildRoot ./build
-
-      - name: Verify Runtime V4.1 RC payload
-        shell: pwsh
-        run: ./tools/verify-rc-build.ps1 -BuildRoot ./build
-
-      - name: Upload ZERO binaries
+      - name: Upload ZERO binaries and acceptance evidence
         uses: actions/upload-artifact@v4
         with:
           name: ZERO-Virtual-Console-Windows-x64
@@ -79,6 +45,8 @@ jobs:
             build/Release/ZeroInputAcceptance.exe
             build/Release/ZeroShellUxAcceptance.exe
             build/ReferencePackage/**
+            build/AcceptanceReports/**
+            tools/verify-m1-automated.ps1
             tools/verify-rc-build.ps1
             tools/verify-installer-v2.ps1
             docs/RUNTIME_V4_1_RC_GATE.md
