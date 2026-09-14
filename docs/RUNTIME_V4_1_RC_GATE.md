@@ -10,21 +10,21 @@ Every PR and `main` build must:
 2. build the dedicated ZERO Reference Experience package;
 3. run `tools/verify-m1-automated.ps1`;
 4. produce both `m1-automated-acceptance.json` and `m1-automated-acceptance.md` evidence;
-5. upload the shell, acceptance tools, reference package, installer/uninstaller, and acceptance evidence as one Windows artifact.
+5. run `tools/run-rc-qualification.ps1 -NonInteractiveValidation` and prove CI remains `PENDING`, never qualified;
+6. upload the shell, acceptance tools, reference package, installer/uninstaller, qualification probe, and acceptance evidence as one Windows artifact.
 
-The automated runner executes the release-engineering gates for:
+The automated runner covers Runtime IPC persistence, package integrity, publisher trust verification, safe repair/re-import, controller input logic, shell/overlay lifecycle, installer/update/uninstall behavior, RC payload completeness, and the locked reference-package contract.
 
-- Runtime IPC persistence ACK behavior;
-- launch-time package integrity verification;
-- real package-signature/trust verification;
-- safe installed-package repair/re-import;
-- controller-input state-machine behavior;
-- shell/overlay motion and focus lifecycle;
-- installer/update/uninstall preservation behavior;
-- RC payload completeness;
-- locked reference-package manifest and integrity contract.
+The automated report deliberately includes `rc_qualified=false`. A green CI report proves tested software contracts passed. It does not prove the supported real-machine experience.
 
-The JSON report deliberately includes `rc_qualified=false`. A green automated report proves the tested software contracts passed in CI. It does not prove the supported real-machine hardware experience.
+## Qualification tooling
+
+PR #43 freezes the RC evidence path around two tools:
+
+- `ZeroQualificationProbe.exe` records only non-sensitive qualification facts: Windows build, native architecture, and XInput slot detection. It does not record the Windows machine name or user identity.
+- `tools/run-rc-qualification.ps1` consumes the automated M1 report plus explicit hardware/manual results and emits `rc-qualification.json` and `rc-qualification.md`.
+
+CI invokes the qualification runner only with `-NonInteractiveValidation`. In that mode it must output `qualification_result=PENDING` and `rc_qualified=false`. CI is structurally prevented from qualifying the release candidate.
 
 ## Real Windows acceptance gate
 
@@ -32,7 +32,7 @@ Run on a clean Windows 11 x64 machine with a physical XInput-compatible controll
 
 1. Install ZERO with `install-zero.ps1`.
 2. Launch ZERO and complete First Boot using the physical controller for navigation and confirmation.
-3. Verify display and audio setup, then restart ZERO and confirm First Boot does not recur.
+3. Verify display and audio setup, restart ZERO, and confirm First Boot does not recur.
 4. Traverse Home, Library, Game Detail, Settings, Achievements, Captures, overlay open/close, and Back/Home navigation entirely with the controller.
 5. Disconnect and reconnect the controller during shell navigation and verify focus remains recoverable without phantom A/B/Menu actions.
 6. Import the generated `ReferencePackage` through ZERO.
@@ -49,20 +49,41 @@ Run on a clean Windows 11 x64 machine with a physical XInput-compatible controll
 17. Launch the reference game and allow its deliberate unhandled exception to occur.
 18. Verify ZERO remains alive and restores the shell foreground/fullscreen experience.
 19. Verify a non-empty `.dmp` and package-specific crash JSON exist under `%LOCALAPPDATA%\ZERO\CrashReports\zero.system.reference`.
-20. Run the installed `ZeroAcceptance.exe`.
-21. Every interactive acceptance check must print PASS and the process must exit 0.
-22. Run the M1 automated acceptance runner locally against the release build and archive its JSON/Markdown evidence with the hardware test record.
-23. Uninstall ZERO normally and verify player saves/library/settings remain as documented.
-24. Reinstall/upgrade ZERO and verify preserved data is still available.
+20. Run the installed `ZeroAcceptance.exe` and require every check to print PASS with process exit code 0.
+21. Run the M1 automated acceptance runner locally against the exact release build.
+22. Uninstall ZERO normally and verify player saves/library/settings remain as documented.
+23. Reinstall/upgrade ZERO and verify preserved data is still available.
+24. Run the RC qualification command below using the real controller make/model and only the switches whose journeys actually passed.
+
+Example only after every listed result has been physically observed:
+
+```powershell
+./tools/run-rc-qualification.ps1 `
+  -BuildRoot ./build `
+  -EvidenceDir ./build/QualificationEvidence `
+  -ControllerModel "<actual controller make/model>" `
+  -FirstBootPassed `
+  -ControllerTraversalPassed `
+  -OverlayFocusPassed `
+  -ForegroundRecoveryPassed `
+  -RestartPersistencePassed `
+  -UninstallReinstallPassed `
+  -CrashContainmentPassed `
+  -ResumeRoundTripPassed `
+  -CanonicalStatePassed
+```
+
+The command exits 0 and writes `rc_qualified=true` only when all automated, OS/architecture, physical-controller, controller-identification, and manual qualification requirements are satisfied. Missing evidence returns a non-zero exit and a `PENDING` report with explicit blockers.
 
 ## Required acceptance evidence
 
 A qualification record must include:
 
-- ZERO commit/build identifier;
+- exact ZERO commit/build identifier and version `0.1.0-rc1`;
 - Windows 11 build and x64 architecture;
 - physical controller make/model and successful XInput detection;
 - generated M1 automated JSON + Markdown reports;
+- generated RC qualification JSON + Markdown reports;
 - installed `ZeroAcceptance.exe` output;
 - package integrity verification result;
 - launch/READY and Resume round-trip evidence;
@@ -72,19 +93,16 @@ A qualification record must include:
 - uninstall/reinstall preservation result;
 - tester PASS/FAIL decision for controller navigation, overlay behavior, and foreground recovery.
 
+## Release freeze rule
+
+After the exact candidate build receives a complete `rc_qualified=true` qualification record, no source, build-script, installer, manifest, runtime, shell, or SDK change may be made to that candidate without invalidating the record and rerunning qualification against the new commit.
+
+Do not rewrite, hand-edit, or promote a `PENDING` qualification report to PASS. Qualification comes from rerunning the tooling against the exact candidate build after the real-machine journey succeeds.
+
 ## Explicit non-claims
 
-This gate does not certify:
-
-- hostile-code sandboxing;
-- Store DRM or online entitlement enforcement;
-- anti-cheat;
-- Store commerce;
-- public cloud identity/social services;
-- native capture recording/encoding;
-- HDR or hardware certification;
-- ARM64 or non-Windows platforms.
+This gate does not certify hostile-code sandboxing, Store DRM or online entitlements, anti-cheat, Store commerce, public cloud identity/social services, native capture recording/encoding, HDR/hardware certification, ARM64, or non-Windows platforms.
 
 Publisher signature verification exists, but RC qualification does not imply a public publisher CA, production publisher portal, or Store signing service.
 
-Only after the automated M1 gate and the full real-machine acceptance journey pass may Runtime V4.1 be called RC-qualified.
+Only after the automated M1 gate and the full real-machine acceptance journey pass for the exact candidate commit may Runtime V4.1 be called RC-qualified.
