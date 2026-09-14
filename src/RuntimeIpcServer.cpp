@@ -73,6 +73,15 @@ bool RuntimeIpcServer::Start(const std::string& sessionId,
                              const std::string& authToken,
                              RuntimeIpcCallbacks callbacks,
                              std::wstring& error) {
+    return StartSecure(sessionId, packageId, authToken, std::move(callbacks), {}, error);
+}
+
+bool RuntimeIpcServer::StartSecure(const std::string& sessionId,
+                                   const std::string& packageId,
+                                   const std::string& authToken,
+                                   RuntimeIpcCallbacks callbacks,
+                                   RuntimeIpcPermissions permissions,
+                                   std::wstring& error) {
     Stop();
     if (sessionId.empty() || packageId.empty() || authToken.empty()) {
         error = L"Runtime IPC requires session, package, and authentication identities.";
@@ -88,6 +97,7 @@ bool RuntimeIpcServer::Start(const std::string& sessionId,
     packageId_ = packageId;
     authToken_ = authToken;
     callbacks_ = std::move(callbacks);
+    permissions_ = permissions;
     stop_.store(false);
     authenticated_.store(false);
     ready_.store(false);
@@ -125,6 +135,7 @@ bool RuntimeIpcServer::Send(HANDLE pipe, protocol::MessageType type, uint64_t re
 }
 
 bool RuntimeIpcServer::SendOverlayFocus(bool focused) {
+    if (!permissions_.overlay) return false;
     std::scoped_lock lock(pipeMutex_);
     if (activePipe_ == INVALID_HANDLE_VALUE || !authenticated_.load()) return false;
     const uint64_t requestId = nextServerRequestId_.fetch_add(1);
@@ -156,18 +167,24 @@ bool RuntimeIpcServer::HandleMessage(const protocol::Message& message, HANDLE pi
             return Send(pipe, MessageType::Ack, message.requestId, {"READY"});
 
         case MessageType::Resume:
+            if (!permissions_.resumeWrite)
+                return Send(pipe, MessageType::Error, message.requestId, {"CAPABILITY_DENIED"});
             if (message.fields.size() != 3) return Send(pipe, MessageType::Error, message.requestId, {"BAD_RESUME"});
             if (!callbacks_.onResume || !callbacks_.onResume(message.fields[0], message.fields[1], message.fields[2]))
                 return Send(pipe, MessageType::Error, message.requestId, {"RESUME_PERSIST_FAILED"});
             return Send(pipe, MessageType::Ack, message.requestId, {"RESUME"});
 
         case MessageType::Achievement:
+            if (!permissions_.achievements)
+                return Send(pipe, MessageType::Error, message.requestId, {"CAPABILITY_DENIED"});
             if (message.fields.size() != 2) return Send(pipe, MessageType::Error, message.requestId, {"BAD_ACHIEVEMENT"});
             if (!callbacks_.onAchievement || !callbacks_.onAchievement(message.fields[0], message.fields[1]))
                 return Send(pipe, MessageType::Error, message.requestId, {"ACHIEVEMENT_PERSIST_FAILED"});
             return Send(pipe, MessageType::Ack, message.requestId, {"ACHIEVEMENT"});
 
         case MessageType::OverlayAck:
+            if (!permissions_.overlay)
+                return Send(pipe, MessageType::Error, message.requestId, {"CAPABILITY_DENIED"});
             if (message.fields.size() != 1) return Send(pipe, MessageType::Error, message.requestId, {"BAD_OVERLAY_ACK"});
             if (callbacks_.onOverlayFocus) callbacks_.onOverlayFocus(message.fields[0] == "1");
             return true;
