@@ -85,8 +85,10 @@ int wmain() {
     check(!wrongRepair.success, "mismatched_package_repair_rejected", all);
     check(readText(installed / L"Game.exe") == "tampered-executable", "failed_repair_leaves_installation_untouched", all);
 
-    auto repaired = service.RepairFolder(source, "zero.test.repair");
-    check(repaired.success, "repair_succeeds", all);
+    // This is the same ImportFolder path used by the shell's existing Library -> Import flow.
+    // When the package ID already exists it now becomes a safe re-import/repair operation.
+    auto repaired = service.ImportFolder(source);
+    check(repaired.success, "shell_reimport_repairs_existing_package", all);
     verifyError.clear();
     check(zero::PackageIntegrityVerifier::Verify(installed, verifyError), "repaired_integrity_valid", all);
     check(readText(installed / L"Game.exe") == "clean-executable-v1", "installed_files_replaced_from_clean_source", all);
