@@ -8,6 +8,10 @@ if(NOT WIN32)
   message(FATAL_ERROR "ZERO Virtual Console currently targets Windows 11 x64 only.")
 endif()
 
+if(MSVC)
+  add_compile_options(/W4 /WX /permissive- /utf-8)
+endif()
+
 add_library(ZeroSdk STATIC
   sdk/ZeroSdk.cpp
   sdk/ZeroSdkCrash.cpp
@@ -28,6 +32,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/LocalIdentityProvider.cpp
   src/GameRegistry.cpp
   src/GameImportService.cpp
+  src/PackageManifestParser.cpp
   src/ManifestValidator.cpp
   src/PackageSecurity.cpp
   src/PackageIntegrityVerifier.cpp
@@ -112,6 +117,7 @@ add_executable(ZeroPackageRepairAcceptance
   tools/PackageRepairAcceptance.cpp
   src/GameImportService.cpp
   src/GameRegistry.cpp
+  src/PackageManifestParser.cpp
   src/ManifestValidator.cpp
   src/PackageSecurity.cpp
   src/PackageIntegrityVerifier.cpp
@@ -119,6 +125,10 @@ add_executable(ZeroPackageRepairAcceptance
 target_include_directories(ZeroPackageRepairAcceptance PRIVATE include)
 target_compile_definitions(ZeroPackageRepairAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroPackageRepairAcceptance PRIVATE bcrypt)
+
+add_executable(ZeroStrictJsonAcceptance tools/StrictJsonAcceptance.cpp)
+target_include_directories(ZeroStrictJsonAcceptance PRIVATE include)
+target_compile_definitions(ZeroStrictJsonAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 add_executable(ZeroInputAcceptance
   tools/InputAcceptance.cpp
