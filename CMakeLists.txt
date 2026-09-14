@@ -107,4 +107,16 @@ target_include_directories(ZeroPackageTrustAcceptance PRIVATE include)
 target_compile_definitions(ZeroPackageTrustAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroPackageTrustAcceptance PRIVATE bcrypt shell32 ole32)
 
+add_executable(ZeroPackageRepairAcceptance
+  tools/PackageRepairAcceptance.cpp
+  src/GameImportService.cpp
+  src/GameRegistry.cpp
+  src/ManifestValidator.cpp
+  src/PackageSecurity.cpp
+  src/PackageIntegrityVerifier.cpp
+)
+target_include_directories(ZeroPackageRepairAcceptance PRIVATE include)
+target_compile_definitions(ZeroPackageRepairAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroPackageRepairAcceptance PRIVATE bcrypt)
+
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
