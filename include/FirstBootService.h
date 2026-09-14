@@ -1,4 +1,6 @@
 #pragma once
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <string>
 
@@ -15,6 +17,25 @@ struct FirstBootState {
     unsigned displayWidth{0};
     unsigned displayHeight{0};
 };
+
+inline bool FirstBootProfileValid(const std::string& value) noexcept {
+    if (value.empty() || value.size() > 64) return false;
+    return std::any_of(value.begin(), value.end(), [](unsigned char c) { return !std::isspace(c); });
+}
+
+inline bool FirstBootRequirementsSatisfied(const FirstBootState& state) noexcept {
+    return FirstBootProfileValid(state.profileName) &&
+           state.controllerConfirmed &&
+           state.displayConfirmed &&
+           state.audioConfirmed &&
+           state.volume <= 100;
+}
+
+inline FirstBootState NormalizeFirstBootState(FirstBootState state) noexcept {
+    if (state.volume > 100) state.volume = 100;
+    if (!FirstBootRequirementsSatisfied(state)) state.completed = false;
+    return state;
+}
 
 class FirstBootService {
 public:
