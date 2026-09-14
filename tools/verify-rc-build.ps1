@@ -12,6 +12,7 @@ $required = @(
   (Join-Path $BuildRoot "Release\ZeroPackageIntegrityAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroPackageTrustAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroPackageRepairAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroStrictJsonAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroInputAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroShellUxAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroProductionUxAcceptance.exe"),
