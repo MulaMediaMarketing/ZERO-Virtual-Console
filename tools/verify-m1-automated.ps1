@@ -65,6 +65,11 @@ $trust = Resolve-RequiredFile "Release\ZeroPackageTrustAcceptance.exe"
 $repair = Resolve-RequiredFile "Release\ZeroPackageRepairAcceptance.exe"
 $input = Resolve-RequiredFile "Release\ZeroInputAcceptance.exe"
 $shellUx = Resolve-RequiredFile "Release\ZeroShellUxAcceptance.exe"
+$productionUx = Resolve-RequiredFile "Release\ZeroProductionUxAcceptance.exe"
+$friendsUx = Resolve-RequiredFile "Release\ZeroFriendsExperienceAcceptance.exe"
+$capturesUx = Resolve-RequiredFile "Release\ZeroCapturesExperienceAcceptance.exe"
+$coreShellUx = Resolve-RequiredFile "Release\ZeroCoreShellExperienceAcceptance.exe"
+$storeSettingsFirstBootUx = Resolve-RequiredFile "Release\ZeroStoreSettingsFirstBootAcceptance.exe"
 $referenceExe = Resolve-RequiredFile "ReferencePackage\ZeroReferenceGame.exe"
 $referenceManifest = Resolve-RequiredFile "ReferencePackage\zero.manifest.json"
 $referenceIntegrity = Resolve-RequiredFile "ReferencePackage\zero.integrity.sha256"
@@ -81,6 +86,11 @@ Invoke-AcceptanceStep -Name "package_trust_crypto" -Category "security" -Command
 Invoke-AcceptanceStep -Name "package_repair" -Category "installation" -Command $repair
 Invoke-AcceptanceStep -Name "controller_input_contract" -Category "input" -Command $input
 Invoke-AcceptanceStep -Name "shell_overlay_ux_contract" -Category "shell" -Command $shellUx
+Invoke-AcceptanceStep -Name "production_navigation_contract" -Category "production_ux" -Command $productionUx
+Invoke-AcceptanceStep -Name "friends_experience_contract" -Category "production_ux" -Command $friendsUx
+Invoke-AcceptanceStep -Name "captures_experience_contract" -Category "production_ux" -Command $capturesUx
+Invoke-AcceptanceStep -Name "core_shell_experience_contract" -Category "production_ux" -Command $coreShellUx
+Invoke-AcceptanceStep -Name "store_settings_firstboot_contract" -Category "production_ux" -Command $storeSettingsFirstBootUx
 Invoke-AcceptanceStep -Name "installer_update_uninstall" -Category "installation" -Command "pwsh" -Arguments @("-NoProfile", "-File", $installerGate, "-BuildRoot", $BuildRoot)
 Invoke-AcceptanceStep -Name "rc_payload" -Category "release" -Command "pwsh" -Arguments @("-NoProfile", "-File", $rcGate, "-BuildRoot", $BuildRoot)
 
@@ -130,9 +140,9 @@ $hardwareRequirements = @(
 )
 
 $report = [ordered]@{
-  schema = 1
+  schema = 2
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
-  zero_milestone = "M1 / Runtime V4.1"
+  zero_milestone = "M1 / Runtime V4.1 / Production UX"
   commit = $commit
   automated_result = $automatedResult
   rc_qualified = $false
