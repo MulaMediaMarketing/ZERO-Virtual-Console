@@ -3,7 +3,6 @@
 #include "FirstBootService.h"
 #include "StoreProvider.h"
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <string_view>
 
@@ -132,19 +131,6 @@ inline constexpr int AdjustVolume(int volume, int delta) noexcept {
     return ClampVolume(volume + delta);
 }
 
-inline bool FirstBootProfileValid(const std::string& value) noexcept {
-    if (value.empty() || value.size() > 64) return false;
-    return std::any_of(value.begin(), value.end(), [](unsigned char c) { return !std::isspace(c); });
-}
-
-inline bool FirstBootRequirementsSatisfied(const FirstBootState& state) noexcept {
-    return FirstBootProfileValid(state.profileName) &&
-           state.controllerConfirmed &&
-           state.displayConfirmed &&
-           state.audioConfirmed &&
-           state.volume <= 100;
-}
-
 inline FirstBootExperienceMode FirstBootModeFor(const FirstBootState& state) noexcept {
     if (state.completed && FirstBootRequirementsSatisfied(state)) return FirstBootExperienceMode::Complete;
     if (state.controllerConfirmed || state.displayConfirmed || state.audioConfirmed || state.profileName != "Player")
@@ -154,12 +140,6 @@ inline FirstBootExperienceMode FirstBootModeFor(const FirstBootState& state) noe
 
 inline bool FirstBootCanComplete(const FirstBootState& state) noexcept {
     return !state.completed && FirstBootRequirementsSatisfied(state);
-}
-
-inline FirstBootState NormalizeFirstBootState(FirstBootState state) noexcept {
-    if (state.volume > 100) state.volume = 100;
-    if (!FirstBootRequirementsSatisfied(state)) state.completed = false;
-    return state;
 }
 
 } // namespace zero
