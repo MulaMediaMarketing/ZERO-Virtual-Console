@@ -40,6 +40,16 @@ std::string makeSessionIdLifecycle() {
     return narrowUtf8Lifecycle(value);
 }
 
+bool safeSessionId(const std::string& value) {
+    if (value.empty() || value.size() > 160) return false;
+    for (const unsigned char c : value) {
+        const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                        (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+        if (!ok) return false;
+    }
+    return value.find("..") == std::string::npos;
+}
+
 bool pathInsideLifecycle(const std::filesystem::path& child, const std::filesystem::path& parent) {
     std::error_code ec;
     const auto c = std::filesystem::weakly_canonical(child, ec);
@@ -78,7 +88,7 @@ std::vector<wchar_t> buildEnvironmentLifecycle(const GameManifest& game,
         entries.push_back(prefix + value);
     };
 
-    setEntry(L"ZERO_RUNTIME", L"4");
+    setEntry(L"ZERO_RUNTIME", L"5");
     setEntry(L"ZERO_SESSION_ID", widenUtf8Lifecycle(info.sessionId));
     setEntry(L"ZERO_PACKAGE_ID", widenUtf8Lifecycle(game.packageId));
     setEntry(L"ZERO_CONTENT_ROOT", game.root.wstring());
@@ -105,6 +115,12 @@ std::vector<wchar_t> buildEnvironmentLifecycle(const GameManifest& game,
 } // namespace
 
 bool RuntimeSession::PrepareLaunch(const GameManifest& game, std::wstring& error) {
+    return PrepareLaunchWithSession(game, {}, error);
+}
+
+bool RuntimeSession::PrepareLaunchWithSession(const GameManifest& game,
+                                              const std::string& authoritativeSessionId,
+                                              std::wstring& error) {
     if (IsActive()) {
         error = L"A game session is already active.";
         return false;
@@ -115,16 +131,16 @@ bool RuntimeSession::PrepareLaunch(const GameManifest& game, std::wstring& error
     exitCode_ = 0;
     packageId_ = game.packageId;
     info_ = {};
-    info_.sessionId = makeSessionIdLifecycle();
+    info_.sessionId = authoritativeSessionId.empty() ? makeSessionIdLifecycle() : authoritativeSessionId;
     info_.packageId = game.packageId;
     info_.title = game.title;
     info_.version = game.version;
     info_.executable = game.executable;
     info_.startedAt = std::chrono::system_clock::now();
 
-    if (info_.sessionId.empty()) {
+    if (!safeSessionId(info_.sessionId)) {
         state_ = RuntimeState::Failed;
-        error = L"ZERO could not allocate a secure runtime session identity.";
+        error = L"ZERO rejected the runtime session identity.";
         return false;
     }
     if (game.packageId.empty() || game.title.empty()) {
@@ -152,8 +168,6 @@ bool RuntimeSession::PrepareLaunch(const GameManifest& game, std::wstring& error
         return false;
     }
 
-    // Pre-provision a canonical dump destination so SDK-integrated games can capture
-    // an unhandled exception while the crashing process is still alive.
     {
         std::error_code ec;
         const auto zeroRoot = info_.saveRoot.parent_path().parent_path();
