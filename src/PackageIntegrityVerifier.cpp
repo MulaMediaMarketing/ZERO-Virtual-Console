@@ -10,6 +10,10 @@
 namespace zero {
 namespace {
 
+void stripCarriageReturn(std::string& value) {
+    if (!value.empty() && value.back() == '\r') value.pop_back();
+}
+
 bool isHexDigest(const std::string& value) {
     if (value.size() != 64) return false;
     return std::all_of(value.begin(), value.end(), [](unsigned char c) {
@@ -81,8 +85,13 @@ bool readExpectedInventory(const std::filesystem::path& packageRoot,
 
     std::string versionLine;
     std::string summaryLine;
-    if (!std::getline(file, versionLine) || versionLine != "# ZERO package integrity v1" ||
-        !std::getline(file, summaryLine) || summaryLine.rfind("# files=", 0) != 0) {
+    if (!std::getline(file, versionLine) || !std::getline(file, summaryLine)) {
+        error = L"ZERO blocked launch because the package integrity manifest format is invalid.";
+        return false;
+    }
+    stripCarriageReturn(versionLine);
+    stripCarriageReturn(summaryLine);
+    if (versionLine != "# ZERO package integrity v1" || summaryLine.rfind("# files=", 0) != 0) {
         error = L"ZERO blocked launch because the package integrity manifest format is invalid.";
         return false;
     }
@@ -98,6 +107,7 @@ bool readExpectedInventory(const std::filesystem::path& packageRoot,
 
     std::string line;
     while (std::getline(file, line)) {
+        stripCarriageReturn(line);
         if (line.empty()) continue;
         const auto firstSep = line.find("  ");
         const auto secondSep = firstSep == std::string::npos ? std::string::npos : line.find("  ", firstSep + 2);
