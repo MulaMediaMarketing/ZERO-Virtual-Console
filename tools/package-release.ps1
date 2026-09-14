@@ -13,7 +13,7 @@ $files=@(
  "Release/ZeroStrictJsonAcceptance.exe","Release/ZeroPlatformDatabaseAcceptance.exe","Release/ZeroFaultInjectionAcceptance.exe","Release/ZeroProductionBenchmarkAcceptance.exe",
  "Release/ZeroInputAcceptance.exe","Release/ZeroShellUxAcceptance.exe","Release/ZeroProductionUxAcceptance.exe","Release/ZeroFriendsExperienceAcceptance.exe",
  "Release/ZeroCapturesExperienceAcceptance.exe","Release/ZeroCoreShellExperienceAcceptance.exe","Release/ZeroStoreSettingsFirstBootAcceptance.exe","Release/ZeroFirstBootPersistenceAcceptance.exe",
- "Release/ZeroQualificationProbe.exe","ReferencePackage/ZeroReferenceGame.exe","ReferencePackage/zero.manifest.json","ReferencePackage/zero.integrity.sha256",
+ "Release/ZeroServerAuthorityAcceptance.exe","Release/ZeroQualificationProbe.exe","ReferencePackage/ZeroReferenceGame.exe","ReferencePackage/zero.manifest.json","ReferencePackage/zero.integrity.sha256",
  "DependencyReports/dependency-surface.json","DependencyReports/dependency-surface.md","ArchitectureReports/production-architecture.json","ArchitectureReports/production-architecture.md",
  "AcceptanceReports/m1-automated-acceptance.json","AcceptanceReports/m1-automated-acceptance.md","QualificationEvidence/rc-qualification.json","QualificationEvidence/rc-qualification.md",
  "SBOM/zero-virtual-console.spdx.json"
