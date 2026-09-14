@@ -60,9 +60,13 @@ int main() {
     out = core.Update(pads, keyboard, t);
     check(out.right, "repeat_fires_at_cadence", all);
 
+    // Release digital navigation before beginning the independent analog case.
+    pads[1].dpadRight = false;
+    t += std::chrono::milliseconds(16);
+    core.Update(pads, keyboard, t);
+
     // Analog hysteresis should engage above 18k, remain held through 12k-18k,
     // and release below 12k without focus chatter.
-    pads[1].dpadRight = false;
     pads[1].leftX = 19000;
     t += std::chrono::milliseconds(16);
     out = core.Update(pads, keyboard, t);
