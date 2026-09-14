@@ -1,8 +1,6 @@
 #include "PlatformDatabase.h"
-#include "PlatformPaths.h"
 #include <winsqlite/winsqlite3.h>
 #include <windows.h>
-#include <filesystem>
 
 namespace zero {
 namespace {
@@ -24,12 +22,7 @@ private:
     sqlite3_stmt* stmt_{nullptr};
 };
 
-std::filesystem::path dbPath() {
-    return PlatformPaths::DataStoreRoot() / L"zero.db";
-}
-
-bool openDb(DbHandle& handle, std::wstring& error) {
-    const auto path = dbPath();
+bool openDb(const std::filesystem::path& path, DbHandle& handle, std::wstring& error) {
     if (sqlite3_open16(path.c_str(), handle.out()) != SQLITE_OK) {
         error = L"ZERO could not open the canonical platform database for shell reads.";
         return false;
@@ -53,7 +46,7 @@ std::optional<std::string> PlatformDatabase::GetSetting(const std::string& key,
                                                         std::wstring& error) const {
     if (!Initialize(error)) return std::nullopt;
     DbHandle db;
-    if (!openDb(db, error)) return std::nullopt;
+    if (!openDb(databasePath_, db, error)) return std::nullopt;
 
     static constexpr const char* sql = "SELECT value FROM settings WHERE key=? LIMIT 1;";
     sqlite3_stmt* raw = nullptr;
@@ -79,7 +72,7 @@ std::optional<GamePlatformState> PlatformDatabase::LoadGameState(const std::stri
                                                                  std::wstring& error) const {
     if (!Initialize(error)) return std::nullopt;
     DbHandle db;
-    if (!openDb(db, error)) return std::nullopt;
+    if (!openDb(databasePath_, db, error)) return std::nullopt;
 
     static constexpr const char* sql =
         "SELECT total_playtime_seconds, launch_count, last_session_id, last_played_utc, last_exit_code, last_crashed "
@@ -117,7 +110,7 @@ std::optional<ResumeMetadata> PlatformDatabase::LoadResume(const std::string& pa
                                                            std::wstring& error) const {
     if (!Initialize(error)) return std::nullopt;
     DbHandle db;
-    if (!openDb(db, error)) return std::nullopt;
+    if (!openDb(databasePath_, db, error)) return std::nullopt;
 
     static constexpr const char* sql =
         "SELECT activity_id, display_label, payload, updated_at FROM resume_activities WHERE package_id=? LIMIT 1;";
@@ -153,7 +146,7 @@ std::vector<AchievementRecord> PlatformDatabase::LoadAchievements(const std::str
     std::vector<AchievementRecord> out;
     if (!Initialize(error)) return out;
     DbHandle db;
-    if (!openDb(db, error)) return out;
+    if (!openDb(databasePath_, db, error)) return out;
 
     static constexpr const char* sql =
         "SELECT achievement_id, title, unlocked_at FROM achievements WHERE package_id=? ORDER BY unlocked_at DESC, achievement_id ASC;";
