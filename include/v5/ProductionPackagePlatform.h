@@ -32,7 +32,8 @@ struct PackageOperationResult {
 class ProductionPackagePlatform final {
 public:
     ProductionPackagePlatform(std::filesystem::path libraryRoot,
-                              const IPublisherTrustProvider& trustProvider);
+                              const IPublisherTrustProvider& trustProvider,
+                              std::filesystem::path databasePath = {});
 
     PackageOperationResult Execute(const PackageOperationRequest& request) const;
     const std::filesystem::path& LibraryRoot() const noexcept { return libraryRoot_; }
@@ -40,6 +41,7 @@ public:
 private:
     std::filesystem::path libraryRoot_;
     const IPublisherTrustProvider& trustProvider_;
+    std::filesystem::path databasePath_;
 };
 
 } // namespace zero::v5
