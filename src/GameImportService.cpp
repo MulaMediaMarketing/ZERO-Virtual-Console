@@ -27,6 +27,7 @@ bool stagePackage(const std::filesystem::path& sourceRoot,
                   const std::string& expectedPackageId,
                   std::filesystem::path& staging,
                   std::filesystem::path& destination,
+                  std::string& packageId,
                   std::wstring& error) {
     const auto manifest = sourceRoot / "zero.manifest.json";
     if (!std::filesystem::exists(manifest)) {
@@ -38,7 +39,7 @@ bool stagePackage(const std::filesystem::path& sourceRoot,
     if (!PackageSecurity::BuildInventory(sourceRoot, sourceInventory, error)) return false;
 
     const auto text = readAll(manifest);
-    const auto packageId = jsonString(text, "package_id");
+    packageId = jsonString(text, "package_id");
     if (!ManifestValidator::IsSafePackageId(packageId)) {
         error = L"The package_id is missing or invalid.";
         return false;
@@ -89,62 +90,15 @@ bool stagePackage(const std::filesystem::path& sourceRoot,
     }
     return true;
 }
-}
 
-GameImportService::GameImportService(std::filesystem::path libraryRoot)
-    : libraryRoot_(std::move(libraryRoot)) {}
-
-ImportResult GameImportService::ImportFolder(const std::filesystem::path& sourceRoot) const {
+ImportResult activateReplacement(const std::filesystem::path& libraryRoot,
+                                 const std::filesystem::path& staging,
+                                 const std::filesystem::path& destination,
+                                 const std::string& packageId) {
     ImportResult result;
-    std::filesystem::path staging;
-    std::filesystem::path destination;
-    if (!stagePackage(sourceRoot, libraryRoot_, {}, staging, destination, result.error)) return result;
-
     std::error_code ec;
-    if (std::filesystem::exists(destination)) {
-        std::filesystem::remove_all(staging, ec);
-        result.error = L"This ZERO package is already installed. Use Repair/Re-import from Game Details to replace it safely.";
-        return result;
-    }
-
-    std::filesystem::rename(staging, destination, ec);
-    if (ec) {
-        std::filesystem::remove_all(staging, ec);
-        result.error = L"ZERO could not finalize the imported game.";
-        return result;
-    }
-
-    if (!PackageIntegrityVerifier::Verify(destination, result.error)) {
-        std::filesystem::remove_all(destination, ec);
-        return result;
-    }
-
-    result.success = true;
-    result.installedRoot = destination;
-    return result;
-}
-
-ImportResult GameImportService::RepairFolder(const std::filesystem::path& sourceRoot,
-                                             const std::string& expectedPackageId) const {
-    ImportResult result;
-    if (!ManifestValidator::IsSafePackageId(expectedPackageId)) {
-        result.error = L"ZERO cannot repair a package with an invalid package identity.";
-        return result;
-    }
-
-    std::filesystem::path staging;
-    std::filesystem::path destination;
-    if (!stagePackage(sourceRoot, libraryRoot_, expectedPackageId, staging, destination, result.error)) return result;
-
-    std::error_code ec;
-    if (!std::filesystem::exists(destination)) {
-        std::filesystem::remove_all(staging, ec);
-        result.error = L"The installed package is no longer present. Import it again instead of repairing it.";
-        return result;
-    }
-
-    const auto backupBase = libraryRoot_ / L".repair-backup";
-    const auto backup = backupBase / std::filesystem::path(expectedPackageId.begin(), expectedPackageId.end());
+    const auto backupBase = libraryRoot / L".repair-backup";
+    const auto backup = backupBase / std::filesystem::path(packageId.begin(), packageId.end());
     std::filesystem::create_directories(backupBase, ec);
     if (ec) {
         std::filesystem::remove_all(staging, ec);
@@ -185,6 +139,62 @@ ImportResult GameImportService::RepairFolder(const std::filesystem::path& source
     result.success = true;
     result.installedRoot = destination;
     return result;
+}
+}
+
+GameImportService::GameImportService(std::filesystem::path libraryRoot)
+    : libraryRoot_(std::move(libraryRoot)) {}
+
+ImportResult GameImportService::ImportFolder(const std::filesystem::path& sourceRoot) const {
+    ImportResult result;
+    std::filesystem::path staging;
+    std::filesystem::path destination;
+    std::string packageId;
+    if (!stagePackage(sourceRoot, libraryRoot_, {}, staging, destination, packageId, result.error)) return result;
+
+    std::error_code ec;
+    if (std::filesystem::exists(destination)) {
+        return activateReplacement(libraryRoot_, staging, destination, packageId);
+    }
+
+    std::filesystem::rename(staging, destination, ec);
+    if (ec) {
+        std::filesystem::remove_all(staging, ec);
+        result.error = L"ZERO could not finalize the imported game.";
+        return result;
+    }
+
+    if (!PackageIntegrityVerifier::Verify(destination, result.error)) {
+        std::filesystem::remove_all(destination, ec);
+        return result;
+    }
+
+    result.success = true;
+    result.installedRoot = destination;
+    return result;
+}
+
+ImportResult GameImportService::RepairFolder(const std::filesystem::path& sourceRoot,
+                                             const std::string& expectedPackageId) const {
+    ImportResult result;
+    if (!ManifestValidator::IsSafePackageId(expectedPackageId)) {
+        result.error = L"ZERO cannot repair a package with an invalid package identity.";
+        return result;
+    }
+
+    std::filesystem::path staging;
+    std::filesystem::path destination;
+    std::string packageId;
+    if (!stagePackage(sourceRoot, libraryRoot_, expectedPackageId, staging, destination, packageId, result.error)) return result;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(destination)) {
+        std::filesystem::remove_all(staging, ec);
+        result.error = L"The installed package is no longer present. Import it again instead of repairing it.";
+        return result;
+    }
+
+    return activateReplacement(libraryRoot_, staging, destination, packageId);
 }
 
 } // namespace zero
