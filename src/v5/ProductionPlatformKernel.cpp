@@ -53,8 +53,9 @@ ProductionLaunchResult ProductionPlatformKernel::RequestLaunch(const ProductionL
 
     const auto managed = managedLaunchAuthority_.Authorize(request.accountId, request.contentId, result.error);
     if (!managed || managed->authorityKind != LaunchAuthorityKind::ServerManaged ||
-        managed->packageId.empty() || managed->sessionToken.empty() || managed->entitlementToken.empty()) {
-        if (result.error.empty()) result.error = L"ZERO managed launch authority rejected the request.";
+        managed->packageId.empty() || managed->sessionToken.empty() || managed->entitlementToken.empty() ||
+        managed->contentId != request.contentId || managed->accountId != request.accountId) {
+        if (result.error.empty()) result.error = L"ZERO managed launch authority rejected or misbound the request.";
         return result;
     }
 
@@ -101,6 +102,7 @@ ProductionLaunchResult ProductionPlatformKernel::RequestLocalInstalled(const std
     descriptor.executable = pathUtf8(parsed.manifest.executable);
     descriptor.saveNamespace = parsed.manifest.packageId;
     descriptor.authorityKind = LaunchAuthorityKind::LocalPackage;
+    descriptor.contentId = parsed.manifest.packageId;
 
     if (parsed.manifest.zeroResume) descriptor.capabilityScope += "resume ";
     if (parsed.manifest.zeroAchievements) descriptor.capabilityScope += "achievements ";
