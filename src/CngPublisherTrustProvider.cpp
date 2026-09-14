@@ -1,7 +1,7 @@
 #include "PackageTrust.h"
+#include "PlatformPaths.h"
 #include <windows.h>
 #include <bcrypt.h>
-#include <shlobj.h>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -108,13 +108,7 @@ CngPublisherTrustProvider::CngPublisherTrustProvider(std::filesystem::path trust
     : trustRoot_(trustRoot.empty() ? DefaultTrustRoot() : std::move(trustRoot)) {}
 
 std::filesystem::path CngPublisherTrustProvider::DefaultTrustRoot() {
-    PWSTR raw = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &raw))) {
-        std::filesystem::path path = std::filesystem::path(raw) / L"ZERO" / L"Trust" / L"Publishers";
-        CoTaskMemFree(raw);
-        return path;
-    }
-    return std::filesystem::current_path() / L"ZeroData" / L"Trust" / L"Publishers";
+    return PlatformPaths::PublisherTrustRoot();
 }
 
 PackageTrustResult CngPublisherTrustProvider::Verify(const PackageSignatureEnvelope& envelope,
