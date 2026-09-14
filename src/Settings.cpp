@@ -15,7 +15,7 @@ SettingsStore::SettingsStore(std::filesystem::path root) : root_(std::move(root)
 
 UserSettings SettingsStore::Load() const {
     UserSettings settings;
-    PlatformDatabase database;
+    PlatformDatabase database(root_ / L"Data" / L"zero.db");
     std::wstring error;
 
     const auto profile = database.GetSetting("profile", error);
@@ -59,7 +59,7 @@ bool SettingsStore::Save(const UserSettings& input) const {
     settings.volume = std::clamp(settings.volume, 0, 100);
     if (settings.profileName.empty()) settings.profileName = "Player";
 
-    PlatformDatabase database;
+    PlatformDatabase database(root_ / L"Data" / L"zero.db");
     std::wstring error;
     if (!database.SetSetting("profile", settings.profileName, error)) return false;
     if (!database.SetSetting("reduced_motion", settings.reducedMotion ? "1" : "0", error)) return false;
