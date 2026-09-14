@@ -36,6 +36,10 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroProductionBenchmarkAcceptance.exe
 
+      - name: Validate dependency surface
+        shell: pwsh
+        run: ./tools/verify-dependency-surface.ps1 -ReportDir ./build/DependencyReports
+
       - name: Validate production architecture and collect benchmarks
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
@@ -109,11 +113,13 @@ jobs:
             build/Release/ZeroFirstBootPersistenceAcceptance.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
+            build/DependencyReports/**
             build/ArchitectureReports/**
             build/AcceptanceReports/**
             build/QualificationEvidence/**
             build/ReleaseBundle/**
             build/ZERO-Virtual-Console-Windows-x64-RC.zip
+            tools/verify-dependency-surface.ps1
             tools/verify-production-architecture.ps1
             tools/verify-m1-automated.ps1
             tools/run-rc-qualification.ps1
