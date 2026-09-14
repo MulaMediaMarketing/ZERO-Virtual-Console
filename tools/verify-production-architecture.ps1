@@ -20,7 +20,7 @@ $sourceFiles = @(Get-ChildItem $SourceRoot -Recurse -File | Where-Object {
 $fileMetrics = New-Object System.Collections.Generic.List[object]
 $totalLines=0; $maxLines=0; $maxFile=""
 foreach($file in $sourceFiles) {
-  $relative=[IO.Path]::GetRelativePath($root,$file.FullName).Replace('\\','/')
+  $relative=[IO.Path]::GetRelativePath($root,$file.FullName).Replace('\','/')
   $lines=@(Get-Content $file.FullName).Count
   $totalLines += $lines
   if($lines -gt $maxLines){$maxLines=$lines;$maxFile=$relative}
@@ -33,7 +33,7 @@ $scanFiles=@(Get-ChildItem $SourceRoot -Recurse -File | Where-Object {
 })
 $debtPattern='(?i)\b(TODO|FIXME|HACK)\b|\bprototype[- ]only\b|\bmock data\b|\bplaceholder data\b'
 foreach($file in $scanFiles){
-  $relative=[IO.Path]::GetRelativePath($root,$file.FullName).Replace('\\','/')
+  $relative=[IO.Path]::GetRelativePath($root,$file.FullName).Replace('\','/')
   if($relative -eq "tools/verify-production-architecture.ps1"){continue}
   foreach($match in @(Select-String -Path $file.FullName -Pattern $debtPattern -AllMatches)){
     Violate "explicit_technical_debt_marker" $relative "line $($match.LineNumber)"
@@ -80,7 +80,7 @@ if($main -notmatch 'DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2'){Violate "per_mo
 
 $pathFiles=@(Get-ChildItem $SourceRoot -Recurse -File | Where-Object {$_.Extension.ToLowerInvariant() -in @(".cpp",".h",".hpp") -and $_.FullName -notmatch "[\\/](build|\.git)[\\/]"})
 foreach($file in $pathFiles){
-  $relative=[IO.Path]::GetRelativePath($root,$file.FullName).Replace('\\','/')
+  $relative=[IO.Path]::GetRelativePath($root,$file.FullName).Replace('\','/')
   if($relative -eq "include/PlatformPaths.h"){continue}
   if(Select-String $file.FullName -Pattern 'SHGetKnownFolderPath\s*\(' -Quiet){Violate "single_platform_path_authority" $relative "Use PlatformPaths."}
 }
