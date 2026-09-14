@@ -1,12 +1,14 @@
 #include "PackageTrust.h"
 #include "PlatformPaths.h"
 #include "StrictJson.h"
+#include "Utf8Path.h"
 #include <windows.h>
 #include <bcrypt.h>
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string_view>
 #include <utility>
@@ -132,7 +134,8 @@ bool sha256(const std::string& payload, std::vector<unsigned char>& digest) {
 }
 
 std::filesystem::path keyPath(const std::filesystem::path& root, const std::string& publisherId, const std::string& keyId) {
-    return root / std::filesystem::u8path(publisherId + "__" + keyId + ".json");
+    const auto relative = PathFromUtf8(publisherId + "__" + keyId + ".json");
+    return relative ? root / *relative : std::filesystem::path{};
 }
 
 struct TrustedKeyRecord { std::string publisherId; std::string keyId; std::string algorithm; std::string x; std::string y; };
@@ -176,6 +179,11 @@ PackageTrustResult CngPublisherTrustProvider::Verify(const PackageSignatureEnvel
         return result;
     }
     const auto keyFile = keyPath(trustRoot_, envelope.publisherId, envelope.keyId);
+    if (keyFile.empty()) {
+        result.state = PackageTrustState::InvalidSignatureEnvelope;
+        result.detail = L"ZERO could not resolve the trusted publisher key path.";
+        return result;
+    }
     const auto text = readAllBounded(keyFile, 64 * 1024);
     if (text.empty()) {
         result.state = PackageTrustState::UntrustedPublisher;
