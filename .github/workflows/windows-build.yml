@@ -51,6 +51,10 @@ jobs:
         shell: pwsh
         run: ./tools/verify-release-governance.ps1 -SourceRoot . -ReportDir ./build/GovernanceReports
 
+      - name: Validate server-authority fail-closed contract
+        shell: pwsh
+        run: ./build/Release/ZeroServerAuthorityAcceptance.exe
+
       - name: Validate production shell navigation contract
         shell: pwsh
         run: ./build/Release/ZeroProductionUxAcceptance.exe
@@ -123,6 +127,7 @@ jobs:
             build/Release/ZeroCoreShellExperienceAcceptance.exe
             build/Release/ZeroStoreSettingsFirstBootAcceptance.exe
             build/Release/ZeroFirstBootPersistenceAcceptance.exe
+            build/Release/ZeroServerAuthorityAcceptance.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
             build/DependencyReports/**
