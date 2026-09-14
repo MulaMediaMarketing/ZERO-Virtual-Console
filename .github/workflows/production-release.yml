@@ -104,16 +104,22 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:ZERO_SIGNING_PFX_PASSWORD)) { throw "Missing production code-signing certificate password." }
           $pfx = Join-Path $env:RUNNER_TEMP "zero-production-signing.pfx"
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:ZERO_SIGNING_PFX_BASE64))
-          "ZERO_SIGNING_PFX=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          try {
+            $securePassword = ConvertTo-SecureString $env:ZERO_SIGNING_PFX_PASSWORD -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword -Exportable:$false
+            if (-not $cert -or -not $cert.Thumbprint) { throw "Production signing certificate import failed." }
+            "ZERO_SIGNING_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } finally {
+            Remove-Item -Force -ErrorAction SilentlyContinue $pfx
+          }
 
       - name: Sign shipping executable
         shell: pwsh
-        env:
-          ZERO_SIGNING_PFX_PASSWORD: ${{ secrets.ZERO_SIGNING_PFX_PASSWORD }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:ZERO_SIGNING_THUMBPRINT)) { throw "Missing imported signing-certificate thumbprint." }
           $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } | Sort-Object FullName -Descending | Select-Object -First 1
           if (-not $signtool) { throw "signtool.exe not found." }
-          & $signtool.FullName sign /fd SHA256 /td SHA256 /tr $env:ZERO_TIMESTAMP_URL /f $env:ZERO_SIGNING_PFX /p $env:ZERO_SIGNING_PFX_PASSWORD ./build/Release/ZeroVirtualConsole.exe
+          & $signtool.FullName sign /fd SHA256 /td SHA256 /tr $env:ZERO_TIMESTAMP_URL /sha1 $env:ZERO_SIGNING_THUMBPRINT /s My ./build/Release/ZeroVirtualConsole.exe
           if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed." }
 
       - name: Verify Authenticode signature
@@ -123,6 +129,14 @@ jobs:
       - name: Build production release bundle
         shell: pwsh
         run: ./tools/package-production-release.ps1 -BuildRoot ./build -OutputDir ./build/ProductionRelease -QualificationEvidence ./build/QualificationEvidence/rc-qualification.json -SbomPath ./build/SBOM/zero-virtual-console.spdx.json -SigningReport ./build/SigningReports/authenticode.json
+
+      - name: Remove signing certificate from runner
+        if: always()
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:ZERO_SIGNING_THUMBPRINT)) {
+            Remove-Item -Force -ErrorAction SilentlyContinue "Cert:\CurrentUser\My\$env:ZERO_SIGNING_THUMBPRINT"
+          }
 
       - name: Upload signed production release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
