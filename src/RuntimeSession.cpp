@@ -1,25 +1,15 @@
 #include "RuntimeSession.h"
+#include "PlatformPaths.h"
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <objbase.h>
-#include <shlobj.h>
 #include <sstream>
 #include <string>
 #include <vector>
 
 namespace zero {
 namespace {
-
-std::filesystem::path zeroDataRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO";
-}
 
 std::wstring widenUtf8(const std::string& value) {
     if (value.empty()) return {};
@@ -138,7 +128,7 @@ std::vector<wchar_t> buildEnvironment(const GameManifest& game,
         entries.push_back(prefix + value);
     };
 
-    setEntry(L"ZERO_RUNTIME", L"2");
+    setEntry(L"ZERO_RUNTIME", L"4");
     setEntry(L"ZERO_SESSION_ID", widenUtf8(info.sessionId));
     setEntry(L"ZERO_PACKAGE_ID", widenUtf8(game.packageId));
     setEntry(L"ZERO_CONTENT_ROOT", game.root.wstring());
@@ -211,11 +201,10 @@ bool RuntimeSession::PrepareStorage(const GameManifest& game, std::wstring& erro
         return false;
     }
 
-    const auto data = zeroDataRoot();
     const auto packageName = std::filesystem::path(widenUtf8(game.packageId));
-    info_.saveRoot = data / "Saves" / packageName;
-    info_.cacheRoot = data / "Cache" / packageName;
-    info_.tempRoot = data / "Temp" / packageName / widenUtf8(info_.sessionId);
+    info_.saveRoot = PlatformPaths::SavesRoot() / packageName;
+    info_.cacheRoot = PlatformPaths::CacheRoot() / packageName;
+    info_.tempRoot = PlatformPaths::TempRoot() / packageName / widenUtf8(info_.sessionId);
 
     std::error_code ec;
     std::filesystem::create_directories(info_.saveRoot, ec);
@@ -226,7 +215,7 @@ bool RuntimeSession::PrepareStorage(const GameManifest& game, std::wstring& erro
         return false;
     }
 
-    const auto sessionDir = data / "Runtime" / "Sessions";
+    const auto sessionDir = PlatformPaths::RuntimeSessionsRoot();
     std::filesystem::create_directories(sessionDir, ec);
     if (ec) {
         error = L"ZERO could not create the runtime session directory.";
@@ -319,7 +308,7 @@ bool RuntimeSession::Launch(const GameManifest& game, std::wstring& error) {
     }
     if (_wcsicmp(game.executable.extension().c_str(), L".exe") != 0) {
         state_ = RuntimeState::Failed;
-        error = L"ZERO Runtime V2 currently supports native Windows .exe game payloads only.";
+        error = L"ZERO Runtime V4.1 supports native Windows .exe game payloads only.";
         return false;
     }
     if (!pathInside(game.executable, game.root)) {
