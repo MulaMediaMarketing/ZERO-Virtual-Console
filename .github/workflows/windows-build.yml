@@ -47,6 +47,10 @@ jobs:
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
 
+      - name: Validate release governance and supply-chain controls
+        shell: pwsh
+        run: ./tools/verify-release-governance.ps1 -SourceRoot . -ReportDir ./build/GovernanceReports
+
       - name: Validate production shell navigation contract
         shell: pwsh
         run: ./build/Release/ZeroProductionUxAcceptance.exe
@@ -97,6 +101,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ZERO-Virtual-Console-Windows-x64
+          if-no-files-found: error
           path: |
             build/Release/ZeroVirtualConsole.exe
             build/Release/ZeroTestGame.exe
@@ -122,6 +127,7 @@ jobs:
             build/ReferencePackage/**
             build/DependencyReports/**
             build/ArchitectureReports/**
+            build/GovernanceReports/**
             build/AcceptanceReports/**
             build/QualificationEvidence/**
             build/SBOM/**
@@ -129,6 +135,7 @@ jobs:
             build/ZERO-Virtual-Console-Windows-x64-RC.zip
             tools/verify-dependency-surface.ps1
             tools/verify-production-architecture.ps1
+            tools/verify-release-governance.ps1
             tools/verify-m1-automated.ps1
             tools/run-rc-qualification.ps1
             tools/verify-rc-build.ps1
@@ -138,6 +145,9 @@ jobs:
             tools/package-release.ps1
             tools/package-production-release.ps1
             docs/PRODUCTION_ARCHITECTURE_STANDARD.md
+            docs/SERVER_AUTHORITY_SECURITY.md
             docs/RUNTIME_V4_1_RC_GATE.md
+            SECURITY.md
+            .github/CODEOWNERS
             installer/install-zero.ps1
             installer/uninstall-zero.ps1
