@@ -28,6 +28,14 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroPlatformDatabaseAcceptance.exe
 
+      - name: Validate local storage fault injection
+        shell: pwsh
+        run: ./build/Release/ZeroFaultInjectionAcceptance.exe
+
+      - name: Validate production core performance budgets
+        shell: pwsh
+        run: ./build/Release/ZeroProductionBenchmarkAcceptance.exe
+
       - name: Validate production architecture and collect benchmarks
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
@@ -89,6 +97,8 @@ jobs:
             build/Release/ZeroPackageRepairAcceptance.exe
             build/Release/ZeroStrictJsonAcceptance.exe
             build/Release/ZeroPlatformDatabaseAcceptance.exe
+            build/Release/ZeroFaultInjectionAcceptance.exe
+            build/Release/ZeroProductionBenchmarkAcceptance.exe
             build/Release/ZeroInputAcceptance.exe
             build/Release/ZeroShellUxAcceptance.exe
             build/Release/ZeroProductionUxAcceptance.exe
