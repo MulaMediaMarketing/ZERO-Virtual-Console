@@ -20,6 +20,10 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Validate strict JSON hostile-input contract
+        shell: pwsh
+        run: ./build/Release/ZeroStrictJsonAcceptance.exe
+
       - name: Validate production architecture and collect benchmarks
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
@@ -79,6 +83,7 @@ jobs:
             build/Release/ZeroPackageIntegrityAcceptance.exe
             build/Release/ZeroPackageTrustAcceptance.exe
             build/Release/ZeroPackageRepairAcceptance.exe
+            build/Release/ZeroStrictJsonAcceptance.exe
             build/Release/ZeroInputAcceptance.exe
             build/Release/ZeroShellUxAcceptance.exe
             build/Release/ZeroProductionUxAcceptance.exe
