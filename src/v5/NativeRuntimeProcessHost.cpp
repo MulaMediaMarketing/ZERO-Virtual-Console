@@ -43,7 +43,7 @@ bool hasCapability(const std::vector<RuntimeCapability>& values,
 std::string capabilityList(const std::vector<RuntimeCapability>& values) {
     std::ostringstream out;
     bool first = true;
-    const auto append = [&](const char* name) mutable {
+    auto append = [&](const char* name) {
         if (!first) out << ' ';
         first = false;
         out << name;
