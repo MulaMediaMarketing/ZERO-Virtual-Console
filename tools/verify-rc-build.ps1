@@ -8,6 +8,7 @@ $required = @(
   (Join-Path $BuildRoot "Release\ZeroVirtualConsole.exe"),
   (Join-Path $BuildRoot "Release\ZeroAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroReferenceGame.exe"),
+  (Join-Path $BuildRoot "Release\ZeroQualificationProbe.exe"),
   (Join-Path $BuildRoot "ReferencePackage\ZeroReferenceGame.exe"),
   (Join-Path $BuildRoot "ReferencePackage\zero.manifest.json"),
   (Join-Path $BuildRoot "ReferencePackage\Assets\hero.png"),
@@ -15,7 +16,10 @@ $required = @(
   (Join-Path $BuildRoot "ReferencePackage\Assets\logo.png"),
   "./installer/install-zero.ps1",
   "./installer/uninstall-zero.ps1",
-  "./tools/verify-installer-v2.ps1"
+  "./tools/verify-installer-v2.ps1",
+  "./tools/verify-m1-automated.ps1",
+  "./tools/run-rc-qualification.ps1",
+  "./docs/RUNTIME_V4_1_RC_GATE.md"
 )
 
 $missing = @()
@@ -41,3 +45,4 @@ foreach ($path in $required) {
 }
 
 Write-Host "ZERO Runtime V4.1 RC build payload verification: PASS"
+Write-Host "RC qualification tooling is present. Physical qualification is still required before rc_qualified may become true."
