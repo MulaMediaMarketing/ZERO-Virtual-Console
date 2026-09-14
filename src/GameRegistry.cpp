@@ -1,43 +1,8 @@
 #include "GameRegistry.h"
-#include "ManifestValidator.h"
-#include <fstream>
-#include <sstream>
+#include "PackageManifestParser.h"
 #include <algorithm>
 
 namespace zero {
-namespace {
-std::string readAll(const std::filesystem::path& p) {
-    std::ifstream f(p, std::ios::binary);
-    if (!f) return {};
-    std::ostringstream ss; ss << f.rdbuf(); return ss.str();
-}
-
-std::string jsonString(const std::string& s, const std::string& key) {
-    const std::string token = "\"" + key + "\"";
-    auto k = s.find(token); if (k == std::string::npos) return {};
-    auto c = s.find(':', k + token.size()); if (c == std::string::npos) return {};
-    auto q1 = s.find('"', c + 1); if (q1 == std::string::npos) return {};
-    auto q2 = s.find('"', q1 + 1); if (q2 == std::string::npos) return {};
-    return s.substr(q1 + 1, q2 - q1 - 1);
-}
-
-bool jsonBool(const std::string& s, const std::string& key, bool fallback) {
-    const std::string token = "\"" + key + "\"";
-    auto k = s.find(token); if (k == std::string::npos) return fallback;
-    auto c = s.find(':', k + token.size()); if (c == std::string::npos) return fallback;
-    auto tail = s.substr(c + 1, 8);
-    if (tail.find("true") != std::string::npos) return true;
-    if (tail.find("false") != std::string::npos) return false;
-    return fallback;
-}
-
-int jsonInt(const std::string& s, const std::string& key, int fallback) {
-    const std::string token = "\"" + key + "\"";
-    auto k = s.find(token); if (k == std::string::npos) return fallback;
-    auto c = s.find(':', k + token.size()); if (c == std::string::npos) return fallback;
-    try { return std::stoi(s.substr(c + 1)); } catch (...) { return fallback; }
-}
-}
 
 GameRegistry::GameRegistry(std::filesystem::path libraryRoot) : root_(std::move(libraryRoot)) {}
 
@@ -45,40 +10,28 @@ void GameRegistry::Refresh() {
     games_.clear();
     std::error_code ec;
     std::filesystem::create_directories(root_, ec);
-    if (!std::filesystem::exists(root_)) return;
+    if (ec || !std::filesystem::exists(root_)) return;
 
     for (const auto& entry : std::filesystem::directory_iterator(root_, ec)) {
-        if (ec || !entry.is_directory() || entry.path().filename() == L".staging") continue;
-        auto manifestPath = entry.path() / "zero.manifest.json";
-        if (!std::filesystem::exists(manifestPath)) continue;
-        auto text = readAll(manifestPath);
-        if (text.empty()) continue;
+        if (ec || !entry.is_directory()) continue;
+        const auto name = entry.path().filename();
+        if (name == L".staging" || name == L".repair-backup") continue;
 
-        GameManifest g;
-        g.root = entry.path();
-        g.schemaVersion = jsonInt(text, "schema", 1);
-        g.minimumRuntimeMajor = jsonInt(text, "minimum_runtime_major", 4);
-        g.packageId = jsonString(text, "package_id");
-        g.title = jsonString(text, "title");
-        g.version = jsonString(text, "version");
-        g.executable = g.root / jsonString(text, "executable");
-        const auto hero = jsonString(text, "hero_image");
-        const auto icon = jsonString(text, "icon_image");
-        const auto logo = jsonString(text, "logo_image");
-        if (!hero.empty()) g.heroImage = g.root / hero;
-        if (!icon.empty()) g.iconImage = g.root / icon;
-        if (!logo.empty()) g.logoImage = g.root / logo;
-        g.zeroResume = jsonBool(text, "zero_resume", false);
-        g.zeroAchievements = jsonBool(text, "zero_achievements", false);
-        g.zeroOverlay = jsonBool(text, "zero_overlay", true);
-        g.zeroInput = jsonBool(text, "zero_input", true);
+        const auto manifestPath = entry.path() / L"zero.manifest.json";
+        if (!std::filesystem::exists(manifestPath, ec) || ec) {
+            ec.clear();
+            continue;
+        }
 
-        if (!ManifestValidator::Validate(g).valid) continue;
-        games_.push_back(std::move(g));
+        auto parsed = PackageManifestParser::ParseFile(manifestPath, entry.path());
+        if (!parsed.valid) continue;
+        games_.push_back(std::move(parsed.manifest));
     }
 
-    std::sort(games_.begin(), games_.end(), [](const GameManifest& a, const GameManifest& b){
+    std::sort(games_.begin(), games_.end(), [](const GameManifest& a, const GameManifest& b) {
+        if (a.title == b.title) return a.packageId < b.packageId;
         return a.title < b.title;
     });
 }
-}
+
+} // namespace zero

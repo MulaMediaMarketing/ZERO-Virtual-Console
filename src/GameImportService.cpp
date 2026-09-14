@@ -1,26 +1,11 @@
 #include "GameImportService.h"
-#include "GameRegistry.h"
 #include "ManifestValidator.h"
 #include "PackageIntegrityVerifier.h"
+#include "PackageManifestParser.h"
 #include "PackageSecurity.h"
-#include <fstream>
-#include <sstream>
 
 namespace zero {
 namespace {
-std::string readAll(const std::filesystem::path& p) {
-    std::ifstream f(p, std::ios::binary);
-    if (!f) return {};
-    std::ostringstream ss; ss << f.rdbuf(); return ss.str();
-}
-std::string jsonString(const std::string& s, const std::string& key) {
-    const std::string token = "\"" + key + "\"";
-    auto k = s.find(token); if (k == std::string::npos) return {};
-    auto c = s.find(':', k + token.size()); if (c == std::string::npos) return {};
-    auto q1 = s.find('"', c + 1); if (q1 == std::string::npos) return {};
-    auto q2 = s.find('"', q1 + 1); if (q2 == std::string::npos) return {};
-    return s.substr(q1 + 1, q2 - q1 - 1);
-}
 
 bool stagePackage(const std::filesystem::path& sourceRoot,
                   const std::filesystem::path& libraryRoot,
@@ -29,34 +14,35 @@ bool stagePackage(const std::filesystem::path& sourceRoot,
                   std::filesystem::path& destination,
                   std::string& packageId,
                   std::wstring& error) {
-    const auto manifest = sourceRoot / "zero.manifest.json";
-    if (!std::filesystem::exists(manifest)) {
+    const auto manifestPath = sourceRoot / L"zero.manifest.json";
+    if (!std::filesystem::exists(manifestPath)) {
         error = L"The selected folder does not contain zero.manifest.json.";
+        return false;
+    }
+
+    auto parsedSource = PackageManifestParser::ParseFile(manifestPath, sourceRoot);
+    if (!parsedSource.valid) {
+        error = parsedSource.error.empty() ? L"The selected package manifest is invalid." : parsedSource.error;
+        return false;
+    }
+    packageId = parsedSource.manifest.packageId;
+    if (!expectedPackageId.empty() && packageId != expectedPackageId) {
+        error = L"The selected package does not match the installed game being repaired.";
         return false;
     }
 
     PackageInventory sourceInventory;
     if (!PackageSecurity::BuildInventory(sourceRoot, sourceInventory, error)) return false;
 
-    const auto text = readAll(manifest);
-    packageId = jsonString(text, "package_id");
-    if (!ManifestValidator::IsSafePackageId(packageId)) {
-        error = L"The package_id is missing or invalid.";
-        return false;
-    }
-    if (!expectedPackageId.empty() && packageId != expectedPackageId) {
-        error = L"The selected package does not match the installed game being repaired.";
-        return false;
-    }
-
     std::error_code ec;
     std::filesystem::create_directories(libraryRoot, ec);
     if (ec) { error = L"ZERO could not access the Library directory."; return false; }
 
     const auto stagingBase = libraryRoot / L".staging";
-    staging = stagingBase / std::filesystem::path(packageId.begin(), packageId.end());
-    destination = libraryRoot / std::filesystem::path(packageId.begin(), packageId.end());
-    std::filesystem::remove_all(staging, ec); ec.clear();
+    staging = stagingBase / std::filesystem::u8path(packageId);
+    destination = libraryRoot / std::filesystem::u8path(packageId);
+    std::filesystem::remove_all(staging, ec);
+    ec.clear();
     std::filesystem::create_directories(staging, ec);
     if (ec) { error = L"ZERO could not create the import staging directory."; return false; }
 
@@ -75,12 +61,10 @@ bool stagePackage(const std::filesystem::path& sourceRoot,
         return false;
     }
 
-    GameRegistry stagedRegistry(stagingBase);
-    stagedRegistry.Refresh();
-    const auto& games = stagedRegistry.Games();
-    if (games.size() != 1 || games.front().packageId != packageId) {
+    auto parsedStaged = PackageManifestParser::ParseFile(staging / L"zero.manifest.json", staging);
+    if (!parsedStaged.valid || parsedStaged.manifest.packageId != packageId) {
         std::filesystem::remove_all(staging, ec);
-        error = L"The staged game failed ZERO manifest validation.";
+        error = parsedStaged.error.empty() ? L"The staged game failed ZERO manifest validation." : parsedStaged.error;
         return false;
     }
 
@@ -98,14 +82,15 @@ ImportResult activateReplacement(const std::filesystem::path& libraryRoot,
     ImportResult result;
     std::error_code ec;
     const auto backupBase = libraryRoot / L".repair-backup";
-    const auto backup = backupBase / std::filesystem::path(packageId.begin(), packageId.end());
+    const auto backup = backupBase / std::filesystem::u8path(packageId);
     std::filesystem::create_directories(backupBase, ec);
     if (ec) {
         std::filesystem::remove_all(staging, ec);
         result.error = L"ZERO could not prepare package repair rollback storage.";
         return result;
     }
-    std::filesystem::remove_all(backup, ec); ec.clear();
+    std::filesystem::remove_all(backup, ec);
+    ec.clear();
 
     std::filesystem::rename(destination, backup, ec);
     if (ec) {
@@ -127,7 +112,8 @@ ImportResult activateReplacement(const std::filesystem::path& libraryRoot,
 
     std::wstring verifyError;
     if (!PackageIntegrityVerifier::Verify(destination, verifyError)) {
-        std::filesystem::remove_all(destination, ec); ec.clear();
+        std::filesystem::remove_all(destination, ec);
+        ec.clear();
         std::filesystem::rename(backup, destination, ec);
         result.error = ec
             ? L"The repaired package failed integrity verification and ZERO could not restore the previous installation automatically."
@@ -140,7 +126,8 @@ ImportResult activateReplacement(const std::filesystem::path& libraryRoot,
     result.installedRoot = destination;
     return result;
 }
-}
+
+} // namespace
 
 GameImportService::GameImportService(std::filesystem::path libraryRoot)
     : libraryRoot_(std::move(libraryRoot)) {}

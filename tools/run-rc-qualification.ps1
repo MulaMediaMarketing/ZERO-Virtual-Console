@@ -39,13 +39,19 @@ $zeroShell = Resolve-RequiredFile "Release\ZeroVirtualConsole.exe"
 $referenceExe = Resolve-RequiredFile "ReferencePackage\ZeroReferenceGame.exe"
 $automatedJson = Join-Path $BuildRoot "AcceptanceReports\m1-automated-acceptance.json"
 $automatedMd = Join-Path $BuildRoot "AcceptanceReports\m1-automated-acceptance.md"
+$architectureJson = Join-Path $BuildRoot "ArchitectureReports\production-architecture.json"
+$architectureMd = Join-Path $BuildRoot "ArchitectureReports\production-architecture.md"
 
-if (-not (Test-Path $automatedJson -PathType Leaf)) { throw "M1 automated JSON evidence is missing: $automatedJson" }
-if (-not (Test-Path $automatedMd -PathType Leaf)) { throw "M1 automated Markdown evidence is missing: $automatedMd" }
+foreach ($path in @($automatedJson, $automatedMd, $architectureJson, $architectureMd)) {
+  if (-not (Test-Path $path -PathType Leaf)) { throw "Required qualification evidence is missing: $path" }
+  if ((Get-Item $path).Length -le 0) { throw "Required qualification evidence is empty: $path" }
+}
 
 $automated = Get-Content $automatedJson -Raw | ConvertFrom-Json
+$architecture = Get-Content $architectureJson -Raw | ConvertFrom-Json
 if ($automated.automated_result -ne "PASS") { throw "M1 automated acceptance has not passed." }
 if ($automated.rc_qualified -ne $false) { throw "Automated evidence must never self-qualify the RC." }
+if ($architecture.result -ne "PASS") { throw "Production architecture gate has not passed." }
 
 $probe = Read-JsonProcess $probeExe
 $windows11x64 = $probe.windows_11 -eq $true -and $probe.architecture -eq "x64"
@@ -86,6 +92,7 @@ if (-not $NonInteractiveValidation) {
 
 $controllerIdentityPresent = -not [string]::IsNullOrWhiteSpace($ControllerModel)
 $qualified =
+  $architecture.result -eq "PASS" -and
   $automated.automated_result -eq "PASS" -and
   $windows11x64 -and
   $physicalControllerDetected -and
@@ -99,6 +106,7 @@ $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
 }
 
 $blockers = New-Object System.Collections.Generic.List[string]
+if ($architecture.result -ne "PASS") { [void]$blockers.Add("Production architecture gate has not passed.") }
 if (-not $windows11x64) { [void]$blockers.Add("Qualification requires a real Windows 11 x64 machine.") }
 if (-not $physicalControllerDetected) { [void]$blockers.Add("No physical XInput controller was detected.") }
 if (-not $controllerIdentityPresent) { [void]$blockers.Add("Controller make/model was not recorded.") }
@@ -115,14 +123,17 @@ $shellHash = (Get-FileHash -Algorithm SHA256 -Path $zeroShell).Hash.ToLowerInvar
 $referenceHash = (Get-FileHash -Algorithm SHA256 -Path $referenceExe).Hash.ToLowerInvariant()
 
 $report = [ordered]@{
-  schema = 1
+  schema = 2
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
-  zero_milestone = "M1 / Runtime V4.1"
+  zero_milestone = "M1 / Runtime V4.1 / Production Architecture"
   version = "0.1.0-rc1"
   commit = $commit
   rc_qualified = [bool]$qualified
   qualification_result = if ($qualified) { "PASS" } else { "PENDING" }
+  architecture_result = $architecture.result
   automated_result = $automated.automated_result
+  architecture_metrics = $architecture.source_metrics
+  automated_performance_metrics = $automated.performance_metrics
   candidate = [ordered]@{
     shell_sha256 = $shellHash
     reference_game_sha256 = $referenceHash
@@ -145,6 +156,8 @@ $report = [ordered]@{
   }
   manual_checks = $manualChecks
   evidence = [ordered]@{
+    architecture_json = (Resolve-Path $architectureJson).Path
+    architecture_markdown = (Resolve-Path $architectureMd).Path
     automated_json = (Resolve-Path $automatedJson).Path
     automated_markdown = (Resolve-Path $automatedMd).Path
     build_acceptance = $buildAcceptance
@@ -156,7 +169,7 @@ $report = [ordered]@{
 
 $jsonPath = Join-Path $EvidenceDir "rc-qualification.json"
 $mdPath = Join-Path $EvidenceDir "rc-qualification.md"
-$report | ConvertTo-Json -Depth 8 | Set-Content -Path $jsonPath -Encoding UTF8
+$report | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath -Encoding UTF8
 
 $lines = New-Object System.Collections.Generic.List[string]
 [void]$lines.Add("# ZERO Runtime V4.1 RC Qualification")
@@ -165,6 +178,8 @@ $lines = New-Object System.Collections.Generic.List[string]
 [void]$lines.Add("- Commit: ``$commit``")
 [void]$lines.Add("- Qualification result: **$($report.qualification_result)**")
 [void]$lines.Add("- RC qualified: **$(if ($qualified) { 'YES' } else { 'NO' })**")
+[void]$lines.Add("- Architecture gate: **$($architecture.result)**")
+[void]$lines.Add("- Automated acceptance: **$($automated.automated_result)**")
 [void]$lines.Add("- Shell SHA-256: ``$shellHash``")
 [void]$lines.Add("- Reference game SHA-256: ``$referenceHash``")
 [void]$lines.Add("- Windows build: $($probe.os_build) ($($probe.architecture))")

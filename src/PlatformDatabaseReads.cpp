@@ -1,7 +1,7 @@
 #include "PlatformDatabase.h"
+#include "PlatformPaths.h"
 #include <winsqlite/winsqlite3.h>
 #include <windows.h>
-#include <shlobj.h>
 #include <filesystem>
 
 namespace zero {
@@ -25,13 +25,7 @@ private:
 };
 
 std::filesystem::path dbPath() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO" / "Data" / "zero.db";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "Data" / "zero.db";
+    return PlatformPaths::DataStoreRoot() / L"zero.db";
 }
 
 bool openDb(DbHandle& handle, std::wstring& error) {
@@ -49,11 +43,37 @@ std::string text(sqlite3_stmt* stmt, int column) {
     return value ? reinterpret_cast<const char*>(value) : std::string{};
 }
 
-bool bindPackage(sqlite3_stmt* stmt, const std::string& packageId) {
-    return sqlite3_bind_text(stmt, 1, packageId.c_str(), static_cast<int>(packageId.size()), SQLITE_TRANSIENT) == SQLITE_OK;
+bool bindText(sqlite3_stmt* stmt, int index, const std::string& value) {
+    return sqlite3_bind_text(stmt, index, value.c_str(), static_cast<int>(value.size()), SQLITE_TRANSIENT) == SQLITE_OK;
 }
 
 } // namespace
+
+std::optional<std::string> PlatformDatabase::GetSetting(const std::string& key,
+                                                        std::wstring& error) const {
+    if (!Initialize(error)) return std::nullopt;
+    DbHandle db;
+    if (!openDb(db, error)) return std::nullopt;
+
+    static constexpr const char* sql = "SELECT value FROM settings WHERE key=? LIMIT 1;";
+    sqlite3_stmt* raw = nullptr;
+    if (sqlite3_prepare_v2(db.get(), sql, -1, &raw, nullptr) != SQLITE_OK) {
+        error = L"ZERO could not prepare the canonical settings query.";
+        return std::nullopt;
+    }
+    Statement stmt(raw);
+    if (!bindText(raw, 1, key)) {
+        error = L"ZERO could not bind the canonical settings query.";
+        return std::nullopt;
+    }
+    const int rc = sqlite3_step(raw);
+    if (rc == SQLITE_DONE) return std::nullopt;
+    if (rc != SQLITE_ROW) {
+        error = L"ZERO could not read canonical settings.";
+        return std::nullopt;
+    }
+    return text(raw, 0);
+}
 
 std::optional<GamePlatformState> PlatformDatabase::LoadGameState(const std::string& packageId,
                                                                  std::wstring& error) const {
@@ -70,7 +90,7 @@ std::optional<GamePlatformState> PlatformDatabase::LoadGameState(const std::stri
         return std::nullopt;
     }
     Statement stmt(raw);
-    if (!bindPackage(raw, packageId)) {
+    if (!bindText(raw, 1, packageId)) {
         error = L"ZERO could not bind the canonical game-state query.";
         return std::nullopt;
     }
@@ -107,7 +127,7 @@ std::optional<ResumeMetadata> PlatformDatabase::LoadResume(const std::string& pa
         return std::nullopt;
     }
     Statement stmt(raw);
-    if (!bindPackage(raw, packageId)) {
+    if (!bindText(raw, 1, packageId)) {
         error = L"ZERO could not bind the canonical Resume query.";
         return std::nullopt;
     }
@@ -143,7 +163,7 @@ std::vector<AchievementRecord> PlatformDatabase::LoadAchievements(const std::str
         return out;
     }
     Statement stmt(raw);
-    if (!bindPackage(raw, packageId)) {
+    if (!bindText(raw, 1, packageId)) {
         error = L"ZERO could not bind the canonical achievement query.";
         return out;
     }

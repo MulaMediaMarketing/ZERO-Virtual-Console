@@ -1,4 +1,5 @@
 #include "PackageTrust.h"
+#include "StrictJson.h"
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -7,39 +8,15 @@
 namespace zero {
 namespace {
 
-std::string readAll(const std::filesystem::path& path) {
+std::string readAllBounded(const std::filesystem::path& path, size_t maxBytes) {
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(path, ec);
+    if (ec || size > maxBytes) return {};
     std::ifstream file(path, std::ios::binary);
     if (!file) return {};
     std::ostringstream stream;
     stream << file.rdbuf();
     return stream.str();
-}
-
-std::string jsonString(const std::string& text, const std::string& key) {
-    const std::string token = "\"" + key + "\"";
-    const auto keyPos = text.find(token);
-    if (keyPos == std::string::npos) return {};
-    const auto colon = text.find(':', keyPos + token.size());
-    if (colon == std::string::npos) return {};
-    const auto quoteStart = text.find('"', colon + 1);
-    if (quoteStart == std::string::npos) return {};
-    const auto quoteEnd = text.find('"', quoteStart + 1);
-    if (quoteEnd == std::string::npos) return {};
-    return text.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
-}
-
-int jsonInt(const std::string& text, const std::string& key) {
-    const std::string token = "\"" + key + "\"";
-    const auto keyPos = text.find(token);
-    if (keyPos == std::string::npos) return 0;
-    const auto colon = text.find(':', keyPos + token.size());
-    if (colon == std::string::npos) return 0;
-    auto start = colon + 1;
-    while (start < text.size() && std::isspace(static_cast<unsigned char>(text[start]))) ++start;
-    auto end = start;
-    while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) ++end;
-    if (start == end) return 0;
-    try { return std::stoi(text.substr(start, end - start)); } catch (...) { return 0; }
 }
 
 bool safeIdentifier(const std::string& value, size_t maxLength) {
@@ -50,14 +27,26 @@ bool safeIdentifier(const std::string& value, size_t maxLength) {
 }
 
 bool parseEnvelope(const std::filesystem::path& path, PackageSignatureEnvelope& envelope) {
-    const auto text = readAll(path);
-    if (text.empty() || text.size() > 64 * 1024) return false;
-    envelope.schema = jsonInt(text, "schema");
-    envelope.publisherId = jsonString(text, "publisher_id");
-    envelope.keyId = jsonString(text, "key_id");
-    envelope.algorithm = jsonString(text, "algorithm");
-    envelope.payload = jsonString(text, "payload");
-    envelope.signatureBase64 = jsonString(text, "signature");
+    const auto text = readAllBounded(path, 64 * 1024);
+    if (text.empty()) return false;
+    const auto parsed = json::Parse(text);
+    const auto* object = parsed.ok ? parsed.root.AsObject() : nullptr;
+    if (!object) return false;
+
+    const auto schema = json::Integer(*object, "schema");
+    const auto* publisherId = json::String(*object, "publisher_id");
+    const auto* keyId = json::String(*object, "key_id");
+    const auto* algorithm = json::String(*object, "algorithm");
+    const auto* payload = json::String(*object, "payload");
+    const auto* signature = json::String(*object, "signature");
+    if (!schema || !publisherId || !keyId || !algorithm || !payload || !signature) return false;
+
+    envelope.schema = static_cast<int>(*schema);
+    envelope.publisherId = *publisherId;
+    envelope.keyId = *keyId;
+    envelope.algorithm = *algorithm;
+    envelope.payload = *payload;
+    envelope.signatureBase64 = *signature;
     return envelope.schema == 1 &&
            safeIdentifier(envelope.publisherId, 160) &&
            safeIdentifier(envelope.keyId, 160) &&
@@ -67,7 +56,7 @@ bool parseEnvelope(const std::filesystem::path& path, PackageSignatureEnvelope& 
 }
 
 std::string integrityPayload(const std::filesystem::path& packageRoot) {
-    return readAll(packageRoot / L"zero.integrity.sha256");
+    return readAllBounded(packageRoot / L"zero.integrity.sha256", 8 * 1024 * 1024);
 }
 
 } // namespace
@@ -111,7 +100,7 @@ PackageTrustResult PackageTrustService::Evaluate(const std::filesystem::path& pa
         result.state = PackageTrustState::InvalidSignatureEnvelope;
         result.signaturePresent = true;
         result.launchAllowed = false;
-        result.detail = L"The package signature envelope is malformed, unsupported, or does not target zero.integrity.sha256.";
+        result.detail = L"The package signature envelope is malformed, unsupported, duplicated, or does not target zero.integrity.sha256.";
         return result;
     }
 

@@ -22,7 +22,6 @@ FirstBootState FirstBootService::Load() const {
         else if (line.rfind("audio=", 0) == 0) state.audioConfirmed = line.substr(6) == "1";
         else if (line.rfind("volume=", 0) == 0) {
             try { state.volume = static_cast<unsigned>(std::stoul(line.substr(7))); } catch (...) {}
-            if (state.volume > 100) state.volume = 100;
         }
         else if (line.rfind("display_width=", 0) == 0) {
             try { state.displayWidth = static_cast<unsigned>(std::stoul(line.substr(14))); } catch (...) {}
@@ -31,10 +30,12 @@ FirstBootState FirstBootService::Load() const {
             try { state.displayHeight = static_cast<unsigned>(std::stoul(line.substr(15))); } catch (...) {}
         }
     }
-    return state;
+    return NormalizeFirstBootState(state);
 }
 
-bool FirstBootService::Save(const FirstBootState& state, std::wstring& error) const {
+bool FirstBootService::Save(const FirstBootState& input, std::wstring& error) const {
+    const FirstBootState state = NormalizeFirstBootState(input);
+
     std::error_code ec;
     std::filesystem::create_directories(root_, ec);
     if (ec) { error = L"ZERO could not create its first-boot state directory."; return false; }
@@ -51,7 +52,7 @@ bool FirstBootService::Save(const FirstBootState& state, std::wstring& error) co
     f << "display_width=" << state.displayWidth << "\n";
     f << "display_height=" << state.displayHeight << "\n";
     f << "audio=" << (state.audioConfirmed ? 1 : 0) << "\n";
-    f << "volume=" << (state.volume > 100 ? 100 : state.volume) << "\n";
+    f << "volume=" << state.volume << "\n";
     f.close();
 
     std::filesystem::rename(tmp, dst, ec);
@@ -66,7 +67,7 @@ bool FirstBootService::Save(const FirstBootState& state, std::wstring& error) co
 
 bool FirstBootService::IsRequired() const {
     const auto state = Load();
-    return !state.completed || !state.controllerConfirmed || !state.displayConfirmed || !state.audioConfirmed;
+    return !state.completed || !FirstBootRequirementsSatisfied(state);
 }
 
 } // namespace zero

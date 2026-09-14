@@ -1,6 +1,6 @@
 #include "App.h"
+#include "PlatformPaths.h"
 #include <Xinput.h>
-#include <shlobj.h>
 #include <shellapi.h>
 #include <algorithm>
 #include <filesystem>
@@ -9,16 +9,6 @@ using Microsoft::WRL::ComPtr;
 
 namespace zero {
 namespace {
-std::filesystem::path LocalRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::current_path() / "ZeroData";
-}
-
 std::wstring BytesLabel(uint64_t bytes) {
     constexpr uint64_t GiB = 1024ull * 1024ull * 1024ull;
     constexpr uint64_t MiB = 1024ull * 1024ull;
@@ -66,9 +56,9 @@ void App::RefreshSettingsTelemetry() {
     settingsDisplayWidth_ = static_cast<unsigned>(std::max<LONG>(0, rc.right - rc.left));
     settingsDisplayHeight_ = static_cast<unsigned>(std::max<LONG>(0, rc.bottom - rc.top));
 
-    const auto root = LocalRoot();
+    const auto root = PlatformPaths::DataRoot();
     settingsStorageBytes_ = DirectorySize(root);
-    settingsCrashReportCount_ = CountJsonReports(root / "CrashReports");
+    settingsCrashReportCount_ = CountJsonReports(PlatformPaths::CrashReportsRoot());
 
     std::error_code ec;
     const auto space = std::filesystem::space(root, ec);
@@ -76,7 +66,7 @@ void App::RefreshSettingsTelemetry() {
 }
 
 void App::OpenSettingsLocation(bool diagnosticsOnly) {
-    const auto target = diagnosticsOnly ? (LocalRoot() / "CrashReports") : LocalRoot();
+    const auto target = diagnosticsOnly ? PlatformPaths::CrashReportsRoot() : PlatformPaths::DataRoot();
     std::error_code ec;
     std::filesystem::create_directories(target, ec);
     if (ec) {
@@ -89,19 +79,12 @@ void App::OpenSettingsLocation(bool diagnosticsOnly) {
 }
 
 void App::HandleSettingsInput(const InputSnapshot& in) {
-    constexpr size_t kCount = 8;
-    if (in.up && selectedSetting_ > 0) {
-        --selectedSetting_;
-        NotifyFocusMoved();
-    }
-    if (in.down && selectedSetting_ + 1 < kCount) {
-        ++selectedSetting_;
-        NotifyFocusMoved();
-    }
+    if (in.up && MoveSettingsUp(settingsUx_)) NotifyFocusMoved();
+    if (in.down && MoveSettingsDown(settingsUx_)) NotifyFocusMoved();
 
-    if (selectedSetting_ == 1 && (in.left || in.right)) {
-        const int delta = in.left ? -5 : 5;
-        settings_.volume = std::clamp(settings_.volume + delta, 0, 100);
+    const auto row = static_cast<SettingsExperienceRow>(settingsUx_.selectedRow);
+    if (row == SettingsExperienceRow::Volume && (in.left || in.right)) {
+        settings_.volume = AdjustVolume(settings_.volume, in.left ? -5 : 5);
         if (!settingsStore_.Save(settings_)) {
             status_ = L"ZERO could not persist its volume preference.";
         } else {
@@ -112,19 +95,19 @@ void App::HandleSettingsInput(const InputSnapshot& in) {
 
     if (!in.select && !in.action) return;
 
-    switch (selectedSetting_) {
-        case 0:
+    switch (row) {
+        case SettingsExperienceRow::Profile:
             status_ = L"This build uses the local profile created during First Boot. Online profile editing is not connected.";
             break;
-        case 1:
-            settings_.volume = std::clamp(settings_.volume + 5, 0, 100);
+        case SettingsExperienceRow::Volume:
+            settings_.volume = AdjustVolume(settings_.volume, 5);
             if (!settingsStore_.Save(settings_)) {
                 status_ = L"ZERO could not persist its volume preference.";
             } else {
                 status_ = L"ZERO volume preference: " + std::to_wstring(settings_.volume) + L"%.";
             }
             break;
-        case 2:
+        case SettingsExperienceRow::ReducedMotion:
             settings_.reducedMotion = !settings_.reducedMotion;
             shellUx_.SetReducedMotion(settings_.reducedMotion);
             if (!settingsStore_.Save(settings_)) {
@@ -133,29 +116,32 @@ void App::HandleSettingsInput(const InputSnapshot& in) {
                 status_ = settings_.reducedMotion ? L"Reduced Motion enabled." : L"Reduced Motion disabled.";
             }
             break;
-        case 3:
+        case SettingsExperienceRow::Controller:
             RefreshSettingsTelemetry();
             status_ = settingsControllerConnected_ ? L"Controller 1 is connected." : L"No XInput controller is currently connected.";
             break;
-        case 4:
+        case SettingsExperienceRow::Display:
             EnterBorderlessFullscreen();
             RefreshSettingsTelemetry();
             status_ = L"Display state refreshed.";
             break;
-        case 5:
+        case SettingsExperienceRow::Storage:
             OpenSettingsLocation(false);
             break;
-        case 6:
+        case SettingsExperienceRow::Diagnostics:
             OpenSettingsLocation(true);
             break;
-        case 7:
+        case SettingsExperienceRow::About:
             status_ = L"ZERO Virtual Console · Runtime V4.1 · Windows 11 x64 · local console shell.";
+            break;
+        case SettingsExperienceRow::Count:
             break;
     }
     NotifyFocusMoved();
 }
 
 void App::DrawSettings(float width, float height) {
+    ClampSettingsSelection(settingsUx_);
     const auto profile = identity_.CurrentProfile();
 
     DrawTextLine(L"Settings", 62, 154, 500, 60, true);
@@ -188,11 +174,11 @@ void App::DrawSettings(float width, float height) {
 
     const float startY = 258.0f;
     const float rowHeight = 60.0f;
-    for (size_t i = 0; i < 8; ++i) {
+    for (size_t i = 0; i < SettingsRowCount(); ++i) {
         const float y = startY + static_cast<float>(i) * (rowHeight + 8.0f);
         const auto rect = D2D1::RectF(62, y, width - 62, y + rowHeight);
         DrawRoundedCard(rect, 18, brushCard_.Get());
-        if (i == selectedSetting_) DrawFocusRing(rect, 18);
+        if (i == settingsUx_.selectedRow) DrawFocusRing(rect, 18);
         DrawTextLine(rows[i].label, 88, y + 10, 210, 26, false);
         DrawTextLine(rows[i].value, 300, y + 10, std::max(240.0f, width - 700.0f), 32, false, brushMuted_.Get());
         DrawTextLine(rows[i].hint, width - 300, y + 10, 210, 28, false, brushMuted_.Get());

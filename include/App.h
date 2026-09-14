@@ -1,6 +1,9 @@
 #pragma once
 #include "CaptureLibrary.h"
+#include "CapturesExperience.h"
 #include "FriendsExperience.h"
+#include "CoreShellExperience.h"
+#include "StoreSettingsFirstBootExperience.h"
 #include "GameRegistry.h"
 #include "GameImportService.h"
 #include "IdentityProvider.h"
@@ -60,24 +63,24 @@ private:
     UserSettings settings_;
     Input input_;
     ShellUxState shellUx_;
+
     FriendsExperienceState friendsUx_{};
+    CaptureExperienceState capturesUx_{};
+    CoreShellExperienceState coreShellUx_{};
+    StoreExperienceState storeUx_{};
+    SettingsExperienceState settingsUx_{};
+
     Page page_{Page::Home};
     Page achievementsReturnPage_{Page::Home};
     LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
     RuntimeOutcome lastRuntimeOutcome_{RuntimeOutcome::None};
-    size_t selectedGame_{0};
-    size_t selectedCapture_{0};
-    size_t captureScroll_{0};
     size_t selectedAchievement_{0};
     size_t achievementScroll_{0};
-    size_t selectedSetting_{0};
     size_t navIndex_{0};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
     bool overlayClosing_{false};
     bool preferResume_{true};
-    bool captureViewerVisible_{false};
-    bool captureDeleteConfirm_{false};
     bool achievementsFromOverlay_{false};
     bool launchUsedResume_{false};
     bool settingsControllerConnected_{false};
@@ -132,7 +135,6 @@ private:
     void RestoreShellForeground();
     void SetOverlayVisible(bool visible);
     bool ShellContentOwnsFocus() const noexcept;
-    void ClampCaptureSelection();
     void NotifyFocusMoved();
     Microsoft::WRL::ComPtr<ID2D1Bitmap> LoadBitmap(const std::filesystem::path& path);
     void DrawHeroArtwork(const GameManifest& game, const D2D1_RECT_F& bounds);

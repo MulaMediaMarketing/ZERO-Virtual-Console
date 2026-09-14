@@ -8,6 +8,10 @@ if(NOT WIN32)
   message(FATAL_ERROR "ZERO Virtual Console currently targets Windows 11 x64 only.")
 endif()
 
+if(MSVC)
+  add_compile_options(/W4 /WX /permissive- /utf-8)
+endif()
+
 add_library(ZeroSdk STATIC
   sdk/ZeroSdk.cpp
   sdk/ZeroSdkCrash.cpp
@@ -28,6 +32,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/LocalIdentityProvider.cpp
   src/GameRegistry.cpp
   src/GameImportService.cpp
+  src/PackageManifestParser.cpp
   src/ManifestValidator.cpp
   src/PackageSecurity.cpp
   src/PackageIntegrityVerifier.cpp
@@ -112,6 +117,7 @@ add_executable(ZeroPackageRepairAcceptance
   tools/PackageRepairAcceptance.cpp
   src/GameImportService.cpp
   src/GameRegistry.cpp
+  src/PackageManifestParser.cpp
   src/ManifestValidator.cpp
   src/PackageSecurity.cpp
   src/PackageIntegrityVerifier.cpp
@@ -119,6 +125,10 @@ add_executable(ZeroPackageRepairAcceptance
 target_include_directories(ZeroPackageRepairAcceptance PRIVATE include)
 target_compile_definitions(ZeroPackageRepairAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroPackageRepairAcceptance PRIVATE bcrypt)
+
+add_executable(ZeroStrictJsonAcceptance tools/StrictJsonAcceptance.cpp)
+target_include_directories(ZeroStrictJsonAcceptance PRIVATE include)
+target_compile_definitions(ZeroStrictJsonAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 add_executable(ZeroInputAcceptance
   tools/InputAcceptance.cpp
@@ -138,6 +148,25 @@ target_compile_definitions(ZeroProductionUxAcceptance PRIVATE UNICODE _UNICODE W
 add_executable(ZeroFriendsExperienceAcceptance tools/FriendsExperienceAcceptance.cpp)
 target_include_directories(ZeroFriendsExperienceAcceptance PRIVATE include)
 target_compile_definitions(ZeroFriendsExperienceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+add_executable(ZeroCapturesExperienceAcceptance tools/CapturesExperienceAcceptance.cpp)
+target_include_directories(ZeroCapturesExperienceAcceptance PRIVATE include)
+target_compile_definitions(ZeroCapturesExperienceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+add_executable(ZeroCoreShellExperienceAcceptance tools/CoreShellExperienceAcceptance.cpp)
+target_include_directories(ZeroCoreShellExperienceAcceptance PRIVATE include)
+target_compile_definitions(ZeroCoreShellExperienceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+add_executable(ZeroStoreSettingsFirstBootAcceptance tools/StoreSettingsFirstBootAcceptance.cpp)
+target_include_directories(ZeroStoreSettingsFirstBootAcceptance PRIVATE include)
+target_compile_definitions(ZeroStoreSettingsFirstBootAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+add_executable(ZeroFirstBootPersistenceAcceptance
+  tools/FirstBootPersistenceAcceptance.cpp
+  src/FirstBootService.cpp
+)
+target_include_directories(ZeroFirstBootPersistenceAcceptance PRIVATE include)
+target_compile_definitions(ZeroFirstBootPersistenceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 add_executable(ZeroQualificationProbe tools/QualificationProbe.cpp)
 target_compile_definitions(ZeroQualificationProbe PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)

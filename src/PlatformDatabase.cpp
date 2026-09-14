@@ -1,7 +1,7 @@
 #include "PlatformDatabase.h"
+#include "PlatformPaths.h"
 #include <winsqlite/winsqlite3.h>
 #include <windows.h>
-#include <shlobj.h>
 #include <chrono>
 #include <filesystem>
 #include <iomanip>
@@ -30,13 +30,7 @@ private:
 };
 
 std::filesystem::path databasePath() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO" / "Data" / "zero.db";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "Data" / "zero.db";
+    return PlatformPaths::DataStoreRoot() / L"zero.db";
 }
 
 std::string utcNow() {
