@@ -1,6 +1,6 @@
 #pragma once
 #include "CaptureLibrary.h"
-#include "FriendsProvider.h"
+#include "FriendsExperience.h"
 #include "GameRegistry.h"
 #include "GameImportService.h"
 #include "IdentityProvider.h"
@@ -60,6 +60,7 @@ private:
     UserSettings settings_;
     Input input_;
     ShellUxState shellUx_;
+    FriendsExperienceState friendsUx_{};
     Page page_{Page::Home};
     Page achievementsReturnPage_{Page::Home};
     LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
