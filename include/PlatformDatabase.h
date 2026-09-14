@@ -4,6 +4,7 @@
 #include "ResumeStore.h"
 #include "ZeroTypes.h"
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,6 +13,8 @@ namespace zero {
 
 class PlatformDatabase {
 public:
+    explicit PlatformDatabase(std::filesystem::path databasePath = {});
+
     bool Initialize(std::wstring& error) const;
     bool UpsertGame(const GameManifest& game, std::wstring& error) const;
     bool RecordSession(const std::string& packageId,
@@ -45,6 +48,11 @@ public:
                                              std::wstring& error) const;
     std::vector<AchievementRecord> LoadAchievements(const std::string& packageId,
                                                      std::wstring& error) const;
+
+    const std::filesystem::path& Path() const noexcept { return databasePath_; }
+
+private:
+    std::filesystem::path databasePath_;
 };
 
 } // namespace zero
