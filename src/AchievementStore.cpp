@@ -1,23 +1,14 @@
 #include "AchievementStore.h"
 #include "PlatformDatabase.h"
+#include "PlatformPaths.h"
 #include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <objbase.h>
-#include <shlobj.h>
 #include <sstream>
 
 namespace zero {
 namespace {
-std::filesystem::path root() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO" / "Achievements";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "Achievements";
-}
 std::string nowUtc() {
     const auto tp = std::chrono::system_clock::now();
     const auto tt = std::chrono::system_clock::to_time_t(tp);
@@ -38,7 +29,7 @@ std::string escapeJson(const std::string& s) {
 }
 
 std::filesystem::path AchievementStore::PathFor(const std::string& packageId) const {
-    return root() / (std::filesystem::path(packageId).wstring() + L".jsonl");
+    return PlatformPaths::AchievementsMirrorRoot() / (std::filesystem::path(packageId).wstring() + L".jsonl");
 }
 
 std::vector<AchievementRecord> AchievementStore::Load(const std::string& packageId) const {
@@ -82,9 +73,8 @@ bool AchievementStore::Unlock(const std::string& packageId,
     const auto stamp = nowUtc();
     if (!database.UpsertAchievement(packageId, achievementId, title, stamp, error)) return false;
 
-    // Compatibility mirror for the current shell. SQLite is canonical.
     std::error_code ec;
-    std::filesystem::create_directories(root(), ec);
+    std::filesystem::create_directories(PlatformPaths::AchievementsMirrorRoot(), ec);
     if (ec) { error = L"ZERO could not create the achievement mirror directory."; return false; }
     std::ofstream f(PathFor(packageId), std::ios::binary | std::ios::app);
     if (!f) { error = L"ZERO could not persist the achievement mirror."; return false; }
