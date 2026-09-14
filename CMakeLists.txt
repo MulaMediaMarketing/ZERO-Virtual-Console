@@ -131,4 +131,8 @@ add_executable(ZeroShellUxAcceptance tools/ShellUxAcceptance.cpp)
 target_include_directories(ZeroShellUxAcceptance PRIVATE include)
 target_compile_definitions(ZeroShellUxAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_executable(ZeroQualificationProbe tools/QualificationProbe.cpp)
+target_compile_definitions(ZeroQualificationProbe PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroQualificationProbe PRIVATE xinput9_1_0)
+
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
