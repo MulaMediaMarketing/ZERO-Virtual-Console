@@ -21,6 +21,7 @@ public:
     void Terminate() override;
 
     void SetCallbacks(zero::RuntimeIpcCallbacks callbacks) { callbacks_ = std::move(callbacks); }
+    bool CaptureDiagnosticDump() { return process_.CaptureDiagnosticDump(); }
     bool ClientAuthenticated() const noexcept { return ipc_.ClientAuthenticated(); }
     bool ReadyReceived() const noexcept { return ipc_.ReadyReceived(); }
     const std::wstring& PipeName() const noexcept { return ipc_.PipeName(); }
