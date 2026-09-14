@@ -13,6 +13,9 @@ $required = @(
   (Join-Path $BuildRoot "Release\ZeroPackageTrustAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroPackageRepairAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroStrictJsonAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroPlatformDatabaseAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroFaultInjectionAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroProductionBenchmarkAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroInputAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroShellUxAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroProductionUxAcceptance.exe"),
@@ -44,9 +47,7 @@ $missing = @()
 foreach ($path in $required) {
   if (-not (Test-Path $path -PathType Leaf)) { $missing += $path }
 }
-if ($missing.Count -gt 0) {
-  throw "ZERO RC artifact verification failed. Missing: $($missing -join ', ')"
-}
+if ($missing.Count -gt 0) { throw "ZERO RC artifact verification failed. Missing: $($missing -join ', ')" }
 
 $manifestPath = Join-Path $BuildRoot "ReferencePackage\zero.manifest.json"
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
@@ -63,5 +64,5 @@ foreach ($path in $required) {
 }
 
 Write-Host "ZERO Runtime V4.1 RC build payload verification: PASS"
-Write-Host "Production architecture tooling and complete automated acceptance payload are present."
+Write-Host "Production architecture, security, persistence, fault-injection, performance, and UX acceptance payloads are present."
 Write-Host "Physical qualification is still required before rc_qualified may become true."
