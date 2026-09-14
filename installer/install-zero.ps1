@@ -110,7 +110,25 @@ try {
   }
 
   New-Item -ItemType Directory -Force -Path $DataRoot | Out-Null
-  foreach ($folder in @("Library", "Saves", "Cache", "Temp", "Captures", "Data", "Diagnostics", "Trust")) {
+  $dataFolders = @(
+    "Library",
+    "Saves",
+    "Cache",
+    "Temp",
+    "Captures",
+    "Data",
+    "Resume",
+    "Achievements",
+    "PlatformState",
+    "CrashReports",
+    "Diagnostics",
+    "Identity",
+    "Trust",
+    "Trust\Publishers",
+    "Runtime",
+    "Runtime\Sessions"
+  )
+  foreach ($folder in $dataFolders) {
     New-Item -ItemType Directory -Force -Path (Join-Path $DataRoot $folder) | Out-Null
   }
 
@@ -152,5 +170,5 @@ try {
 
 $mode = if ($previousVersion) { "updated from $previousVersion to $Version" } else { "installed as $Version" }
 Write-Host "ZERO Virtual Console $mode at $InstallDir"
-Write-Host "Player saves, library packages, settings, and diagnostics remain under $DataRoot and are not replaced during updates."
+Write-Host "Player saves, library packages, settings, identity, captures, diagnostics, and platform state remain under $DataRoot and are not replaced during updates."
 Write-Host "Acceptance tool installed at $(Join-Path $InstallDir 'ZeroAcceptance.exe')"

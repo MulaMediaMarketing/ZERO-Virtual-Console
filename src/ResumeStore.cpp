@@ -1,23 +1,13 @@
 #include "ResumeStore.h"
 #include "PlatformDatabase.h"
+#include "PlatformPaths.h"
 #include <chrono>
 #include <fstream>
 #include <iomanip>
-#include <shlobj.h>
 #include <sstream>
 
 namespace zero {
 namespace {
-
-std::filesystem::path root() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO" / "Resume";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "Resume";
-}
 
 std::string escapeJson(const std::string& s) {
     std::string out;
@@ -87,7 +77,7 @@ bool safeId(const std::string& id) {
 } // namespace
 
 std::filesystem::path ResumeStore::PathFor(const std::string& packageId) const {
-    return root() / std::filesystem::path(std::wstring(packageId.begin(), packageId.end()) + L".json");
+    return PlatformPaths::ResumeMirrorRoot() / std::filesystem::path(std::wstring(packageId.begin(), packageId.end()) + L".json");
 }
 
 bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) const {
@@ -104,7 +94,7 @@ bool ResumeStore::Save(const ResumeMetadata& metadata, std::wstring& error) cons
     }
 
     std::error_code ec;
-    std::filesystem::create_directories(root(), ec);
+    std::filesystem::create_directories(PlatformPaths::ResumeMirrorRoot(), ec);
     if (ec) {
         error = L"ZERO could not create the Resume metadata mirror directory.";
         return false;
@@ -148,7 +138,6 @@ std::optional<ResumeMetadata> ResumeStore::Load(const std::string& packageId) co
     std::wstring databaseError;
     if (const auto canonical = database.LoadResume(packageId, databaseError)) return canonical;
 
-    // Compatibility fallback for installations that predate canonical SQLite Resume rows.
     std::ifstream f(PathFor(packageId), std::ios::binary);
     if (!f) return std::nullopt;
     std::ostringstream ss;

@@ -1,22 +1,13 @@
 #include "PlatformStateStore.h"
+#include "PlatformPaths.h"
 #include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <objbase.h>
-#include <shlobj.h>
 #include <sstream>
 
 namespace zero {
 namespace {
-std::filesystem::path root() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO" / "PlatformState";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "PlatformState";
-}
 std::string nowUtc() {
     const auto tp = std::chrono::system_clock::now();
     const auto tt = std::chrono::system_clock::to_time_t(tp);
@@ -45,7 +36,7 @@ bool getBool(const std::string& s, const std::string& key) {
 }
 
 std::filesystem::path PlatformStateStore::PathFor(const std::string& packageId) const {
-    return root() / (std::filesystem::path(packageId).wstring() + L".json");
+    return PlatformPaths::PlatformStateMirrorRoot() / (std::filesystem::path(packageId).wstring() + L".json");
 }
 
 GamePlatformState PlatformStateStore::Load(const std::string& packageId) const {
@@ -62,7 +53,7 @@ GamePlatformState PlatformStateStore::Load(const std::string& packageId) const {
 }
 
 bool PlatformStateStore::Save(const GamePlatformState& s, std::wstring& error) const {
-    std::error_code ec; std::filesystem::create_directories(root(), ec);
+    std::error_code ec; std::filesystem::create_directories(PlatformPaths::PlatformStateMirrorRoot(), ec);
     if (ec) { error = L"ZERO could not create the platform state directory."; return false; }
     const auto path = PathFor(s.packageId); const auto tmp = path.wstring() + L".tmp";
     std::ofstream f(std::filesystem::path(tmp), std::ios::binary | std::ios::trunc);

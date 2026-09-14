@@ -1,7 +1,7 @@
 #include "PlatformDatabase.h"
+#include "PlatformPaths.h"
 #include <winsqlite/winsqlite3.h>
 #include <windows.h>
-#include <shlobj.h>
 #include <chrono>
 #include <filesystem>
 #include <iomanip>
@@ -28,16 +28,6 @@ public:
 private:
     sqlite3_stmt* stmt_{nullptr};
 };
-
-std::filesystem::path databasePath() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO" / "Data" / "zero.db";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "Data" / "zero.db";
-}
 
 std::string utcNow() {
     const auto now = std::chrono::system_clock::now();
@@ -81,8 +71,7 @@ bool exec(sqlite3* db, const char* sql, std::wstring& error) {
     return false;
 }
 
-bool openDatabase(DbHandle& handle, std::wstring& error) {
-    const auto path = databasePath();
+bool openDatabase(const std::filesystem::path& path, DbHandle& handle, std::wstring& error) {
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
     if (ec) {
@@ -176,14 +165,17 @@ bool stepDone(sqlite3* db, sqlite3_stmt* stmt, std::wstring& error) {
 
 } // namespace
 
+PlatformDatabase::PlatformDatabase(std::filesystem::path databasePath)
+    : databasePath_(databasePath.empty() ? PlatformPaths::DataStoreRoot() / L"zero.db" : std::move(databasePath)) {}
+
 bool PlatformDatabase::Initialize(std::wstring& error) const {
     DbHandle db;
-    return openDatabase(db, error) && ensureSchema(db.get(), error);
+    return openDatabase(databasePath_, db, error) && ensureSchema(db.get(), error);
 }
 
 bool PlatformDatabase::UpsertGame(const GameManifest& game, std::wstring& error) const {
     DbHandle db;
-    if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
+    if (!openDatabase(databasePath_, db, error) || !ensureSchema(db.get(), error)) return false;
     static constexpr const char* sql =
         "INSERT INTO games(package_id,title,version,executable,updated_at) VALUES(?,?,?,?,?) "
         "ON CONFLICT(package_id) DO UPDATE SET title=excluded.title,version=excluded.version,"
@@ -208,7 +200,7 @@ bool PlatformDatabase::RecordSession(const std::string& packageId,
                                      bool crashed,
                                      std::wstring& error) const {
     DbHandle db;
-    if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
+    if (!openDatabase(databasePath_, db, error) || !ensureSchema(db.get(), error)) return false;
     if (!exec(db.get(), "BEGIN IMMEDIATE;", error)) return false;
 
     bool ok = true;
@@ -263,7 +255,7 @@ bool PlatformDatabase::UpsertResume(const std::string& packageId,
                                     const std::string& updatedAtUtc,
                                     std::wstring& error) const {
     DbHandle db;
-    if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
+    if (!openDatabase(databasePath_, db, error) || !ensureSchema(db.get(), error)) return false;
     static constexpr const char* sql =
         "INSERT INTO resume_activities(package_id,activity_id,display_label,payload,updated_at) VALUES(?,?,?,?,?) "
         "ON CONFLICT(package_id) DO UPDATE SET activity_id=excluded.activity_id,display_label=excluded.display_label,"
@@ -285,7 +277,7 @@ bool PlatformDatabase::UpsertAchievement(const std::string& packageId,
                                          const std::string& unlockedAtUtc,
                                          std::wstring& error) const {
     DbHandle db;
-    if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
+    if (!openDatabase(databasePath_, db, error) || !ensureSchema(db.get(), error)) return false;
     static constexpr const char* sql =
         "INSERT OR IGNORE INTO achievements(package_id,achievement_id,title,unlocked_at) VALUES(?,?,?,?);";
     sqlite3_stmt* raw = nullptr;
@@ -302,7 +294,7 @@ bool PlatformDatabase::SetSetting(const std::string& key,
                                   const std::string& value,
                                   std::wstring& error) const {
     DbHandle db;
-    if (!openDatabase(db, error) || !ensureSchema(db.get(), error)) return false;
+    if (!openDatabase(databasePath_, db, error) || !ensureSchema(db.get(), error)) return false;
     static constexpr const char* sql =
         "INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) "
         "ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at;";

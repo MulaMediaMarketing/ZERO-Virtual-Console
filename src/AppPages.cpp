@@ -51,32 +51,35 @@ void App::DrawEmptyState(const std::wstring& title, const std::wstring& body, fl
 
 void App::DrawStore(float width, float height) {
     (void)height;
+    const auto& products = store_.Products();
+    ClampStoreSelection(storeUx_, store_.State(), products.size());
+
     DrawTextLine(L"Store", 62, 154, 500, 60, true);
     DrawTextLine(L"ZERO Store", 64, 204, 300, 30, false, brushMuted_.Get());
-    const auto state = store_.State();
-    const auto& products = store_.Products();
-    if (state == StoreProviderState::Disconnected) {
+    if (storeUx_.mode == StoreExperienceMode::Disconnected) {
         DrawEmptyState(L"Store service is not connected", L"Catalog, checkout, entitlement, CDN, and publisher services will populate this destination when a real Store provider is connected. ZERO does not inject fake products or prices.", width);
         return;
     }
-    if (state == StoreProviderState::Error) {
+    if (storeUx_.mode == StoreExperienceMode::Error) {
         DrawEmptyState(L"ZERO Store is unavailable", L"The connected Store provider reported an error. Your installed library remains available while the service recovers.", width);
         return;
     }
-    if (products.empty()) {
+    if (storeUx_.mode == StoreExperienceMode::Empty) {
         DrawEmptyState(L"No products available", L"The Store provider is connected but returned no catalog entries.", width);
         return;
     }
+
+    const size_t end = std::min(products.size(), storeUx_.scrollOffset + storeUx_.visibleRows);
     float y = 280.0f;
-    const size_t count = std::min<size_t>(6, products.size());
-    for (size_t i = 0; i < count; ++i, y += 80.0f) {
+    for (size_t i = storeUx_.scrollOffset; i < end; ++i, y += 80.0f) {
         const auto& product = products[i];
         const auto rect = D2D1::RectF(62, y, width - 62, y + 64);
         DrawRoundedCard(rect, 18, brushCard_.Get());
+        if (i == storeUx_.selectedIndex) DrawFocusRing(rect, 18);
         DrawTextLine(Widen(product.title), 92, y + 10, 430, 30, false);
         DrawTextLine(Widen(product.shortDescription), 92, y + 34, width - 520, 24, false, brushMuted_.Get());
         std::wstring right = Widen(product.displayPrice);
-        if (product.entitlement == EntitlementState::Owned) right = L"Owned";
+        if (StoreProductIsOwned(product)) right = L"Owned";
         DrawTextLine(right, width - 260, y + 18, 170, 30, false, brushMuted_.Get());
     }
 }
@@ -84,39 +87,44 @@ void App::DrawStore(float width, float height) {
 void App::DrawFriends(float width, float height) {
     (void)height;
     const auto profile = identity_.CurrentProfile();
-    const auto state = friends_.State();
     const auto& list = friends_.Friends();
+    ClampFriendsExperience(friendsUx_, friends_.State(), list);
+
     DrawTextLine(L"Friends", 62, 154, 500, 60, true);
     DrawTextLine(L"Zero Link", 64, 204, 300, 30, false, brushMuted_.Get());
     DrawRoundedCard(D2D1::RectF(62, 265, width - 62, 370), 24, brushCard_.Get());
     DrawTextLine(profile.displayName.empty() ? L"Player" : Widen(profile.displayName), 92, 286, 420, 42, true);
     DrawTextLine(profile.zeroId.empty() ? L"Local identity unavailable" : Widen(profile.zeroId), 92, 330, width - 360, 30, false, brushMuted_.Get());
     DrawTextLine(profile.localOnly ? L"Local Zero ID" : L"Zero ID", width - 260, 298, 170, 30, false, brushMuted_.Get());
-    if (state == FriendsProviderState::Disconnected) {
+
+    if (friendsUx_.mode == FriendsExperienceMode::Disconnected) {
         DrawRoundedCard(D2D1::RectF(62, 395, width - 62, 590), 24, brushCard_.Get());
-        DrawTextLine(L"Zero Link is not connected", 92, 430, 520, 48, true);
-        DrawTextLine(L"Presence, requests, invites, joinability, and friend activity will appear here when a real social provider is connected. No placeholder users are shown.", 94, 490, width - 220, 70, false, brushMuted_.Get());
+        DrawTextLine(FriendsModeTitle(friendsUx_.mode).data(), 92, 430, 520, 48, true);
+        DrawTextLine(L"Presence, requests, invites, joinability, and friend activity will appear here when a real social provider is connected. No synthetic users are shown.", 94, 490, width - 220, 70, false, brushMuted_.Get());
         return;
     }
-    if (state == FriendsProviderState::Error) {
-        DrawEmptyState(L"Zero Link is unavailable", L"The social provider reported an error. ZERO keeps the rest of the console usable without inventing social data.", width);
+    if (friendsUx_.mode == FriendsExperienceMode::Error) {
+        DrawEmptyState(std::wstring(FriendsModeTitle(friendsUx_.mode)), L"The social provider reported an error. ZERO keeps the rest of the console usable without inventing social data.", width);
         return;
     }
-    if (list.empty()) {
-        DrawEmptyState(L"No friends to show", L"Zero Link is connected, but the provider returned no friend or presence records.", width);
+    if (friendsUx_.mode == FriendsExperienceMode::Empty) {
+        DrawEmptyState(std::wstring(FriendsModeTitle(friendsUx_.mode)), L"Zero Link is connected, but the provider returned no friend or presence records.", width);
         return;
     }
+
+    const size_t end = std::min(list.size(), friendsUx_.scrollOffset + friendsUx_.visibleRows);
     float y = 405.0f;
-    const size_t count = std::min<size_t>(5, list.size());
-    for (size_t i = 0; i < count; ++i, y += 66.0f) {
+    for (size_t i = friendsUx_.scrollOffset; i < end; ++i, y += 66.0f) {
         const auto& friendItem = list[i];
-        DrawRoundedCard(D2D1::RectF(62, y, width - 62, y + 52), 16, brushCard_.Get());
+        const auto rect = D2D1::RectF(62, y, width - 62, y + 52);
+        DrawRoundedCard(rect, 16, brushCard_.Get());
+        if (i == friendsUx_.selectedIndex) DrawFocusRing(rect, 16);
         DrawTextLine(Widen(friendItem.displayName), 90, y + 10, 360, 30, false);
         std::wstring presence = L"Offline";
         if (friendItem.presence == PresenceState::Online) presence = L"Online";
         else if (friendItem.presence == PresenceState::InGame)
             presence = friendItem.gamePackageId.empty() ? L"In game" : L"In game · " + Widen(friendItem.gamePackageId);
-        if (friendItem.joinable) presence += L" · Joinable";
+        if (FriendCanJoin(friendItem)) presence += L" · Joinable";
         DrawTextLine(presence, width - 500, y + 10, 410, 30, false, brushMuted_.Get());
     }
 }
@@ -124,18 +132,21 @@ void App::DrawFriends(float width, float height) {
 void App::DrawCaptures(float width, float height) {
     (void)height;
     const auto& items = captures_.Items();
+    ClampCaptureExperience(capturesUx_, items);
+
     DrawTextLine(L"Captures", 62, 154, 500, 60, true);
     DrawTextLine(std::to_wstring(items.size()) + L" local captures   ·   A View/Open   ·   X Delete   ·   Right Reveal", 64, 204, width - 128, 30, false, brushMuted_.Get());
-    if (items.empty()) {
+    if (capturesUx_.mode == CaptureExperienceMode::Empty) {
         DrawEmptyState(L"No captures yet", L"Screenshots and clips created through ZERO will appear here. No sample captures are injected.", width);
         return;
     }
-    const size_t end = std::min(items.size(), captureScroll_ + 6);
+
+    const size_t end = std::min(items.size(), capturesUx_.scrollOffset + capturesUx_.visibleRows);
     float y = 270.0f;
-    for (size_t i = captureScroll_; i < end; ++i, y += 78.0f) {
+    for (size_t i = capturesUx_.scrollOffset; i < end; ++i, y += 78.0f) {
         const auto& item = items[i];
         const auto rect = D2D1::RectF(62, y, width - 62, y + 62);
-        if (i == selectedCapture_) {
+        if (i == capturesUx_.selectedIndex) {
             DrawRoundedCard(rect, 18, brushAccent_.Get());
             ComPtr<ID2D1SolidColorBrush> white;
             target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
@@ -151,10 +162,11 @@ void App::DrawCaptures(float width, float height) {
 }
 
 void App::DrawCaptureViewer(float width, float height) {
-    if (!captureViewerVisible_) return;
+    if (capturesUx_.mode != CaptureExperienceMode::Viewer) return;
     const auto& items = captures_.Items();
-    if (items.empty() || selectedCapture_ >= items.size()) return;
-    const auto& item = items[selectedCapture_];
+    const auto selected = SelectedCaptureIndex(capturesUx_, items);
+    if (!selected) return;
+    const auto& item = items[*selected];
     ComPtr<ID2D1SolidColorBrush> veil;
     ComPtr<ID2D1SolidColorBrush> white;
     target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.94f), veil.GetAddressOf());
@@ -183,9 +195,10 @@ void App::DrawCaptureViewer(float width, float height) {
 }
 
 void App::DrawCaptureDeleteConfirm(float width, float height) {
-    if (!captureDeleteConfirm_) return;
+    if (capturesUx_.mode != CaptureExperienceMode::DeleteConfirm) return;
     const auto& items = captures_.Items();
-    if (items.empty() || selectedCapture_ >= items.size()) return;
+    const auto selected = SelectedCaptureIndex(capturesUx_, items);
+    if (!selected) return;
     ComPtr<ID2D1SolidColorBrush> veil;
     ComPtr<ID2D1SolidColorBrush> white;
     target_->CreateSolidColorBrush(D2D1::ColorF(0x000000, 0.70f), veil.GetAddressOf());
@@ -195,7 +208,7 @@ void App::DrawCaptureDeleteConfirm(float width, float height) {
     const float top = std::max(120.0f, height * 0.5f - 150.0f);
     DrawRoundedCard(D2D1::RectF(left, top, left + 660, top + 300), 28, brushAccent_.Get());
     DrawTextLine(L"Delete capture?", left + 40, top + 40, 520, 50, true, white.Get());
-    DrawTextLine(items[selectedCapture_].path.filename().wstring(), left + 40, top + 105, 580, 34, false, white.Get());
+    DrawTextLine(items[*selected].path.filename().wstring(), left + 40, top + 105, 580, 34, false, white.Get());
     DrawTextLine(L"This permanently removes the local capture file.", left + 40, top + 150, 580, 42, false, white.Get());
     const auto action = D2D1::RectF(left + 38, top + 214, left + 238, top + 264);
     DrawRoundedCard(action, 16, white.Get());
@@ -284,29 +297,32 @@ void App::Paint() {
     const float height = static_cast<float>(rc.bottom);
     DrawTextLine(L"ZERO", 42, 28, 180, 54, true);
     DrawTextLine(L"VIRTUAL CONSOLE", 44, 68, 210, 28, false, brushMuted_.Get());
-    const wchar_t* nav[] = {L"Home", L"Library", L"Store", L"Friends", L"Captures", L"Settings"};
+
     const float navStart = 300.0f;
     const float navStep = 128.0f;
-    const bool topLevel = page_ != Page::GameDetail && page_ != Page::Import && page_ != Page::Achievements;
-    for (size_t i = 0; i < 6; ++i) {
+    const bool topLevel = ProductionUxIsTopLevelPage(page_);
+    for (size_t i = 0; i < ProductionUxNavCount(); ++i) {
         const float x = navStart + static_cast<float>(i) * navStep;
         const auto rect = D2D1::RectF(x - 16, 38, x + 102, 82);
         if (navIndex_ == i) {
             DrawRoundedCard(rect, 18, brushCard_.Get());
             if (topLevel) DrawFocusRing(rect, 18);
         }
-        DrawTextLine(nav[i], x, 48, 104, 30, false);
+        DrawTextLine(std::wstring(kProductionUxNavigation[i].label), x, 48, 104, 30, false);
     }
+
     target_->SetTransform(D2D1::Matrix3x2F::Translation(0.0f, shellUx_.PageOffsetY()));
     const auto& games = registry_.Games();
+    ClampCoreShellSelection(coreShellUx_, games.size());
+
     if (page_ == Page::Home) {
         const auto profile = identity_.CurrentProfile();
         const std::string greetingName = profile.displayName.empty() ? settings_.profileName : profile.displayName;
         DrawTextLine(L"Good evening, " + Widen(greetingName), 62, 154, 700, 60, true);
         DrawTextLine(L"Your games. One calm console experience.", 64, 204, 650, 40, false, brushMuted_.Get());
-        if (games.empty()) DrawEmptyState(L"No games installed", L"Open Library, then use X to import a ZERO-compatible game folder.", width);
+        if (coreShellUx_.homeMode == HomeExperienceMode::Empty) DrawEmptyState(L"No games installed", L"Open Library, then use X to import a ZERO-compatible game folder.", width);
         else {
-            const auto& game = games[std::min(selectedGame_, games.size() - 1)];
+            const auto& game = games[coreShellUx_.selectedGame];
             const auto trustUi = PresentPackageTrust(runtime_.PackageTrust(game));
             const auto hero = D2D1::RectF(62, 285, width - 62, 620);
             DrawHeroArtwork(game, hero);
@@ -329,14 +345,14 @@ void App::Paint() {
     } else if (page_ == Page::Library) {
         DrawTextLine(L"Library", 62, 154, 500, 60, true);
         DrawTextLine(std::to_wstring(games.size()) + L" installed   ·   A Open   ·   X Import Game", 64, 204, 620, 30, false, brushMuted_.Get());
-        if (games.empty()) DrawEmptyState(L"Your library is empty", L"Press X to import a validated ZERO-compatible native game package.", width);
+        if (coreShellUx_.libraryMode == LibraryExperienceMode::Empty) DrawEmptyState(L"Your library is empty", L"Press X to import a validated ZERO-compatible native game package.", width);
         else {
             float y = 280.0f;
             const size_t count = std::min<size_t>(8, games.size());
             for (size_t i = 0; i < count; ++i, y += 78.0f) {
                 const auto trustUi = PresentPackageTrust(runtime_.PackageTrust(games[i]));
                 const auto rect = D2D1::RectF(62, y, width - 62, y + 62);
-                if (i == selectedGame_) { DrawRoundedCard(rect, 18, brushCard_.Get()); DrawFocusRing(rect, 18); }
+                if (i == coreShellUx_.selectedGame) { DrawRoundedCard(rect, 18, brushCard_.Get()); DrawFocusRing(rect, 18); }
                 DrawTextLine(Widen(games[i].title), 92, y + 9, 540, 28, false);
                 DrawTextLine(trustUi.shortLabel, 92, y + 34, 360, 22, false, brushMuted_.Get());
                 DrawTextLine(Widen(games[i].version), width - 250, y + 14, 120, 30, false, brushMuted_.Get());
@@ -348,12 +364,13 @@ void App::Paint() {
     else if (page_ == Page::Settings) DrawSettings(width, height);
     else if (page_ == Page::Achievements) DrawAchievements(width, height);
     else if (page_ == Page::GameDetail && !games.empty()) {
-        const auto& game = games[std::min(selectedGame_, games.size() - 1)];
+        const auto& game = games[coreShellUx_.selectedGame];
         const auto platform = runtime_.PlatformState(game.packageId);
         const auto achievements = runtime_.Achievements(game.packageId);
         const auto resume = game.zeroResume ? resumeStore_.Load(game.packageId) : std::nullopt;
         const auto trust = runtime_.PackageTrust(game);
         const auto trustUi = PresentPackageTrust(trust);
+        const auto detailAction = GameDetailAction(trustUi.blocked, game.zeroResume, resume.has_value(), preferResume_);
         const float split = std::max(760.0f, width - 470.0f);
         const auto hero = D2D1::RectF(62, 150, split, 535);
         DrawHeroArtwork(game, hero);
@@ -368,12 +385,12 @@ void App::Paint() {
         DrawTextLine(trustUi.shortLabel, 106, 337, split - 180, 30, false, white.Get());
         const auto playRect = D2D1::RectF(104, 430, 282, 488);
         DrawRoundedCard(playRect, 20, preferResume_ && resume ? brushCard_.Get() : white.Get());
-        DrawTextLine(trustUi.blocked ? L"Blocked" : L"Play", trustUi.blocked ? 151 : 166, 446, 110, 30, false, brushText_.Get());
+        DrawTextLine(detailAction == GameDetailPrimaryAction::Blocked ? L"Blocked" : L"Play", detailAction == GameDetailPrimaryAction::Blocked ? 151.0f : 166.0f, 446, 110, 30, false, brushText_.Get());
         if (!resume || !preferResume_) DrawFocusRing(playRect, 20, false);
         if (resume) {
             const auto resumeRect = D2D1::RectF(300, 430, 500, 488);
             DrawRoundedCard(resumeRect, 20, preferResume_ ? white.Get() : brushCard_.Get());
-            DrawTextLine(trustUi.blocked ? L"Blocked" : L"Resume", trustUi.blocked ? 345 : 354, 446, 120, 30, false, brushText_.Get());
+            DrawTextLine(detailAction == GameDetailPrimaryAction::Blocked ? L"Blocked" : L"Resume", detailAction == GameDetailPrimaryAction::Blocked ? 345.0f : 354.0f, 446, 120, 30, false, brushText_.Get());
             if (preferResume_) DrawFocusRing(resumeRect, 20, false);
         }
         const float cardLeft = split + 20.0f;
@@ -408,8 +425,8 @@ void App::Paint() {
         DrawTextLine(trustUi.blocked
             ? L"Launch blocked by package trust   ·   X Achievements   ·   B Library"
             : (resume ? L"Left / Right  Choose Play or Resume   ·   A Launch   ·   X Achievements   ·   B Library" : L"A Play   ·   X Achievements   ·   B Library"),
-            64, resume ? 730 : 670, width - 128, 32, false, brushMuted_.Get());
-        if (!status_.empty()) DrawTextLine(status_, 64, resume ? 770 : 716, width - 128, 42, false, brushMuted_.Get());
+            64, resume ? 730.0f : 670.0f, width - 128, 32, false, brushMuted_.Get());
+        if (!status_.empty()) DrawTextLine(status_, 64, resume ? 770.0f : 716.0f, width - 128, 42, false, brushMuted_.Get());
     } else if (page_ == Page::Import) {
         DrawTextLine(L"Import a game", 62, 154, 600, 60, true);
         DrawTextLine(L"Add a folder that contains a valid zero.manifest.json and native Windows game executable.", 64, 214, width - 128, 48, false, brushMuted_.Get());

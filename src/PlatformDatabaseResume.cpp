@@ -1,28 +1,13 @@
 #include "PlatformDatabase.h"
 #include <winsqlite/winsqlite3.h>
-#include <windows.h>
-#include <shlobj.h>
-#include <filesystem>
 
 namespace zero {
-namespace {
-std::filesystem::path dbPath() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO" / "Data" / "zero.db";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "Data" / "zero.db";
-}
-}
 
 bool PlatformDatabase::ClearResume(const std::string& packageId, std::wstring& error) const {
     if (!Initialize(error)) return false;
 
     sqlite3* db = nullptr;
-    const auto path = dbPath();
-    if (sqlite3_open16(path.c_str(), &db) != SQLITE_OK) {
+    if (sqlite3_open16(databasePath_.c_str(), &db) != SQLITE_OK) {
         if (db) sqlite3_close(db);
         error = L"ZERO could not open the platform database to clear Resume metadata.";
         return false;

@@ -1,8 +1,8 @@
 #include "CrashReportStore.h"
+#include "PlatformPaths.h"
 #include <chrono>
 #include <fstream>
 #include <iomanip>
-#include <shlobj.h>
 #include <sstream>
 
 namespace zero {
@@ -32,13 +32,7 @@ std::string utcNow() {
 }
 
 std::filesystem::path CrashReportStore::Root() const {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path root = std::filesystem::path(p) / "ZERO" / "CrashReports";
-        CoTaskMemFree(p);
-        return root;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "CrashReports";
+    return PlatformPaths::CrashReportsRoot();
 }
 
 bool CrashReportStore::Save(const CrashReport& report, std::wstring& error) const {

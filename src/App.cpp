@@ -1,5 +1,5 @@
 #include "App.h"
-#include <shlobj.h>
+#include "PlatformPaths.h"
 #include <shobjidl.h>
 #include <algorithm>
 #include <filesystem>
@@ -7,40 +7,19 @@
 using Microsoft::WRL::ComPtr;
 
 namespace zero {
-namespace {
-std::filesystem::path localRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::current_path() / "ZeroData";
-}
-
-App::Page pageForNavIndex(size_t index) {
-    switch (index) {
-        case 0: return App::Page::Home;
-        case 1: return App::Page::Library;
-        case 2: return App::Page::Store;
-        case 3: return App::Page::Friends;
-        case 4: return App::Page::Captures;
-        default: return App::Page::Settings;
-    }
-}
-}
 
 App::App(HINSTANCE instance)
     : instance_(instance),
-      registry_(localRoot() / "Library"),
-      importer_(localRoot() / "Library"),
-      captures_(localRoot() / "Captures"),
-      identity_(localRoot()),
-      settingsStore_(localRoot()) {}
+      registry_(PlatformPaths::LibraryRoot()),
+      importer_(PlatformPaths::LibraryRoot()),
+      captures_(PlatformPaths::CapturesRoot()),
+      identity_(PlatformPaths::DataRoot()),
+      settingsStore_(PlatformPaths::DataRoot()) {}
 
 int App::Run() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     settings_ = settingsStore_.Load();
+    settings_.volume = ClampVolume(settings_.volume);
     shellUx_.SetReducedMotion(settings_.reducedMotion);
     lastTick_ = std::chrono::steady_clock::now();
 
@@ -50,6 +29,12 @@ int App::Run() {
     store_.Refresh();
     registry_.Refresh();
     captures_.Refresh();
+
+    ClampFriendsExperience(friendsUx_, friends_.State(), friends_.Friends());
+    ClampStoreSelection(storeUx_, store_.State(), store_.Products().size());
+    ClampCoreShellSelection(coreShellUx_, registry_.Games().size());
+    ClampCaptureExperience(capturesUx_, captures_.Items());
+    ClampSettingsSelection(settingsUx_);
 
     if (!InitWindow() || !InitGraphics()) return 1;
     ShowWindow(hwnd_, SW_SHOW);
@@ -193,21 +178,6 @@ std::wstring App::Widen(const std::string& text) const {
     return out;
 }
 
-void App::ClampCaptureSelection() {
-    const auto count = captures_.Items().size();
-    if (count == 0) {
-        selectedCapture_ = 0;
-        captureScroll_ = 0;
-        return;
-    }
-    if (selectedCapture_ >= count) selectedCapture_ = count - 1;
-    constexpr size_t visible = 6;
-    if (selectedCapture_ < captureScroll_) captureScroll_ = selectedCapture_;
-    if (selectedCapture_ >= captureScroll_ + visible) captureScroll_ = selectedCapture_ - visible + 1;
-    const size_t maxStart = count > visible ? count - visible : 0;
-    captureScroll_ = std::min(captureScroll_, maxStart);
-}
-
 void App::SetOverlayVisible(bool visible) {
     if (visible) {
         if (overlayVisible_ && !overlayClosing_) return;
@@ -264,104 +234,100 @@ void App::NavigateTo(Page next) {
         NotifyFocusMoved();
     }
     status_.clear();
-    captureViewerVisible_ = false;
-    captureDeleteConfirm_ = false;
+    CancelCaptureModal(capturesUx_, captures_.Items());
 
     if (next == Page::Captures) {
         captures_.Refresh();
-        ClampCaptureSelection();
+        ClampCaptureExperience(capturesUx_, captures_.Items());
     } else if (next == Page::Friends) {
         friends_.Refresh();
+        ClampFriendsExperience(friendsUx_, friends_.State(), friends_.Friends());
     } else if (next == Page::Store) {
         store_.Refresh();
+        ClampStoreSelection(storeUx_, store_.State(), store_.Products().size());
     } else if (next == Page::Achievements) {
         ClampAchievementSelection();
     } else if (next == Page::Settings) {
+        ClampSettingsSelection(settingsUx_);
         RefreshSettingsTelemetry();
+    } else if (next == Page::Home || next == Page::Library || next == Page::GameDetail) {
+        ClampCoreShellSelection(coreShellUx_, registry_.Games().size());
     }
 }
 
 void App::HandleCaptureInput(const InputSnapshot& in) {
     const auto& items = captures_.Items();
+    ClampCaptureExperience(capturesUx_, items);
 
-    if (captureDeleteConfirm_) {
+    if (capturesUx_.mode == CaptureExperienceMode::DeleteConfirm) {
         if (in.back) {
-            captureDeleteConfirm_ = false;
+            CancelCaptureModal(capturesUx_, items);
             NotifyFocusMoved();
             return;
         }
-        if (in.select && !items.empty() && selectedCapture_ < items.size()) {
+        const auto selected = SelectedCaptureIndex(capturesUx_, items);
+        if (in.select && selected) {
             std::wstring error;
-            const auto item = items[selectedCapture_];
+            const auto item = items[*selected];
             if (captures_.Delete(item, error)) {
                 status_ = L"Capture deleted.";
-                captureDeleteConfirm_ = false;
-                captureViewerVisible_ = false;
                 cachedCapture_.Reset();
                 cachedCapturePath_.clear();
-                ClampCaptureSelection();
+                OnCaptureDeleted(capturesUx_, captures_.Items());
                 NotifyFocusMoved();
             } else {
                 status_ = error;
-                captureDeleteConfirm_ = false;
+                CancelCaptureModal(capturesUx_, captures_.Items());
             }
         }
         return;
     }
 
-    if (captureViewerVisible_) {
+    if (capturesUx_.mode == CaptureExperienceMode::Viewer) {
         if (in.back) {
-            captureViewerVisible_ = false;
+            CancelCaptureModal(capturesUx_, items);
             NotifyFocusMoved();
             return;
         }
-        if (items.empty() || selectedCapture_ >= items.size()) {
-            captureViewerVisible_ = false;
+        const auto selected = SelectedCaptureIndex(capturesUx_, items);
+        if (!selected) {
+            CancelCaptureModal(capturesUx_, items);
             return;
         }
         if (in.action) {
-            captureDeleteConfirm_ = true;
-            NotifyFocusMoved();
+            if (BeginCaptureDelete(capturesUx_, items)) NotifyFocusMoved();
             return;
         }
         if (in.right) {
             std::wstring error;
-            if (!captures_.Reveal(items[selectedCapture_], error)) status_ = error;
-            return;
+            if (!captures_.Reveal(items[*selected], error)) status_ = error;
         }
         return;
     }
 
     if (items.empty()) return;
-    if (in.up && selectedCapture_ > 0) {
-        --selectedCapture_;
-        ClampCaptureSelection();
-        NotifyFocusMoved();
-    }
-    if (in.down && selectedCapture_ + 1 < items.size()) {
-        ++selectedCapture_;
-        ClampCaptureSelection();
-        NotifyFocusMoved();
-    }
-    if (in.select && selectedCapture_ < items.size()) {
-        const auto& item = items[selectedCapture_];
-        if (item.kind == CaptureKind::Screenshot) {
-            captureViewerVisible_ = true;
-            cachedCapture_.Reset();
-            cachedCapturePath_.clear();
-            NotifyFocusMoved();
-        } else {
+    if (in.up && MoveCaptureSelectionUp(capturesUx_, items)) NotifyFocusMoved();
+    if (in.down && MoveCaptureSelectionDown(capturesUx_, items)) NotifyFocusMoved();
+
+    const auto selected = SelectedCaptureIndex(capturesUx_, items);
+    if (!selected) return;
+    if (in.select) {
+        const auto& item = items[*selected];
+        if (CaptureCanViewInline(item)) {
+            if (OpenCaptureViewer(capturesUx_, items)) {
+                cachedCapture_.Reset();
+                cachedCapturePath_.clear();
+                NotifyFocusMoved();
+            }
+        } else if (CaptureCanOpenExternally(item)) {
             std::wstring error;
             if (!captures_.Open(item, error)) status_ = error;
         }
     }
-    if (in.action && selectedCapture_ < items.size()) {
-        captureDeleteConfirm_ = true;
-        NotifyFocusMoved();
-    }
-    if (in.right && selectedCapture_ < items.size()) {
+    if (in.action && BeginCaptureDelete(capturesUx_, items)) NotifyFocusMoved();
+    if (in.right) {
         std::wstring error;
-        if (!captures_.Reveal(items[selectedCapture_], error)) status_ = error;
+        if (!captures_.Reveal(items[*selected], error)) status_ = error;
     }
 }
 
@@ -371,7 +337,8 @@ void App::HandleInput(const InputSnapshot& in) {
         return;
     }
 
-    if (captureDeleteConfirm_ || captureViewerVisible_) {
+    if (capturesUx_.mode == CaptureExperienceMode::DeleteConfirm ||
+        capturesUx_.mode == CaptureExperienceMode::Viewer) {
         HandleCaptureInput(in);
         return;
     }
@@ -396,11 +363,11 @@ void App::HandleInput(const InputSnapshot& in) {
                 SetOverlayVisible(false);
             } else if (overlayIndex_ == 1) {
                 SetOverlayVisible(false);
-                navIndex_ = 3;
+                navIndex_ = ProductionUxIndex(ProductionUxDestination::Friends);
                 NavigateTo(Page::Friends);
             } else if (overlayIndex_ == 2) {
                 SetOverlayVisible(false);
-                navIndex_ = 4;
+                navIndex_ = ProductionUxIndex(ProductionUxDestination::Captures);
                 NavigateTo(Page::Captures);
             } else if (overlayIndex_ == 3) {
                 OpenAchievements(runtime_.Info().packageId, page_, true);
@@ -427,15 +394,41 @@ void App::HandleInput(const InputSnapshot& in) {
         if (in.up || in.down || in.select || in.action || in.right) return;
     }
 
+    if (page_ == Page::Friends && !(in.shoulderLeft || in.shoulderRight)) {
+        const auto& list = friends_.Friends();
+        if (in.up && MoveFriendSelectionUp(friendsUx_, friends_.State(), list)) NotifyFocusMoved();
+        if (in.down && MoveFriendSelectionDown(friendsUx_, friends_.State(), list)) NotifyFocusMoved();
+        if (in.select) {
+            const auto* selected = SelectedFriend(friendsUx_, friends_.State(), list);
+            if (selected && FriendCanJoin(*selected))
+                status_ = L"Joinable presence is available, but the online join transport is not connected in this build.";
+        }
+        if (in.up || in.down || in.select) return;
+    }
+
+    if (page_ == Page::Store && !(in.shoulderLeft || in.shoulderRight)) {
+        const auto count = store_.Products().size();
+        if (in.up && MoveStoreSelectionUp(storeUx_, store_.State(), count)) NotifyFocusMoved();
+        if (in.down && MoveStoreSelectionDown(storeUx_, store_.State(), count)) NotifyFocusMoved();
+        if (in.select && storeUx_.mode == StoreExperienceMode::Browsing && storeUx_.selectedIndex < count) {
+            const auto& product = store_.Products()[storeUx_.selectedIndex];
+            if (StoreProductIsOwned(product)) status_ = L"This product is already owned.";
+            else if (StoreProductCanLaunchPurchase(product)) status_ = L"Store purchase transport is not connected in this build.";
+            else status_ = L"This product does not expose a valid purchase action.";
+        }
+        if (in.up || in.down || in.select) return;
+    }
+
     if (page_ == Page::Settings && !(in.shoulderLeft || in.shoulderRight)) {
-        const bool volumeHorizontal = selectedSetting_ == 1 && (in.left || in.right);
+        const bool volumeHorizontal = settingsUx_.selectedRow == static_cast<size_t>(SettingsExperienceRow::Volume) && (in.left || in.right);
         HandleSettingsInput(in);
         if (in.up || in.down || in.select || in.action || volumeHorizontal) return;
     }
 
     const auto gameCount = registry_.Games().size();
+    ClampCoreShellSelection(coreShellUx_, gameCount);
     if (page_ == Page::GameDetail && gameCount) {
-        const auto& game = registry_.Games()[std::min(selectedGame_, gameCount - 1)];
+        const auto& game = registry_.Games()[coreShellUx_.selectedGame];
         const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
         if (hasResume && in.left && preferResume_) {
             preferResume_ = false;
@@ -450,13 +443,19 @@ void App::HandleInput(const InputSnapshot& in) {
             return;
         }
     } else {
-        if ((in.left || in.shoulderLeft) && navIndex_ > 0) {
-            --navIndex_;
-            NavigateTo(pageForNavIndex(navIndex_));
+        if (in.left || in.shoulderLeft) {
+            const auto next = ProductionUxMoveLeft(navIndex_);
+            if (next != navIndex_) {
+                navIndex_ = next;
+                NavigateTo(ProductionUxPageAt(navIndex_));
+            }
         }
-        if ((in.right || in.shoulderRight) && navIndex_ < 5) {
-            ++navIndex_;
-            NavigateTo(pageForNavIndex(navIndex_));
+        if (in.right || in.shoulderRight) {
+            const auto next = ProductionUxMoveRight(navIndex_);
+            if (next != navIndex_) {
+                navIndex_ = next;
+                NavigateTo(ProductionUxPageAt(navIndex_));
+            }
         }
     }
 
@@ -464,14 +463,8 @@ void App::HandleInput(const InputSnapshot& in) {
         if (in.action) {
             NavigateTo(Page::Import);
         } else if (gameCount) {
-            if (in.up && selectedGame_ > 0) {
-                --selectedGame_;
-                NotifyFocusMoved();
-            }
-            if (in.down && selectedGame_ + 1 < gameCount) {
-                ++selectedGame_;
-                NotifyFocusMoved();
-            }
+            if (in.up && MoveGameSelectionUp(coreShellUx_, gameCount)) NotifyFocusMoved();
+            if (in.down && MoveGameSelectionDown(coreShellUx_, gameCount)) NotifyFocusMoved();
             if (in.select) {
                 preferResume_ = true;
                 NavigateTo(Page::GameDetail);
@@ -480,7 +473,7 @@ void App::HandleInput(const InputSnapshot& in) {
     } else if (page_ == Page::Import && in.select) {
         ImportGameFolder();
     } else if (page_ == Page::Home && in.select && gameCount) {
-        const auto& game = registry_.Games()[std::min(selectedGame_, gameCount - 1)];
+        const auto& game = registry_.Games()[coreShellUx_.selectedGame];
         const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
         LaunchSelected(hasResume);
     } else if (page_ == Page::GameDetail && in.select && gameCount) {
@@ -489,10 +482,10 @@ void App::HandleInput(const InputSnapshot& in) {
 
     if (in.back) {
         if (page_ == Page::GameDetail || page_ == Page::Import) {
-            navIndex_ = 1;
+            navIndex_ = ProductionUxIndex(ProductionUxDestination::Library);
             NavigateTo(Page::Library);
         } else if (page_ != Page::Home) {
-            navIndex_ = 0;
+            navIndex_ = ProductionUxIndex(ProductionUxDestination::Home);
             NavigateTo(Page::Home);
         }
     }
@@ -535,16 +528,18 @@ void App::ImportGameFolder() {
     }
 
     registry_.Refresh();
-    selectedGame_ = registry_.Games().empty() ? 0 : registry_.Games().size() - 1;
-    navIndex_ = 1;
+    coreShellUx_.selectedGame = registry_.Games().empty() ? 0 : registry_.Games().size() - 1;
+    ClampCoreShellSelection(coreShellUx_, registry_.Games().size());
+    navIndex_ = ProductionUxIndex(ProductionUxDestination::Library);
     NavigateTo(Page::Library);
     status_ = L"Game imported successfully.";
 }
 
 void App::LaunchSelected(bool useResume) {
     const auto& games = registry_.Games();
-    if (games.empty() || selectedGame_ >= games.size()) return;
-    const auto& game = games[selectedGame_];
+    ClampCoreShellSelection(coreShellUx_, games.size());
+    if (games.empty() || coreShellUx_.selectedGame >= games.size()) return;
+    const auto& game = games[coreShellUx_.selectedGame];
 
     const auto trust = runtime_.PackageTrust(game);
     if (!trust.launchAllowed) {
@@ -611,7 +606,11 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
                 captures_.Refresh();
                 friends_.Refresh();
                 store_.Refresh();
-                ClampCaptureSelection();
+                ClampCoreShellSelection(coreShellUx_, registry_.Games().size());
+                ClampCaptureExperience(capturesUx_, captures_.Items());
+                ClampFriendsExperience(friendsUx_, friends_.State(), friends_.Friends());
+                ClampStoreSelection(storeUx_, store_.State(), store_.Products().size());
+                ClampSettingsSelection(settingsUx_);
                 ClampAchievementSelection();
                 RefreshSettingsTelemetry();
                 cachedHero_.Reset();

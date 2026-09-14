@@ -1,22 +1,11 @@
 #include "App.h"
 #include "FirstBootService.h"
 #include "FirstBootWizard.h"
+#include "PlatformPaths.h"
 #include "Settings.h"
 #include <windows.h>
-#include <shlobj.h>
-#include <filesystem>
 
 namespace {
-std::filesystem::path zeroRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path root = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return root;
-    }
-    return std::filesystem::current_path() / "ZeroData";
-}
-
 bool applyFirstBootSettings(const std::filesystem::path& root, const zero::FirstBootState& state) {
     zero::SettingsStore settingsStore(root);
     auto settings = settingsStore.Load();
@@ -27,7 +16,11 @@ bool applyFirstBootSettings(const std::filesystem::path& root, const zero::First
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
-    const auto root = zeroRoot();
+    // ZERO owns its physical-pixel layout and must not be virtualized by Windows when
+    // moving between displays or running at 125/150/200% scale.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
+    const auto root = zero::PlatformPaths::DataRoot();
     zero::FirstBootService firstBoot(root);
     if (firstBoot.IsRequired()) {
         zero::FirstBootWizard wizard(hInstance, firstBoot);
