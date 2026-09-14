@@ -27,6 +27,7 @@ $files = @(
   "Release/ZeroCapturesExperienceAcceptance.exe",
   "Release/ZeroCoreShellExperienceAcceptance.exe",
   "Release/ZeroStoreSettingsFirstBootAcceptance.exe",
+  "Release/ZeroFirstBootPersistenceAcceptance.exe",
   "Release/ZeroQualificationProbe.exe",
   "ReferencePackage/ZeroReferenceGame.exe",
   "ReferencePackage/zero.manifest.json",
@@ -70,7 +71,7 @@ $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
 }
 
 $manifest = [ordered]@{
-  schema = 2
+  schema = 3
   product = "ZERO Virtual Console"
   milestone = "M1 / Runtime V4.1 / Production Architecture"
   commit = $commit
@@ -78,14 +79,16 @@ $manifest = [ordered]@{
   architecture_result = $architecture.result
   automated_acceptance_result = $acceptance.automated_result
   architecture_metrics = $architecture.source_metrics
-  acceptance_metrics = $architecture.acceptance_metrics
+  acceptance_contract_metrics = $architecture.acceptance_metrics
+  acceptance_performance_metrics = $acceptance.performance_metrics
+  shell_metric = $architecture.shell_metric
   rc_qualified = $false
   rc_qualification_note = "Bundle is release-candidate material only until physical Windows 11 x64 and controller qualification passes for this exact commit."
   files = $manifestEntries.ToArray()
 }
 
 $manifestPath = Join-Path $OutputDir "release-manifest.json"
-$manifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 -Path $manifestPath
+$manifest | ConvertTo-Json -Depth 12 | Set-Content -Encoding UTF8 -Path $manifestPath
 
 $zipPath = Join-Path (Split-Path -Parent $OutputDir) "ZERO-Virtual-Console-Windows-x64-RC.zip"
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
@@ -97,4 +100,5 @@ Write-Host "ZERO release manifest: $manifestPath"
 Write-Host "ZERO RC archive: $zipPath"
 Write-Host "ZERO production architecture: $($architecture.result)"
 Write-Host "ZERO automated acceptance: $($acceptance.automated_result)"
+Write-Host "ZERO acceptance runtime: $($acceptance.performance_metrics.total_acceptance_duration_ms) ms"
 Write-Host "ZERO RC qualification: PENDING PHYSICAL ACCEPTANCE"
