@@ -126,7 +126,9 @@ private:
     void OpenSettingsLocation(bool diagnosticsOnly);
     void ImportGameFolder();
     void EnterBorderlessFullscreen();
+    void RestoreShellForeground();
     void SetOverlayVisible(bool visible);
+    bool ShellContentOwnsFocus() const noexcept;
     void ClampCaptureSelection();
     void NotifyFocusMoved();
     Microsoft::WRL::ComPtr<ID2D1Bitmap> LoadBitmap(const std::filesystem::path& path);
