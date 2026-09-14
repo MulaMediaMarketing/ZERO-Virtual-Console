@@ -1,22 +1,9 @@
 #include "MilestoneAcceptance.h"
-#include <shlobj.h>
-#include <filesystem>
+#include "PlatformPaths.h"
 #include <iostream>
 
-namespace {
-std::filesystem::path zeroRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path root = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return root;
-    }
-    return std::filesystem::current_path() / "ZeroData";
-}
-}
-
 int wmain() {
-    zero::MilestoneAcceptance acceptance(zeroRoot());
+    zero::MilestoneAcceptance acceptance(zero::PlatformPaths::DataRoot());
     const auto checks = acceptance.Run();
     std::cout << "ZERO Console Experience Milestone 1 Acceptance\n";
     std::cout << "================================================\n";
