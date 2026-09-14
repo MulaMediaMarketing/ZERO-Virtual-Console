@@ -1,25 +1,15 @@
 #include "RuntimeV3.h"
+#include "PlatformPaths.h"
 #include <bcrypt.h>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
-#include <shlobj.h>
 #include <sstream>
 #include <vector>
 #pragma comment(lib, "bcrypt.lib")
 
 namespace zero {
 namespace {
-
-std::filesystem::path zeroDataRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path out = std::filesystem::path(p) / "ZERO";
-        CoTaskMemFree(p);
-        return out;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO";
-}
 
 std::string utf8(const std::wstring& value) {
     if (value.empty()) return {};
@@ -51,18 +41,13 @@ std::string hexString(const std::string& value) {
 
 std::string RuntimeV3::CreateAuthToken() const {
     unsigned char bytes[32]{};
-    if (BCryptGenRandom(nullptr, bytes, sizeof(bytes), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
-        return {};
-    }
+    if (BCryptGenRandom(nullptr, bytes, sizeof(bytes), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) return {};
     return hex(bytes, sizeof(bytes));
 }
 
 bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
                        const std::optional<ResumeMetadata>& launchResume) {
-    if (IsActive()) {
-        error = L"A game session is already active.";
-        return false;
-    }
+    if (IsActive()) { error = L"A game session is already active."; return false; }
 
     ready_.store(false);
     outcome_.store(RuntimeOutcome::Starting);
@@ -172,7 +157,7 @@ bool RuntimeV3::Launch(const GameManifest& game, std::wstring& error,
 void RuntimeV3::PersistPlaytime() const {
     if (activeGame_.packageId.empty()) return;
     std::error_code ec;
-    const auto dir = zeroDataRoot() / "Playtime";
+    const auto dir = PlatformPaths::DataRoot() / L"Playtime";
     std::filesystem::create_directories(dir, ec);
     if (ec) return;
     std::ofstream f(dir / (std::filesystem::path(activeGame_.packageId) += L".txt"), std::ios::trunc);
@@ -180,10 +165,7 @@ void RuntimeV3::PersistPlaytime() const {
 }
 
 void RuntimeV3::Poll() {
-    if (v2_.HasAbnormalExit()) {
-        v2_.CaptureDiagnosticDump();
-    }
-
+    if (v2_.HasAbnormalExit()) v2_.CaptureDiagnosticDump();
     v2_.Poll();
 
     const bool isReady = ready_.load();
