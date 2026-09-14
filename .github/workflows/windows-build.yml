@@ -67,6 +67,10 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroV5RuntimeAuthorityAcceptance.exe
 
+      - name: Validate V5 native process supervisor and secure IPC
+        shell: pwsh
+        run: ./build/Release/ZeroV5NativeRuntimeAcceptance.exe
+
       - name: Validate production shell navigation contract
         shell: pwsh
         run: ./build/Release/ZeroProductionUxAcceptance.exe
@@ -143,6 +147,8 @@ jobs:
             build/Release/ZeroV5CoreArchitectureAcceptance.exe
             build/Release/ZeroV5ProductionPackageAcceptance.exe
             build/Release/ZeroV5RuntimeAuthorityAcceptance.exe
+            build/Release/ZeroV5NativeRuntimeAcceptance.exe
+            build/Release/ZeroV5RuntimeChild.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
             build/DependencyReports/**
