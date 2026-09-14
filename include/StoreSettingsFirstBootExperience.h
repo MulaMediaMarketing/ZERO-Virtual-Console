@@ -3,6 +3,7 @@
 #include "FirstBootService.h"
 #include "StoreProvider.h"
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <string_view>
 
@@ -36,6 +37,8 @@ enum class FirstBootExperienceMode {
 struct StoreExperienceState {
     StoreExperienceMode mode{StoreExperienceMode::Disconnected};
     std::size_t selectedIndex{0};
+    std::size_t scrollOffset{0};
+    std::size_t visibleRows{6};
 };
 
 struct SettingsExperienceState {
@@ -63,11 +66,38 @@ inline void ClampStoreSelection(StoreExperienceState& state,
                                 StoreProviderState providerState,
                                 std::size_t productCount) noexcept {
     state.mode = StoreModeFor(providerState, productCount);
+    if (state.visibleRows == 0) state.visibleRows = 1;
     if (state.mode != StoreExperienceMode::Browsing) {
         state.selectedIndex = 0;
+        state.scrollOffset = 0;
         return;
     }
     if (state.selectedIndex >= productCount) state.selectedIndex = productCount - 1;
+    if (state.selectedIndex < state.scrollOffset) state.scrollOffset = state.selectedIndex;
+    if (state.selectedIndex >= state.scrollOffset + state.visibleRows)
+        state.scrollOffset = state.selectedIndex - state.visibleRows + 1;
+    const auto maxStart = productCount > state.visibleRows ? productCount - state.visibleRows : 0;
+    state.scrollOffset = std::min(state.scrollOffset, maxStart);
+}
+
+inline bool MoveStoreSelectionUp(StoreExperienceState& state,
+                                 StoreProviderState providerState,
+                                 std::size_t productCount) noexcept {
+    ClampStoreSelection(state, providerState, productCount);
+    if (state.mode != StoreExperienceMode::Browsing || state.selectedIndex == 0) return false;
+    --state.selectedIndex;
+    ClampStoreSelection(state, providerState, productCount);
+    return true;
+}
+
+inline bool MoveStoreSelectionDown(StoreExperienceState& state,
+                                   StoreProviderState providerState,
+                                   std::size_t productCount) noexcept {
+    ClampStoreSelection(state, providerState, productCount);
+    if (state.mode != StoreExperienceMode::Browsing || state.selectedIndex + 1 >= productCount) return false;
+    ++state.selectedIndex;
+    ClampStoreSelection(state, providerState, productCount);
+    return true;
 }
 
 inline constexpr std::size_t SettingsRowCount() noexcept {
@@ -102,26 +132,31 @@ inline constexpr int AdjustVolume(int volume, int delta) noexcept {
     return ClampVolume(volume + delta);
 }
 
-inline constexpr bool FirstBootRequirementsSatisfied(const FirstBootState& state) noexcept {
-    return !state.profileName.empty() &&
+inline bool FirstBootProfileValid(const std::string& value) noexcept {
+    if (value.empty() || value.size() > 64) return false;
+    return std::any_of(value.begin(), value.end(), [](unsigned char c) { return !std::isspace(c); });
+}
+
+inline bool FirstBootRequirementsSatisfied(const FirstBootState& state) noexcept {
+    return FirstBootProfileValid(state.profileName) &&
            state.controllerConfirmed &&
            state.displayConfirmed &&
            state.audioConfirmed &&
            state.volume <= 100;
 }
 
-inline constexpr FirstBootExperienceMode FirstBootModeFor(const FirstBootState& state) noexcept {
+inline FirstBootExperienceMode FirstBootModeFor(const FirstBootState& state) noexcept {
     if (state.completed && FirstBootRequirementsSatisfied(state)) return FirstBootExperienceMode::Complete;
     if (state.controllerConfirmed || state.displayConfirmed || state.audioConfirmed || state.profileName != "Player")
         return FirstBootExperienceMode::InProgress;
     return FirstBootExperienceMode::Required;
 }
 
-inline constexpr bool FirstBootCanComplete(const FirstBootState& state) noexcept {
+inline bool FirstBootCanComplete(const FirstBootState& state) noexcept {
     return !state.completed && FirstBootRequirementsSatisfied(state);
 }
 
-inline constexpr FirstBootState NormalizeFirstBootState(FirstBootState state) noexcept {
+inline FirstBootState NormalizeFirstBootState(FirstBootState state) noexcept {
     if (state.volume > 100) state.volume = 100;
     if (!FirstBootRequirementsSatisfied(state)) state.completed = false;
     return state;
