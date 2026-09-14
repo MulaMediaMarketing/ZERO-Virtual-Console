@@ -35,8 +35,8 @@ foreach ($file in $sourceFiles) {
   }
 }
 
-# Debt markers are enforced in executable/configuration source, not prose documentation,
-# where the words may legitimately appear while describing the policy itself.
+# Debt markers are enforced in product/build source. The architecture gate excludes
+# itself because the rule definitions necessarily contain the banned tokens.
 $scanFiles = @(Get-ChildItem -Path $SourceRoot -Recurse -File | Where-Object {
   $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".ps1", ".yml", ".yaml") -and
   $_.FullName -notmatch "[\\/](build|\.git)[\\/]"
@@ -44,9 +44,10 @@ $scanFiles = @(Get-ChildItem -Path $SourceRoot -Recurse -File | Where-Object {
 
 $debtPattern = '(?i)\b(TODO|FIXME|HACK)\b|\bprototype[- ]only\b|\bmock data\b|\bplaceholder data\b'
 foreach ($file in $scanFiles) {
+  $relative = [IO.Path]::GetRelativePath($sourceRootResolved, $file.FullName).Replace('\\','/')
+  if ($relative -eq "tools/verify-production-architecture.ps1") { continue }
   $matches = Select-String -Path $file.FullName -Pattern $debtPattern -AllMatches
   foreach ($match in $matches) {
-    $relative = [IO.Path]::GetRelativePath($sourceRootResolved, $file.FullName).Replace('\\','/')
     $violations.Add([pscustomobject]@{ severity = "error"; rule = "explicit_technical_debt_marker"; path = $relative; detail = "line $($match.LineNumber)" })
   }
 }
@@ -67,6 +68,8 @@ if ($productionStandard -notmatch 'Single authority per concern' -or $production
 }
 
 $appPath = Join-Path $SourceRoot "src/App.cpp"
+$appPagesPath = Join-Path $SourceRoot "src/AppPages.cpp"
+$appHeaderPath = Join-Path $SourceRoot "include/App.h"
 if (Test-Path $appPath) {
   $app = Get-Content $appPath -Raw
   if ($app -match 'App::Page pageForNavIndex') {
@@ -74,6 +77,34 @@ if (Test-Path $appPath) {
   }
   if ($app -match 'navIndex_\s*=\s*[34]\s*;') {
     $violations.Add([pscustomobject]@{ severity = "error"; rule = "no_magic_navigation_indexes"; path = "src/App.cpp"; detail = "Top-level navigation indexes must come from ProductionUxContract." })
+  }
+}
+if (Test-Path $appPagesPath) {
+  $pages = Get-Content $appPagesPath -Raw
+  if ($pages -match 'const\s+wchar_t\*\s+nav\s*\[') {
+    $violations.Add([pscustomobject]@{ severity = "error"; rule = "single_navigation_label_authority"; path = "src/AppPages.cpp"; detail = "Top navigation labels must come from ProductionUxContract." })
+  }
+}
+if (Test-Path $appHeaderPath) {
+  $appHeader = Get-Content $appHeaderPath -Raw
+  foreach ($legacy in @("selectedGame_", "selectedCapture_", "captureScroll_", "selectedSetting_", "captureViewerVisible_", "captureDeleteConfirm_")) {
+    if ($appHeader -match [regex]::Escape($legacy)) {
+      $violations.Add([pscustomobject]@{ severity = "error"; rule = "single_experience_state_authority"; path = "include/App.h"; detail = "Legacy parallel shell state '$legacy' must not coexist with production experience state." })
+    }
+  }
+}
+
+# LocalAppData discovery belongs to PlatformPaths only. This prevents services from
+# silently creating divergent storage layouts.
+$pathAuthority = "include/PlatformPaths.h"
+$pathFiles = @(Get-ChildItem -Path $SourceRoot -Recurse -File | Where-Object {
+  $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp") -and $_.FullName -notmatch "[\\/](build|\.git)[\\/]"
+})
+foreach ($file in $pathFiles) {
+  $relative = [IO.Path]::GetRelativePath($sourceRootResolved, $file.FullName).Replace('\\','/')
+  if ($relative -eq $pathAuthority) { continue }
+  if (Select-String -Path $file.FullName -Pattern 'SHGetKnownFolderPath\s*\(' -Quiet) {
+    $violations.Add([pscustomobject]@{ severity = "error"; rule = "single_platform_path_authority"; path = $relative; detail = "LocalAppData discovery must use PlatformPaths." })
   }
 }
 
@@ -117,7 +148,7 @@ $failed = @($violations | Where-Object { $_.severity -eq "error" }).Count
 $status = if ($failed -eq 0) { "PASS" } else { "FAIL" }
 
 $report = [ordered]@{
-  schema = 2
+  schema = 3
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
   commit = $commit
   result = $status
@@ -127,6 +158,8 @@ $report = [ordered]@{
     shell_binary_max_bytes = 67108864
     current_runtime = "V4.1"
     publisher_signature_algorithm = "ecdsa-p256-sha256"
+    navigation_authority = "ProductionUxContract"
+    platform_path_authority = "PlatformPaths"
   }
   source_metrics = [ordered]@{
     files = $sourceFiles.Count
