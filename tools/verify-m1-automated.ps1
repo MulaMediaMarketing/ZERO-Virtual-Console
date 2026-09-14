@@ -43,10 +43,11 @@ function Invoke-AcceptanceStep {
 
   $ended = [DateTime]::UtcNow
   $passed = $exitCode -eq 0
+  $status = if ($passed) { "PASS" } else { "FAIL" }
   $results.Add([pscustomobject]@{
     name = $Name
     category = $Category
-    status = if ($passed) { "PASS" } else { "FAIL" }
+    status = $status
     exit_code = $exitCode
     started_at_utc = $started.ToString("o")
     ended_at_utc = $ended.ToString("o")
@@ -54,7 +55,7 @@ function Invoke-AcceptanceStep {
     output = $output
   })
 
-  Write-Host ("[{0}] {1}" -f $(if ($passed) { "PASS" } else { "FAIL" }), $Name)
+  Write-Host ("[{0}] {1}" -f $status, $Name)
   if (-not $passed -and $output) { Write-Host $output }
 }
 
@@ -93,22 +94,32 @@ $payloadContractPassed =
   $manifest.zero_overlay -eq $true -and
   $integrityHeader -eq "# ZERO package integrity v1"
 
+$referenceStatus = if ($payloadContractPassed) { "PASS" } else { "FAIL" }
+$referenceExitCode = if ($payloadContractPassed) { 0 } else { 2 }
+$referenceOutput = if ($payloadContractPassed) {
+  "Reference package manifest and integrity contract are locked."
+} else {
+  "Reference package contract does not match M1 requirements."
+}
+$referenceTimestamp = [DateTime]::UtcNow.ToString("o")
 $results.Add([pscustomobject]@{
   name = "reference_package_contract"
   category = "reference_package"
-  status = if ($payloadContractPassed) { "PASS" } else { "FAIL" }
-  exit_code = if ($payloadContractPassed) { 0 } else { 2 }
-  started_at_utc = [DateTime]::UtcNow.ToString("o")
-  ended_at_utc = [DateTime]::UtcNow.ToString("o")
+  status = $referenceStatus
+  exit_code = $referenceExitCode
+  started_at_utc = $referenceTimestamp
+  ended_at_utc = $referenceTimestamp
   duration_ms = 0
-  output = if ($payloadContractPassed) { "Reference package manifest and integrity contract are locked." } else { "Reference package contract does not match M1 requirements." }
+  output = $referenceOutput
 })
-Write-Host ("[{0}] reference_package_contract" -f $(if ($payloadContractPassed) { "PASS" } else { "FAIL" }))
+Write-Host ("[{0}] reference_package_contract" -f $referenceStatus)
 
-$allAutomatedPassed = @($results | Where-Object { $_.status -ne "PASS" }).Count -eq 0
+$failedCount = @($results | Where-Object { $_.status -ne "PASS" }).Count
+$allAutomatedPassed = $failedCount -eq 0
 $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
   try { (& git rev-parse HEAD 2>$null).Trim() } catch { "unknown" }
 }
+$automatedResult = if ($allAutomatedPassed) { "PASS" } else { "FAIL" }
 
 $hardwareRequirements = @(
   [pscustomobject]@{ name = "windows_11_x64_real_machine"; status = "REQUIRED"; reason = "GitHub Actions runs Windows Server and cannot qualify the supported client OS hardware path." },
@@ -123,7 +134,7 @@ $report = [ordered]@{
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
   zero_milestone = "M1 / Runtime V4.1"
   commit = $commit
-  automated_result = if ($allAutomatedPassed) { "PASS" } else { "FAIL" }
+  automated_result = $automatedResult
   rc_qualified = $false
   rc_qualification_note = "Automated PASS does not qualify an RC. Real Windows 11 x64 and physical-controller acceptance is still required."
   binaries = [ordered]@{
@@ -131,7 +142,7 @@ $report = [ordered]@{
     acceptance = $zeroAcceptance
     reference_game = $referenceExe
   }
-  automated_checks = @($results)
+  automated_checks = $results.ToArray()
   physical_qualification_required = $hardwareRequirements
 }
 
@@ -143,7 +154,7 @@ $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add("# ZERO M1 Automated Acceptance Report")
 $lines.Add("")
 $lines.Add("- Commit: ``$commit``")
-$lines.Add("- Automated result: **$($report.automated_result)**")
+$lines.Add("- Automated result: **$automatedResult**")
 $lines.Add("- RC qualified: **NO**")
 $lines.Add("- Generated: $($report.generated_at_utc)")
 $lines.Add("")
@@ -166,7 +177,7 @@ $lines | Set-Content -Path $markdownPath -Encoding UTF8
 
 Write-Host "ZERO M1 automated acceptance report: $jsonPath"
 Write-Host "ZERO M1 automated acceptance summary: $markdownPath"
-Write-Host ("ZERO M1 automated acceptance: {0}" -f $report.automated_result)
+Write-Host ("ZERO M1 automated acceptance: {0}" -f $automatedResult)
 Write-Host "ZERO M1 RC qualification: PENDING PHYSICAL ACCEPTANCE"
 
 if (-not $allAutomatedPassed) { exit 2 }
