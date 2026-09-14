@@ -1,7 +1,8 @@
 #include "PackageIntegrityVerifier.h"
-#include "PackageTrust.h"
 #include "PackageManifestParser.h"
+#include "PackageTrust.h"
 #include "v5/ProductionPackagePlatform.h"
+#include "v5/ProductionPlatformKernel.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -72,6 +73,8 @@ int main() {
 
     DisconnectedPublisherTrustProvider trust;
     ProductionPackagePlatform packages(library, trust, database);
+    DisconnectedManagedLaunchAuthorityClient managedAuthority;
+    ProductionPlatformKernel kernel(library, trust, managedAuthority);
 
     PackageOperationRequest import;
     import.operation = PackageOperation::Import;
@@ -86,6 +89,23 @@ int main() {
     const auto parsedV1 = PackageManifestParser::ParseFile(imported.installedRoot / L"zero.manifest.json",
                                                            imported.installedRoot);
     if (!parsedV1.valid || parsedV1.manifest.version != "1.0.0") return 23;
+
+    ProductionLaunchRequest localRequest;
+    localRequest.mode = LaunchRequestMode::LocalInstalled;
+    localRequest.contentId = "zero.acceptance.game";
+    const auto localLaunch = kernel.RequestLaunch(localRequest);
+    if (!localLaunch.authorized) return 24;
+    if (localLaunch.descriptor.authorityKind != LaunchAuthorityKind::LocalPackage) return 25;
+    if (!localLaunch.descriptor.entitlementToken.empty()) return 26;
+
+    ProductionLaunchRequest managedRequest;
+    managedRequest.mode = LaunchRequestMode::Managed;
+    managedRequest.contentId = "zero.acceptance.game";
+    managedRequest.accountId = "acct-1";
+    if (kernel.RequestLaunch(managedRequest).authorized) return 27;
+
+    if (!writeText(imported.installedRoot / L"game.exe", "tampered")) return 28;
+    if (kernel.RequestLaunch(localRequest).authorized) return 29;
 
     PackageOperationRequest mismatch;
     mismatch.operation = PackageOperation::Repair;
@@ -109,6 +129,9 @@ int main() {
     if (!parsedV2.valid || parsedV2.manifest.version != "1.1.0") return 43;
     if (!std::filesystem::exists(database)) return 44;
 
-    std::cout << "ZERO V5 production package platform acceptance: PASS\n";
+    const auto repairedLaunch = kernel.RequestLaunch(localRequest);
+    if (!repairedLaunch.authorized || repairedLaunch.descriptor.version != "1.1.0") return 45;
+
+    std::cout << "ZERO V5 production package + platform kernel acceptance: PASS\n";
     return 0;
 }
