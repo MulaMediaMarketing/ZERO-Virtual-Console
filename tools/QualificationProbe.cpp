@@ -1,7 +1,6 @@
 #include <windows.h>
 #include <xinput.h>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 namespace {
@@ -16,43 +15,6 @@ struct RTL_OSVERSIONINFOW_LOCAL {
 };
 
 using RtlGetVersionFn = LONG (WINAPI*)(RTL_OSVERSIONINFOW_LOCAL*);
-
-std::string JsonEscape(const std::string& text) {
-    std::ostringstream out;
-    for (unsigned char c : text) {
-        switch (c) {
-            case '\\': out << "\\\\"; break;
-            case '"': out << "\\\""; break;
-            case '\n': out << "\\n"; break;
-            case '\r': out << "\\r"; break;
-            case '\t': out << "\\t"; break;
-            default:
-                if (c < 0x20) {
-                    const char* hex = "0123456789abcdef";
-                    out << "\\u00" << hex[(c >> 4) & 0xf] << hex[c & 0xf];
-                } else {
-                    out << static_cast<char>(c);
-                }
-        }
-    }
-    return out.str();
-}
-
-std::string WideToUtf8(const std::wstring& value) {
-    if (value.empty()) return {};
-    const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
-    if (size <= 0) return {};
-    std::string out(static_cast<size_t>(size), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), out.data(), size, nullptr, nullptr);
-    return out;
-}
-
-std::string MachineName() {
-    wchar_t buffer[MAX_COMPUTERNAME_LENGTH + 1]{};
-    DWORD size = static_cast<DWORD>(std::size(buffer));
-    if (!GetComputerNameW(buffer, &size)) return {};
-    return WideToUtf8(std::wstring(buffer, size));
-}
 
 std::string NativeArchitecture() {
     SYSTEM_INFO info{};
@@ -95,7 +57,6 @@ int wmain() {
 
     std::cout << "{";
     std::cout << "\"schema\":1,";
-    std::cout << "\"machine_name\":\"" << JsonEscape(MachineName()) << "\",";
     std::cout << "\"os_major\":" << major << ",";
     std::cout << "\"os_minor\":" << minor << ",";
     std::cout << "\"os_build\":" << build << ",";
