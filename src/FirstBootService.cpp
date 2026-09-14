@@ -1,7 +1,25 @@
 #include "FirstBootService.h"
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 
 namespace zero {
+namespace {
+
+bool validProfileName(const std::string& value) {
+    if (value.empty() || value.size() > 64) return false;
+    return std::any_of(value.begin(), value.end(), [](unsigned char c) { return !std::isspace(c); });
+}
+
+bool requirementsSatisfied(const FirstBootState& state) {
+    return validProfileName(state.profileName) &&
+           state.controllerConfirmed &&
+           state.displayConfirmed &&
+           state.audioConfirmed &&
+           state.volume <= 100;
+}
+
+} // namespace
 
 FirstBootService::FirstBootService(std::filesystem::path zeroRoot) : root_(std::move(zeroRoot)) {}
 
@@ -31,10 +49,18 @@ FirstBootState FirstBootService::Load() const {
             try { state.displayHeight = static_cast<unsigned>(std::stoul(line.substr(15))); } catch (...) {}
         }
     }
+
+    // Persisted completion is never trusted by itself. A malformed or incomplete
+    // state always returns to First Boot instead of bypassing setup.
+    if (!requirementsSatisfied(state)) state.completed = false;
     return state;
 }
 
-bool FirstBootService::Save(const FirstBootState& state, std::wstring& error) const {
+bool FirstBootService::Save(const FirstBootState& input, std::wstring& error) const {
+    FirstBootState state = input;
+    if (state.volume > 100) state.volume = 100;
+    if (state.completed && !requirementsSatisfied(state)) state.completed = false;
+
     std::error_code ec;
     std::filesystem::create_directories(root_, ec);
     if (ec) { error = L"ZERO could not create its first-boot state directory."; return false; }
@@ -51,7 +77,7 @@ bool FirstBootService::Save(const FirstBootState& state, std::wstring& error) co
     f << "display_width=" << state.displayWidth << "\n";
     f << "display_height=" << state.displayHeight << "\n";
     f << "audio=" << (state.audioConfirmed ? 1 : 0) << "\n";
-    f << "volume=" << (state.volume > 100 ? 100 : state.volume) << "\n";
+    f << "volume=" << state.volume << "\n";
     f.close();
 
     std::filesystem::rename(tmp, dst, ec);
@@ -66,7 +92,7 @@ bool FirstBootService::Save(const FirstBootState& state, std::wstring& error) co
 
 bool FirstBootService::IsRequired() const {
     const auto state = Load();
-    return !state.completed || !state.controllerConfirmed || !state.displayConfirmed || !state.audioConfirmed;
+    return !state.completed || !requirementsSatisfied(state);
 }
 
 } // namespace zero
