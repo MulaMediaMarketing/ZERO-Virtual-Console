@@ -28,6 +28,10 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroFriendsExperienceAcceptance.exe
 
+      - name: Validate Captures experience contract
+        shell: pwsh
+        run: ./build/Release/ZeroCapturesExperienceAcceptance.exe
+
       - name: Build ZERO reference package
         shell: pwsh
         run: ./sample_game/reference/build-reference-package.ps1 -ReferenceExe ./build/Release/ZeroReferenceGame.exe -Output ./build/ReferencePackage
@@ -59,6 +63,7 @@ jobs:
             build/Release/ZeroShellUxAcceptance.exe
             build/Release/ZeroProductionUxAcceptance.exe
             build/Release/ZeroFriendsExperienceAcceptance.exe
+            build/Release/ZeroCapturesExperienceAcceptance.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
             build/AcceptanceReports/**
