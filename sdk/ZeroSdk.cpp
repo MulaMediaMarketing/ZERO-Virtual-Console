@@ -201,6 +201,13 @@ void Client::CloseTransport() {
 void Client::Shutdown() {
     stop_.store(true);
     FailAllPending();
+
+    // The receiver performs synchronous named-pipe reads. Explicitly cancel that
+    // thread's blocking I/O before closing the shared transport and joining it.
+    if (receiverThread_.joinable()) {
+        CancelSynchronousIo(static_cast<HANDLE>(receiverThread_.native_handle()));
+    }
+
     CloseTransport();
     if (heartbeatThread_.joinable()) heartbeatThread_.join();
     if (receiverThread_.joinable()) receiverThread_.join();
