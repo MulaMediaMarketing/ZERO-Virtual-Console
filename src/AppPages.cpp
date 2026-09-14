@@ -1,4 +1,5 @@
 #include "App.h"
+#include "PackageTrustPresentation.h"
 #include <algorithm>
 #include <vector>
 
@@ -306,6 +307,7 @@ void App::Paint() {
         if (games.empty()) DrawEmptyState(L"No games installed", L"Open Library, then use X to import a ZERO-compatible game folder.", width);
         else {
             const auto& game = games[std::min(selectedGame_, games.size() - 1)];
+            const auto trustUi = PresentPackageTrust(runtime_.PackageTrust(game));
             const auto hero = D2D1::RectF(62, 285, width - 62, 620);
             DrawHeroArtwork(game, hero);
             ComPtr<ID2D1SolidColorBrush> shade;
@@ -315,6 +317,7 @@ void App::Paint() {
             target_->FillRectangle(hero, shade.Get());
             DrawTextLine(Widen(game.title), 108, 334, 760, 60, true, white.Get());
             DrawTextLine(L"Version " + Widen(game.version), 110, 392, 400, 35, false, white.Get());
+            DrawTextLine(trustUi.shortLabel, 110, 428, 430, 30, false, white.Get());
             const auto resume = game.zeroResume ? resumeStore_.Load(game.packageId) : std::nullopt;
             const auto playRect = D2D1::RectF(108, 500, 300, 556);
             DrawRoundedCard(playRect, 20, white.Get());
@@ -331,9 +334,11 @@ void App::Paint() {
             float y = 280.0f;
             const size_t count = std::min<size_t>(8, games.size());
             for (size_t i = 0; i < count; ++i, y += 78.0f) {
+                const auto trustUi = PresentPackageTrust(runtime_.PackageTrust(games[i]));
                 const auto rect = D2D1::RectF(62, y, width - 62, y + 62);
                 if (i == selectedGame_) { DrawRoundedCard(rect, 18, brushCard_.Get()); DrawFocusRing(rect, 18); }
-                DrawTextLine(Widen(games[i].title), 92, y + 14, 540, 30, false);
+                DrawTextLine(Widen(games[i].title), 92, y + 9, 540, 28, false);
+                DrawTextLine(trustUi.shortLabel, 92, y + 34, 360, 22, false, brushMuted_.Get());
                 DrawTextLine(Widen(games[i].version), width - 250, y + 14, 120, 30, false, brushMuted_.Get());
             }
         }
@@ -347,6 +352,8 @@ void App::Paint() {
         const auto platform = runtime_.PlatformState(game.packageId);
         const auto achievements = runtime_.Achievements(game.packageId);
         const auto resume = game.zeroResume ? resumeStore_.Load(game.packageId) : std::nullopt;
+        const auto trust = runtime_.PackageTrust(game);
+        const auto trustUi = PresentPackageTrust(trust);
         const float split = std::max(760.0f, width - 470.0f);
         const auto hero = D2D1::RectF(62, 150, split, 535);
         DrawHeroArtwork(game, hero);
@@ -358,14 +365,15 @@ void App::Paint() {
         DrawTextLine(Widen(game.title), 104, 205, split - 150, 58, true, white.Get());
         DrawTextLine(Widen(game.packageId), 106, 263, split - 170, 32, false, white.Get());
         DrawTextLine(L"Version " + Widen(game.version), 106, 300, 380, 30, false, white.Get());
+        DrawTextLine(trustUi.shortLabel, 106, 337, split - 180, 30, false, white.Get());
         const auto playRect = D2D1::RectF(104, 430, 282, 488);
         DrawRoundedCard(playRect, 20, preferResume_ && resume ? brushCard_.Get() : white.Get());
-        DrawTextLine(L"Play", 166, 446, 90, 30, false, brushText_.Get());
+        DrawTextLine(trustUi.blocked ? L"Blocked" : L"Play", trustUi.blocked ? 151 : 166, 446, 110, 30, false, brushText_.Get());
         if (!resume || !preferResume_) DrawFocusRing(playRect, 20, false);
         if (resume) {
             const auto resumeRect = D2D1::RectF(300, 430, 500, 488);
             DrawRoundedCard(resumeRect, 20, preferResume_ ? white.Get() : brushCard_.Get());
-            DrawTextLine(L"Resume", 354, 446, 110, 30, false, brushText_.Get());
+            DrawTextLine(trustUi.blocked ? L"Blocked" : L"Resume", trustUi.blocked ? 345 : 354, 446, 120, 30, false, brushText_.Get());
             if (preferResume_) DrawFocusRing(resumeRect, 20, false);
         }
         const float cardLeft = split + 20.0f;
@@ -385,15 +393,23 @@ void App::Paint() {
         DrawTextLine(lastSession, width - 280, 405, 180, 30, false);
         DrawTextLine(L"Last played", cardLeft + 28, 445, 160, 30, false, brushMuted_.Get());
         DrawTextLine(platform.lastPlayedAtUtc.empty() ? L"—" : Widen(platform.lastPlayedAtUtc), width - 330, 445, 230, 30, false);
-        DrawTextLine(L"Exit code", cardLeft + 28, 485, 160, 30, false, brushMuted_.Get());
-        DrawTextLine(std::to_wstring(platform.lastExitCode), width - 250, 485, 150, 30, false);
+        DrawTextLine(L"Package trust", cardLeft + 28, 485, 160, 30, false, brushMuted_.Get());
+        DrawTextLine(trustUi.shortLabel, width - 335, 485, 235, 30, false);
+
+        DrawRoundedCard(D2D1::RectF(62, 555, width - 62, 635), 20, brushCard_.Get());
+        DrawTextLine(trustUi.title, 88, 570, 290, 30, false);
+        DrawTextLine(trustUi.body, 380, 565, width - 470, 58, false, brushMuted_.Get());
+
         if (resume) {
-            DrawRoundedCard(D2D1::RectF(62, 565, width - 62, 635), 20, brushCard_.Get());
-            DrawTextLine(L"Continue from", 88, 584, 180, 30, false, brushMuted_.Get());
-            DrawTextLine(Widen(resume->displayLabel), 270, 584, width - 360, 30, false);
+            DrawRoundedCard(D2D1::RectF(62, 648, width - 62, 708), 20, brushCard_.Get());
+            DrawTextLine(L"Continue from", 88, 663, 180, 30, false, brushMuted_.Get());
+            DrawTextLine(Widen(resume->displayLabel), 270, 663, width - 360, 30, false);
         }
-        DrawTextLine(resume ? L"Left / Right  Choose Play or Resume   ·   A Launch   ·   X Achievements   ·   B Library" : L"A Play   ·   X Achievements   ·   B Library", 64, 670, width - 128, 32, false, brushMuted_.Get());
-        if (!status_.empty()) DrawTextLine(status_, 64, 716, width - 128, 42, false, brushMuted_.Get());
+        DrawTextLine(trustUi.blocked
+            ? L"Launch blocked by package trust   ·   X Achievements   ·   B Library"
+            : (resume ? L"Left / Right  Choose Play or Resume   ·   A Launch   ·   X Achievements   ·   B Library" : L"A Play   ·   X Achievements   ·   B Library"),
+            64, resume ? 730 : 670, width - 128, 32, false, brushMuted_.Get());
+        if (!status_.empty()) DrawTextLine(status_, 64, resume ? 770 : 716, width - 128, 42, false, brushMuted_.Get());
     } else if (page_ == Page::Import) {
         DrawTextLine(L"Import a game", 62, 154, 600, 60, true);
         DrawTextLine(L"Add a folder that contains a valid zero.manifest.json and native Windows game executable.", 64, 214, width - 128, 48, false, brushMuted_.Get());

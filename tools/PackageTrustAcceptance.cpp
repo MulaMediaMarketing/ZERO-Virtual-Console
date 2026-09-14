@@ -1,4 +1,5 @@
 #include "PackageTrust.h"
+#include "PackageTrustPresentation.h"
 #include <windows.h>
 #include <bcrypt.h>
 #include <chrono>
@@ -43,6 +44,8 @@ int wmain() {
     zero::DisconnectedPublisherTrustProvider disconnected;
     auto r=zero::PackageTrustService::Evaluate(root,zero::PackageTrustPolicy::AllowLocalUnsigned,disconnected);
     check(r.state==zero::PackageTrustState::Unsigned && r.launchAllowed,"unsigned_local_package_allowed",all);
+    auto ui=zero::PresentPackageTrust(r);
+    check(ui.shortLabel==L"Unsigned" && !ui.blocked && !ui.verified,"unsigned_player_label_is_clear",all);
 
     BCRYPT_ALG_HANDLE alg=nullptr; BCRYPT_KEY_HANDLE key=nullptr;
     bool crypto=BCryptOpenAlgorithmProvider(&alg,BCRYPT_ECDSA_P256_ALGORITHM,nullptr,0)==0 && BCryptGenerateKeyPair(alg,&key,256,0)==0 && BCryptFinalizeKeyPair(key,0)==0;
@@ -61,18 +64,24 @@ int wmain() {
     zero::CngPublisherTrustProvider provider(trustRoot);
     r=zero::PackageTrustService::Evaluate(root,zero::PackageTrustPolicy::RequireTrustedPublisher,provider);
     check(r.state==zero::PackageTrustState::TrustedPublisher && r.identityVerified && r.launchAllowed,"real_cng_signature_trusted",all);
+    ui=zero::PresentPackageTrust(r);
+    check(ui.shortLabel==L"Trusted Publisher" && ui.verified && !ui.blocked && ui.body.find(L"zero.test.publisher")!=std::wstring::npos,
+          "trusted_publisher_player_label_is_verified",all);
 
-    auto tampered=env; auto p=tampered.find("signature\\\":\\\""); (void)p;
     sig[0]^=0x01;
     const std::string badEnv="{\"schema\":1,\"publisher_id\":\"zero.test.publisher\",\"key_id\":\"test-key-1\",\"algorithm\":\"ecdsa-p256-sha256\",\"payload\":\"zero.integrity.sha256\",\"signature\":\""+b64(sig.data(),sigSize)+"\"}";
     writeText(root/L"zero.signature.json",badEnv);
     r=zero::PackageTrustService::Evaluate(root,zero::PackageTrustPolicy::AllowLocalUnsigned,provider);
     check(r.state==zero::PackageTrustState::InvalidSignature && !r.launchAllowed,"invalid_crypto_signature_blocks_launch",all);
+    ui=zero::PresentPackageTrust(r);
+    check(ui.shortLabel==L"Blocked · Signature Failed" && ui.blocked,"invalid_signature_player_label_is_blocked",all);
 
     const std::string unknownEnv="{\"schema\":1,\"publisher_id\":\"zero.unknown.publisher\",\"key_id\":\"key-1\",\"algorithm\":\"ecdsa-p256-sha256\",\"payload\":\"zero.integrity.sha256\",\"signature\":\""+b64(sig.data(),sigSize)+"\"}";
     writeText(root/L"zero.signature.json",unknownEnv);
     r=zero::PackageTrustService::Evaluate(root,zero::PackageTrustPolicy::RequireTrustedPublisher,provider);
     check(r.state==zero::PackageTrustState::UntrustedPublisher && !r.launchAllowed,"unknown_publisher_blocked_by_strict_policy",all);
+    ui=zero::PresentPackageTrust(r);
+    check(ui.shortLabel==L"Publisher Not Trusted" && ui.blocked,"untrusted_publisher_player_label_is_clear",all);
 
     if(key)BCryptDestroyKey(key); if(alg)BCryptCloseAlgorithmProvider(alg,0); std::filesystem::remove_all(root,ec);
     std::cout << "Result: " << (all?"PASS":"FAIL") << "\n"; return all?0:2;
