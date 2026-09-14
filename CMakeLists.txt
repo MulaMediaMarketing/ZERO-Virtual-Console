@@ -52,6 +52,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/FirstBootWizard.cpp
   src/MilestoneAcceptance.cpp
   src/Settings.cpp
+  src/InputCore.cpp
   src/Input.cpp
 )
 
@@ -118,5 +119,12 @@ add_executable(ZeroPackageRepairAcceptance
 target_include_directories(ZeroPackageRepairAcceptance PRIVATE include)
 target_compile_definitions(ZeroPackageRepairAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroPackageRepairAcceptance PRIVATE bcrypt)
+
+add_executable(ZeroInputAcceptance
+  tools/InputAcceptance.cpp
+  src/InputCore.cpp
+)
+target_include_directories(ZeroInputAcceptance PRIVATE include)
+target_compile_definitions(ZeroInputAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
