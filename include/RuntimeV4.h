@@ -1,6 +1,7 @@
 #pragma once
 #include "AchievementStore.h"
 #include "CrashReportStore.h"
+#include "PackageTrust.h"
 #include "PlatformDatabase.h"
 #include "PlatformStateStore.h"
 #include "RuntimeV3.h"
@@ -31,6 +32,7 @@ public:
     GamePlatformState PlatformState(const std::string& packageId) const;
     std::optional<ResumeMetadata> Resume(const std::string& packageId) const;
     std::vector<AchievementRecord> Achievements(const std::string& packageId) const;
+    PackageTrustResult PackageTrust(const GameManifest& game) const;
 
 private:
     RuntimeV3 v3_;
@@ -39,6 +41,8 @@ private:
     AchievementStore achievements_;
     ResumeStore resumeStore_;
     CrashReportStore crashReports_;
+    DisconnectedPublisherTrustProvider trustProvider_;
+    PackageTrustPolicy trustPolicy_{PackageTrustPolicy::AllowLocalUnsigned};
     std::string activePackageId_;
     std::string activeSessionId_;
     bool sessionRecorded_{true};

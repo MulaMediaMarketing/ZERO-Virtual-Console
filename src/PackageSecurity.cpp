@@ -39,8 +39,10 @@ bool safeRelativePath(const std::filesystem::path& relative) {
     return true;
 }
 
-bool isGeneratedIntegrityManifest(const std::filesystem::path& relative) {
-    return _wcsicmp(relative.generic_wstring().c_str(), L"zero.integrity.sha256") == 0;
+bool isGeneratedPackageMetadata(const std::filesystem::path& relative) {
+    const auto value = relative.generic_wstring();
+    return _wcsicmp(value.c_str(), L"zero.integrity.sha256") == 0 ||
+           _wcsicmp(value.c_str(), L"zero.signature.json") == 0;
 }
 
 bool isReparsePoint(const std::filesystem::path& path) {
@@ -152,7 +154,7 @@ bool PackageSecurity::BuildInventory(const std::filesystem::path& root,
             error = L"ZERO packages may contain regular files and directories only.";
             return false;
         }
-        if (isGeneratedIntegrityManifest(relative)) continue;
+        if (isGeneratedPackageMetadata(relative)) continue;
         if (++inventory.fileCount > kMaxFiles) {
             error = L"ZERO package exceeds the maximum supported file count.";
             return false;

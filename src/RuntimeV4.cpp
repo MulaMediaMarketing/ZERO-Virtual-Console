@@ -25,6 +25,13 @@ const char* outcomeName(RuntimeOutcome outcome) {
 bool RuntimeV4::Launch(const GameManifest& game, std::wstring& error,
                        const std::optional<ResumeMetadata>& launchResume) {
     if (!PackageIntegrityVerifier::Verify(game.root, error)) return false;
+
+    const auto trust = PackageTrust(game);
+    if (!trust.launchAllowed) {
+        error = trust.detail.empty() ? L"ZERO blocked launch because package trust validation failed." : trust.detail;
+        return false;
+    }
+
     if (!database_.UpsertGame(game, error)) return false;
 
     v3_.SetAchievementCallback([this](const std::string& id, const std::string& title) {
@@ -118,6 +125,10 @@ std::vector<AchievementRecord> RuntimeV4::Achievements(const std::string& packag
     auto canonical = database_.LoadAchievements(packageId, error);
     if (!canonical.empty()) return canonical;
     return achievements_.Load(packageId);
+}
+
+PackageTrustResult RuntimeV4::PackageTrust(const GameManifest& game) const {
+    return PackageTrustService::Evaluate(game.root, trustPolicy_, trustProvider_);
 }
 
 } // namespace zero
