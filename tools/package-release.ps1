@@ -20,6 +20,10 @@ $files = @(
   "Release/ZeroPackageIntegrityAcceptance.exe",
   "Release/ZeroPackageTrustAcceptance.exe",
   "Release/ZeroPackageRepairAcceptance.exe",
+  "Release/ZeroStrictJsonAcceptance.exe",
+  "Release/ZeroPlatformDatabaseAcceptance.exe",
+  "Release/ZeroFaultInjectionAcceptance.exe",
+  "Release/ZeroProductionBenchmarkAcceptance.exe",
   "Release/ZeroInputAcceptance.exe",
   "Release/ZeroShellUxAcceptance.exe",
   "Release/ZeroProductionUxAcceptance.exe",
@@ -71,7 +75,7 @@ $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
 }
 
 $manifest = [ordered]@{
-  schema = 3
+  schema = 4
   product = "ZERO Virtual Console"
   milestone = "M1 / Runtime V4.1 / Production Architecture"
   commit = $commit
