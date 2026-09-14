@@ -37,6 +37,11 @@ enum class RuntimeType : std::uint8_t {
     FutureRuntime
 };
 
+enum class LaunchAuthorityKind : std::uint8_t {
+    ServerManaged,
+    LocalPackage
+};
+
 struct ContentIdentity {
     std::string contentId;
     std::string packageId;
@@ -65,6 +70,9 @@ struct LaunchDescriptor {
     std::string capabilityScope;
     std::string entitlementToken;
     std::string sessionToken;
+    LaunchAuthorityKind authorityKind{LaunchAuthorityKind::ServerManaged};
+    std::string contentId;
+    std::string accountId;
 };
 
 } // namespace zero::v5

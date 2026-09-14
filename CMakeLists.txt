@@ -21,7 +21,8 @@ add_executable(ZeroVirtualConsole WIN32
   src/CngPublisherTrustProvider.cpp src/RuntimeSession.cpp src/RuntimeSessionLifecycle.cpp src/RuntimeSessionDiagnostics.cpp src/RuntimeIpcServer.cpp
   src/RuntimeV3.cpp src/RuntimeV4.cpp src/ResumeStore.cpp src/PlatformStateStore.cpp src/PlatformDatabase.cpp src/PlatformDatabaseResume.cpp
   src/PlatformDatabaseReads.cpp src/AchievementStore.cpp src/CrashReportStore.cpp src/MiniDumpWriter.cpp src/FirstBootService.cpp src/FirstBootWizard.cpp
-  src/MilestoneAcceptance.cpp src/Settings.cpp src/InputCore.cpp src/Input.cpp)
+  src/MilestoneAcceptance.cpp src/Settings.cpp src/InputCore.cpp src/Input.cpp
+  src/v5/ProductionPackagePlatform.cpp src/v5/ProductionPlatformKernel.cpp)
 target_include_directories(ZeroVirtualConsole PRIVATE include)
 target_compile_definitions(ZeroVirtualConsole PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroVirtualConsole PRIVATE d2d1 dwrite windowscodecs xinput9_1_0 shlwapi shell32 ole32 bcrypt advapi32 dbghelp winsqlite3)
@@ -100,6 +101,14 @@ target_compile_definitions(ZeroServerAuthorityAcceptance PRIVATE UNICODE _UNICOD
 add_executable(ZeroV5CoreArchitectureAcceptance tools/V5CoreArchitectureAcceptance.cpp)
 target_include_directories(ZeroV5CoreArchitectureAcceptance PRIVATE include)
 target_compile_definitions(ZeroV5CoreArchitectureAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+add_executable(ZeroV5ProductionPackageAcceptance
+  tools/V5ProductionPackageAcceptance.cpp
+  src/v5/ProductionPackagePlatform.cpp src/v5/ProductionPlatformKernel.cpp
+  src/PackageManifestParser.cpp src/ManifestValidator.cpp src/PackageSecurity.cpp src/PackageIntegrityVerifier.cpp src/PackageTrust.cpp
+  src/PlatformDatabase.cpp src/PlatformDatabaseResume.cpp src/PlatformDatabaseReads.cpp)
+target_include_directories(ZeroV5ProductionPackageAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5ProductionPackageAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroV5ProductionPackageAcceptance PRIVATE bcrypt shell32 ole32 winsqlite3)
 add_executable(ZeroQualificationProbe tools/QualificationProbe.cpp)
 target_compile_definitions(ZeroQualificationProbe PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroQualificationProbe PRIVATE xinput9_1_0)
