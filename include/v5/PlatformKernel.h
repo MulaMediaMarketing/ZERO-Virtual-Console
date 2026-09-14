@@ -14,12 +14,36 @@ struct AccountSession {
     bool authenticated{false};
 };
 
+enum class LaunchAuthorityRequirement : unsigned char {
+    LocalPackage,
+    ZeroService
+};
+
 struct CatalogItem {
     ContentIdentity identity;
     std::string title;
     std::string version;
     bool cloudReady{false};
     bool locallyInstallable{true};
+    LaunchAuthorityRequirement authorityRequirement{LaunchAuthorityRequirement::ZeroService};
+};
+
+enum class LaunchFailure : unsigned char {
+    None,
+    NoAuthenticatedSession,
+    ContentNotFound,
+    EntitlementUnavailable,
+    WrongAccount,
+    WrongContent,
+    WrongAuthority,
+    AuthorizationDenied
+};
+
+struct LaunchResult {
+    LaunchFailure failure{LaunchFailure::None};
+    std::optional<LaunchDescriptor> descriptor;
+
+    bool Allowed() const noexcept { return failure == LaunchFailure::None && descriptor.has_value(); }
 };
 
 class IIdentityService {
@@ -58,15 +82,26 @@ public:
                    ILaunchAuthority& launchAuthority)
         : identity_(identity), catalog_(catalog), entitlements_(entitlements), launchAuthority_(launchAuthority) {}
 
-    std::optional<LaunchDescriptor> RequestLaunch(const std::string& contentId) const {
+    LaunchResult RequestLaunch(const std::string& contentId) const {
         const auto session = identity_.CurrentSession();
-        if (!session || !session->authenticated) return std::nullopt;
+        if (!session || !session->authenticated) return {LaunchFailure::NoAuthenticatedSession, std::nullopt};
+
         const auto item = catalog_.FindByContentId(contentId);
-        if (!item) return std::nullopt;
+        if (!item) return {LaunchFailure::ContentNotFound, std::nullopt};
+
         const auto entitlement = entitlements_.GetLaunchEntitlement(session->accountId, contentId);
-        if (!entitlement || !entitlement->authoritative) return std::nullopt;
-        if (entitlement->accountId != session->accountId || entitlement->contentId != contentId) return std::nullopt;
-        return launchAuthority_.Authorize(*session, *item, *entitlement);
+        if (!entitlement) return {LaunchFailure::EntitlementUnavailable, std::nullopt};
+        if (entitlement->accountId != session->accountId) return {LaunchFailure::WrongAccount, std::nullopt};
+        if (entitlement->contentId != contentId) return {LaunchFailure::WrongContent, std::nullopt};
+
+        const auto requiredAuthority = item->authorityRequirement == LaunchAuthorityRequirement::ZeroService
+            ? AuthoritySource::ZeroService
+            : AuthoritySource::LocalPackage;
+        if (entitlement->authority != requiredAuthority) return {LaunchFailure::WrongAuthority, std::nullopt};
+
+        auto descriptor = launchAuthority_.Authorize(*session, *item, *entitlement);
+        if (!descriptor) return {LaunchFailure::AuthorizationDenied, std::nullopt};
+        return {LaunchFailure::None, std::move(descriptor)};
     }
 
 private:

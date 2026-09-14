@@ -37,6 +37,15 @@ enum class RuntimeType : std::uint8_t {
     FutureRuntime
 };
 
+// LocalPackage is valid only for explicitly local/imported content. Managed ZERO
+// catalog content must be authorized by ZeroService. This prevents cached/local
+// state from silently becoming authority for commerce or online access.
+enum class AuthoritySource : std::uint8_t {
+    None,
+    LocalPackage,
+    ZeroService
+};
+
 struct ContentIdentity {
     std::string contentId;
     std::string packageId;
@@ -49,9 +58,9 @@ struct EntitlementGrant {
     std::string accountId;
     std::string contentId;
     EntitlementType type{EntitlementType::Purchased};
+    AuthoritySource authority{AuthoritySource::None};
     std::string authorityVersion;
     std::string expiresAtUtc;
-    bool authoritative{false};
 };
 
 struct LaunchDescriptor {
