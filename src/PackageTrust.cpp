@@ -62,17 +62,12 @@ bool parseEnvelope(const std::filesystem::path& path, PackageSignatureEnvelope& 
            safeIdentifier(envelope.publisherId, 160) &&
            safeIdentifier(envelope.keyId, 160) &&
            safeIdentifier(envelope.algorithm, 64) &&
-           !envelope.payload.empty() && envelope.payload.size() <= 256 &&
+           envelope.payload == "zero.integrity.sha256" &&
            !envelope.signatureBase64.empty() && envelope.signatureBase64.size() <= 16384;
 }
 
 std::string integrityPayload(const std::filesystem::path& packageRoot) {
-    const auto integrity = readAll(packageRoot / L"zero.integrity.sha256");
-    if (integrity.empty()) return {};
-    // Foundation binds signatures to the exact generated integrity manifest.
-    // A production signer/verifier can replace this provider without changing
-    // the envelope or RuntimeV4 policy boundary.
-    return integrity;
+    return readAll(packageRoot / L"zero.integrity.sha256");
 }
 
 } // namespace
@@ -116,7 +111,7 @@ PackageTrustResult PackageTrustService::Evaluate(const std::filesystem::path& pa
         result.state = PackageTrustState::InvalidSignatureEnvelope;
         result.signaturePresent = true;
         result.launchAllowed = false;
-        result.detail = L"The package signature envelope is malformed or unsupported.";
+        result.detail = L"The package signature envelope is malformed, unsupported, or does not target zero.integrity.sha256.";
         return result;
     }
 
