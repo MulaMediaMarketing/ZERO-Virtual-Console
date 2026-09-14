@@ -55,6 +55,10 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroServerAuthorityAcceptance.exe
 
+      - name: Validate ZERO Core Architecture V5 foundation
+        shell: pwsh
+        run: ./build/Release/ZeroV5CoreArchitectureAcceptance.exe
+
       - name: Validate production shell navigation contract
         shell: pwsh
         run: ./build/Release/ZeroProductionUxAcceptance.exe
@@ -128,6 +132,7 @@ jobs:
             build/Release/ZeroStoreSettingsFirstBootAcceptance.exe
             build/Release/ZeroFirstBootPersistenceAcceptance.exe
             build/Release/ZeroServerAuthorityAcceptance.exe
+            build/Release/ZeroV5CoreArchitectureAcceptance.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
             build/DependencyReports/**
@@ -152,6 +157,7 @@ jobs:
             docs/PRODUCTION_ARCHITECTURE_STANDARD.md
             docs/SERVER_AUTHORITY_SECURITY.md
             docs/RUNTIME_V4_1_RC_GATE.md
+            docs/ZERO_CORE_ARCHITECTURE_V5.md
             SECURITY.md
             .github/CODEOWNERS
             installer/install-zero.ps1
