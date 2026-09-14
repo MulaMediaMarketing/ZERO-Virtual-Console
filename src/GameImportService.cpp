@@ -3,9 +3,23 @@
 #include "PackageIntegrityVerifier.h"
 #include "PackageManifestParser.h"
 #include "PackageSecurity.h"
+#include "Utf8Path.h"
 
 namespace zero {
 namespace {
+
+bool packagePath(const std::filesystem::path& root,
+                 const std::string& packageId,
+                 std::filesystem::path& out,
+                 std::wstring& error) {
+    const auto converted = PathFromUtf8(packageId);
+    if (!converted || converted->empty()) {
+        error = L"ZERO could not convert the package identity into a filesystem path.";
+        return false;
+    }
+    out = root / *converted;
+    return true;
+}
 
 bool stagePackage(const std::filesystem::path& sourceRoot,
                   const std::filesystem::path& libraryRoot,
@@ -39,8 +53,9 @@ bool stagePackage(const std::filesystem::path& sourceRoot,
     if (ec) { error = L"ZERO could not access the Library directory."; return false; }
 
     const auto stagingBase = libraryRoot / L".staging";
-    staging = stagingBase / std::filesystem::u8path(packageId);
-    destination = libraryRoot / std::filesystem::u8path(packageId);
+    if (!packagePath(stagingBase, packageId, staging, error) ||
+        !packagePath(libraryRoot, packageId, destination, error)) return false;
+
     std::filesystem::remove_all(staging, ec);
     ec.clear();
     std::filesystem::create_directories(staging, ec);
@@ -82,7 +97,11 @@ ImportResult activateReplacement(const std::filesystem::path& libraryRoot,
     ImportResult result;
     std::error_code ec;
     const auto backupBase = libraryRoot / L".repair-backup";
-    const auto backup = backupBase / std::filesystem::u8path(packageId);
+    std::filesystem::path backup;
+    if (!packagePath(backupBase, packageId, backup, result.error)) {
+        std::filesystem::remove_all(staging, ec);
+        return result;
+    }
     std::filesystem::create_directories(backupBase, ec);
     if (ec) {
         std::filesystem::remove_all(staging, ec);
