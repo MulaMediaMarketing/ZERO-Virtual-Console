@@ -63,6 +63,19 @@ bool stageSource(const std::filesystem::path& source,
     return true;
 }
 
+bool restorePrevious(const std::filesystem::path& destination,
+                     const std::filesystem::path& rollback,
+                     std::wstring& error) {
+    removeBestEffort(destination);
+    std::error_code ec;
+    if (!std::filesystem::exists(rollback, ec) || ec) return true;
+    ec.clear();
+    std::filesystem::rename(rollback, destination, ec);
+    if (!ec) return true;
+    error = L"ZERO V5 could not restore the previous package from rollback storage.";
+    return false;
+}
+
 bool activate(const std::filesystem::path& staging,
               const std::filesystem::path& destination,
               const std::filesystem::path& rollback,
@@ -96,10 +109,12 @@ bool activate(const std::filesystem::path& staging,
     std::filesystem::rename(staging, destination, ec);
     if (ec) {
         if (exists) {
-            std::error_code restore;
-            std::filesystem::rename(rollback, destination, restore);
-            error = restore ? L"ZERO V5 activation and rollback both failed."
-                            : L"ZERO V5 activation failed; the previous package was restored.";
+            std::wstring restoreError;
+            if (!restorePrevious(destination, rollback, restoreError)) {
+                error = L"ZERO V5 activation failed and rollback also failed.";
+            } else {
+                error = L"ZERO V5 activation failed; the previous package was restored.";
+            }
         } else {
             error = L"ZERO V5 could not commit the staged package.";
         }
@@ -109,19 +124,17 @@ bool activate(const std::filesystem::path& staging,
 
     std::wstring verifyError;
     if (!PackageIntegrityVerifier::Verify(destination, verifyError)) {
-        removeBestEffort(destination);
-        if (exists) {
-            std::error_code restore;
-            std::filesystem::rename(rollback, destination, restore);
-            error = restore ? L"ZERO V5 integrity verification failed and rollback failed."
-                            : verifyError + L" The previous package was restored.";
+        std::wstring restoreError;
+        const bool restored = restorePrevious(destination, rollback, restoreError);
+        if (!restored) {
+            error = L"ZERO V5 integrity verification failed and rollback failed.";
         } else {
-            error = verifyError.empty() ? L"ZERO V5 integrity verification failed after commit." : verifyError;
+            error = verifyError.empty() ? L"ZERO V5 integrity verification failed after commit."
+                                        : verifyError;
+            if (exists) error += L" The previous package was restored.";
         }
         return false;
     }
-
-    removeBestEffort(rollback);
     return true;
 }
 
@@ -194,12 +207,24 @@ PackageOperationResult ProductionPackagePlatform::Execute(const PackageOperation
     result.finalStage = PackageStage::Register;
     const auto installed = PackageManifestParser::ParseFile(destination / L"zero.manifest.json", destination);
     if (!installed.valid) {
-        result.error = L"ZERO V5 could not register the committed package because its installed manifest is invalid.";
+        std::wstring rollbackError;
+        restorePrevious(destination, rollback, rollbackError);
+        result.error = rollbackError.empty()
+            ? L"ZERO V5 could not register the committed package because its installed manifest is invalid."
+            : rollbackError;
         return result;
     }
-    PlatformDatabase database(databasePath_);
-    if (!database.Initialize(result.error) || !database.UpsertGame(installed.manifest, result.error)) return result;
 
+    PlatformDatabase database(databasePath_);
+    if (!database.Initialize(result.error) || !database.UpsertGame(installed.manifest, result.error)) {
+        const auto databaseError = result.error;
+        std::wstring rollbackError;
+        const bool restored = restorePrevious(destination, rollback, rollbackError);
+        result.error = restored ? databaseError : rollbackError;
+        return result;
+    }
+
+    removeBestEffort(rollback);
     result.success = true;
     result.finalStage = PackageStage::Ready;
     result.installedRoot = destination;
