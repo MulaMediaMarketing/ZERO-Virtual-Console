@@ -23,8 +23,12 @@ struct PlatformPaths {
     static std::filesystem::path TempRoot() { return DataRoot() / L"Temp"; }
     static std::filesystem::path CapturesRoot() { return DataRoot() / L"Captures"; }
     static std::filesystem::path DataStoreRoot() { return DataRoot() / L"Data"; }
+    static std::filesystem::path ResumeMirrorRoot() { return DataRoot() / L"Resume"; }
+    static std::filesystem::path AchievementsMirrorRoot() { return DataRoot() / L"Achievements"; }
+    static std::filesystem::path PlatformStateMirrorRoot() { return DataRoot() / L"PlatformState"; }
     static std::filesystem::path CrashReportsRoot() { return DataRoot() / L"CrashReports"; }
     static std::filesystem::path DiagnosticsRoot() { return DataRoot() / L"Diagnostics"; }
+    static std::filesystem::path IdentityRoot() { return DataRoot() / L"Identity"; }
     static std::filesystem::path TrustRoot() { return DataRoot() / L"Trust"; }
     static std::filesystem::path PublisherTrustRoot() { return TrustRoot() / L"Publishers"; }
 };
