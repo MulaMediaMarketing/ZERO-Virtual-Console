@@ -4,7 +4,9 @@
 target_sources(ZeroVirtualConsole PRIVATE
   src/v5/ProductionPackagePlatform.cpp
   src/v5/RuntimeAuthority.cpp
-  src/v5/NativeRuntimeProcessHost.cpp)
+  src/v5/NativeRuntimeProcessHost.cpp
+  src/v5/CrashSupervisor.cpp
+  src/v5/ResumeCoordinator.cpp)
 
 add_executable(ZeroV5ProductionPackageAcceptance
   tools/V5ProductionPackageAcceptance.cpp
@@ -39,3 +41,15 @@ add_executable(ZeroV5NativeRuntimeAcceptance
 target_include_directories(ZeroV5NativeRuntimeAcceptance PRIVATE include)
 target_compile_definitions(ZeroV5NativeRuntimeAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroV5NativeRuntimeAcceptance PRIVATE advapi32 ole32 dbghelp)
+
+add_executable(ZeroV5CrashResumeAcceptance
+  tools/V5CrashResumeAcceptance.cpp
+  src/v5/CrashSupervisor.cpp
+  src/v5/ResumeCoordinator.cpp
+  src/ResumeStore.cpp
+  src/PlatformDatabase.cpp
+  src/PlatformDatabaseResume.cpp
+  src/PlatformDatabaseReads.cpp)
+target_include_directories(ZeroV5CrashResumeAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5CrashResumeAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ZeroV5CrashResumeAcceptance PRIVATE shell32 ole32 winsqlite3)
