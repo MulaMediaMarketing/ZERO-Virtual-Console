@@ -127,4 +127,8 @@ add_executable(ZeroInputAcceptance
 target_include_directories(ZeroInputAcceptance PRIVATE include)
 target_compile_definitions(ZeroInputAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
+add_executable(ZeroShellUxAcceptance tools/ShellUxAcceptance.cpp)
+target_include_directories(ZeroShellUxAcceptance PRIVATE include)
+target_compile_definitions(ZeroShellUxAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
