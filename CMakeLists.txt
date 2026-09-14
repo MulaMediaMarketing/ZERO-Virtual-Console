@@ -31,6 +31,7 @@ add_executable(ZeroVirtualConsole WIN32
   src/ManifestValidator.cpp
   src/PackageSecurity.cpp
   src/PackageIntegrityVerifier.cpp
+  src/PackageTrust.cpp
   src/RuntimeSession.cpp
   src/RuntimeSessionLifecycle.cpp
   src/RuntimeSessionDiagnostics.cpp
@@ -93,5 +94,12 @@ add_executable(ZeroPackageIntegrityAcceptance
 target_include_directories(ZeroPackageIntegrityAcceptance PRIVATE include)
 target_compile_definitions(ZeroPackageIntegrityAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroPackageIntegrityAcceptance PRIVATE bcrypt)
+
+add_executable(ZeroPackageTrustAcceptance
+  tools/PackageTrustAcceptance.cpp
+  src/PackageTrust.cpp
+)
+target_include_directories(ZeroPackageTrustAcceptance PRIVATE include)
+target_compile_definitions(ZeroPackageTrustAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 install(TARGETS ZeroVirtualConsole ZeroAcceptance RUNTIME DESTINATION .)
