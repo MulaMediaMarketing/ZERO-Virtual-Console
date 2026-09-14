@@ -3,22 +3,39 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
 
 $required = @(
   (Join-Path $BuildRoot "Release\ZeroVirtualConsole.exe"),
   (Join-Path $BuildRoot "Release\ZeroAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroIpcPersistenceAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroPackageIntegrityAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroPackageTrustAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroPackageRepairAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroInputAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroShellUxAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroProductionUxAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroFriendsExperienceAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroCapturesExperienceAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroCoreShellExperienceAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroStoreSettingsFirstBootAcceptance.exe"),
+  (Join-Path $BuildRoot "Release\ZeroFirstBootPersistenceAcceptance.exe"),
   (Join-Path $BuildRoot "Release\ZeroReferenceGame.exe"),
   (Join-Path $BuildRoot "Release\ZeroQualificationProbe.exe"),
   (Join-Path $BuildRoot "ReferencePackage\ZeroReferenceGame.exe"),
   (Join-Path $BuildRoot "ReferencePackage\zero.manifest.json"),
+  (Join-Path $BuildRoot "ReferencePackage\zero.integrity.sha256"),
   (Join-Path $BuildRoot "ReferencePackage\Assets\hero.png"),
   (Join-Path $BuildRoot "ReferencePackage\Assets\icon.png"),
   (Join-Path $BuildRoot "ReferencePackage\Assets\logo.png"),
   "./installer/install-zero.ps1",
   "./installer/uninstall-zero.ps1",
   "./tools/verify-installer-v2.ps1",
+  "./tools/verify-production-architecture.ps1",
   "./tools/verify-m1-automated.ps1",
   "./tools/run-rc-qualification.ps1",
+  "./tools/package-release.ps1",
+  "./docs/PRODUCTION_ARCHITECTURE_STANDARD.md",
   "./docs/RUNTIME_V4_1_RC_GATE.md"
 )
 
@@ -45,4 +62,5 @@ foreach ($path in $required) {
 }
 
 Write-Host "ZERO Runtime V4.1 RC build payload verification: PASS"
-Write-Host "RC qualification tooling is present. Physical qualification is still required before rc_qualified may become true."
+Write-Host "Production architecture tooling and complete automated acceptance payload are present."
+Write-Host "Physical qualification is still required before rc_qualified may become true."
