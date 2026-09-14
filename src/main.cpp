@@ -16,6 +16,10 @@ bool applyFirstBootSettings(const std::filesystem::path& root, const zero::First
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
+    // ZERO owns its physical-pixel layout and must not be virtualized by Windows when
+    // moving between displays or running at 125/150/200% scale.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
     const auto root = zero::PlatformPaths::DataRoot();
     zero::FirstBootService firstBoot(root);
     if (firstBoot.IsRequired()) {
