@@ -1,6 +1,6 @@
 #include "MiniDumpWriter.h"
+#include "PlatformPaths.h"
 #include <dbghelp.h>
-#include <shlobj.h>
 
 namespace zero {
 namespace {
@@ -13,16 +13,6 @@ bool safeId(const std::string& id) {
         if (!ok) return false;
     }
     return true;
-}
-
-std::filesystem::path crashRoot() {
-    PWSTR p = nullptr;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {
-        std::filesystem::path root = std::filesystem::path(p) / "ZERO" / "CrashReports";
-        CoTaskMemFree(p);
-        return root;
-    }
-    return std::filesystem::temp_directory_path() / "ZERO" / "CrashReports";
 }
 
 } // namespace
@@ -42,7 +32,7 @@ MiniDumpResult MiniDumpWriter::Capture(HANDLE process,
     }
 
     std::error_code ec;
-    const auto dir = crashRoot() / std::filesystem::path(packageId.begin(), packageId.end());
+    const auto dir = PlatformPaths::CrashReportsRoot() / std::filesystem::path(packageId.begin(), packageId.end());
     std::filesystem::create_directories(dir, ec);
     if (ec) {
         result.note = "Crash-report directory creation failed.";
