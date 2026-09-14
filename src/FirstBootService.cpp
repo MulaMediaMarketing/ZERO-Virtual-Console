@@ -1,25 +1,7 @@
 #include "FirstBootService.h"
-#include <algorithm>
-#include <cctype>
 #include <fstream>
 
 namespace zero {
-namespace {
-
-bool validProfileName(const std::string& value) {
-    if (value.empty() || value.size() > 64) return false;
-    return std::any_of(value.begin(), value.end(), [](unsigned char c) { return !std::isspace(c); });
-}
-
-bool requirementsSatisfied(const FirstBootState& state) {
-    return validProfileName(state.profileName) &&
-           state.controllerConfirmed &&
-           state.displayConfirmed &&
-           state.audioConfirmed &&
-           state.volume <= 100;
-}
-
-} // namespace
 
 FirstBootService::FirstBootService(std::filesystem::path zeroRoot) : root_(std::move(zeroRoot)) {}
 
@@ -40,7 +22,6 @@ FirstBootState FirstBootService::Load() const {
         else if (line.rfind("audio=", 0) == 0) state.audioConfirmed = line.substr(6) == "1";
         else if (line.rfind("volume=", 0) == 0) {
             try { state.volume = static_cast<unsigned>(std::stoul(line.substr(7))); } catch (...) {}
-            if (state.volume > 100) state.volume = 100;
         }
         else if (line.rfind("display_width=", 0) == 0) {
             try { state.displayWidth = static_cast<unsigned>(std::stoul(line.substr(14))); } catch (...) {}
@@ -49,17 +30,11 @@ FirstBootState FirstBootService::Load() const {
             try { state.displayHeight = static_cast<unsigned>(std::stoul(line.substr(15))); } catch (...) {}
         }
     }
-
-    // Persisted completion is never trusted by itself. A malformed or incomplete
-    // state always returns to First Boot instead of bypassing setup.
-    if (!requirementsSatisfied(state)) state.completed = false;
-    return state;
+    return NormalizeFirstBootState(state);
 }
 
 bool FirstBootService::Save(const FirstBootState& input, std::wstring& error) const {
-    FirstBootState state = input;
-    if (state.volume > 100) state.volume = 100;
-    if (state.completed && !requirementsSatisfied(state)) state.completed = false;
+    const FirstBootState state = NormalizeFirstBootState(input);
 
     std::error_code ec;
     std::filesystem::create_directories(root_, ec);
@@ -92,7 +67,7 @@ bool FirstBootService::Save(const FirstBootState& input, std::wstring& error) co
 
 bool FirstBootService::IsRequired() const {
     const auto state = Load();
-    return !state.completed || !requirementsSatisfied(state);
+    return !state.completed || !FirstBootRequirementsSatisfied(state);
 }
 
 } // namespace zero
