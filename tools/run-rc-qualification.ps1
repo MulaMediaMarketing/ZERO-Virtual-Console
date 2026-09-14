@@ -2,6 +2,7 @@ param(
   [string]$BuildRoot = "./build",
   [string]$EvidenceDir = "./build/QualificationEvidence",
   [string]$ControllerModel = "",
+  [string]$InstalledAcceptancePath = "$env:LOCALAPPDATA\Programs\ZERO Virtual Console\ZeroAcceptance.exe",
   [switch]$ControllerTraversalPassed,
   [switch]$OverlayFocusPassed,
   [switch]$ForegroundRecoveryPassed,
@@ -33,7 +34,7 @@ function Read-JsonProcess([string]$exe) {
 New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
 
 $probeExe = Resolve-RequiredFile "Release\ZeroQualificationProbe.exe"
-$zeroAcceptance = Resolve-RequiredFile "Release\ZeroAcceptance.exe"
+$buildAcceptance = Resolve-RequiredFile "Release\ZeroAcceptance.exe"
 $zeroShell = Resolve-RequiredFile "Release\ZeroVirtualConsole.exe"
 $referenceExe = Resolve-RequiredFile "ReferencePackage\ZeroReferenceGame.exe"
 $automatedJson = Join-Path $BuildRoot "AcceptanceReports\m1-automated-acceptance.json"
@@ -68,6 +69,21 @@ foreach ($entry in $manualChecks.GetEnumerator()) {
 }
 if ($NonInteractiveValidation) { $manualAllPassed = $false }
 
+$installedAcceptancePassed = $false
+$installedAcceptanceOutput = "Not executed in CI/non-interactive validation."
+$resolvedInstalledAcceptance = $null
+if (-not $NonInteractiveValidation) {
+  if (Test-Path $InstalledAcceptancePath -PathType Leaf) {
+    $resolvedInstalledAcceptance = (Resolve-Path $InstalledAcceptancePath).Path
+    $captured = (& $resolvedInstalledAcceptance 2>&1 | ForEach-Object { $_.ToString() })
+    $installedAcceptanceExit = $LASTEXITCODE
+    $installedAcceptanceOutput = $captured -join "`n"
+    $installedAcceptancePassed = $installedAcceptanceExit -eq 0
+  } else {
+    $installedAcceptanceOutput = "Installed ZeroAcceptance.exe was not found at $InstalledAcceptancePath"
+  }
+}
+
 $controllerIdentityPresent = -not [string]::IsNullOrWhiteSpace($ControllerModel)
 $qualified =
   $automated.automated_result -eq "PASS" -and
@@ -75,6 +91,7 @@ $qualified =
   $physicalControllerDetected -and
   $controllerIdentityPresent -and
   $manualAllPassed -and
+  $installedAcceptancePassed -and
   -not $NonInteractiveValidation
 
 $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
@@ -88,8 +105,14 @@ if (-not $controllerIdentityPresent) { [void]$blockers.Add("Controller make/mode
 foreach ($entry in $manualChecks.GetEnumerator()) {
   if (-not $entry.Value) { [void]$blockers.Add("Manual qualification check not passed: $($entry.Key)") }
 }
+if (-not $NonInteractiveValidation -and -not $installedAcceptancePassed) {
+  [void]$blockers.Add("Installed ZeroAcceptance.exe did not complete with PASS/exit 0.")
+}
 if ($NonInteractiveValidation) { [void]$blockers.Add("CI/non-interactive validation can never produce RC qualification.") }
 $blockerArray = [string[]]$blockers
+
+$shellHash = (Get-FileHash -Algorithm SHA256 -Path $zeroShell).Hash.ToLowerInvariant()
+$referenceHash = (Get-FileHash -Algorithm SHA256 -Path $referenceExe).Hash.ToLowerInvariant()
 
 $report = [ordered]@{
   schema = 1
@@ -100,6 +123,10 @@ $report = [ordered]@{
   rc_qualified = [bool]$qualified
   qualification_result = if ($qualified) { "PASS" } else { "PENDING" }
   automated_result = $automated.automated_result
+  candidate = [ordered]@{
+    shell_sha256 = $shellHash
+    reference_game_sha256 = $referenceHash
+  }
   machine = [ordered]@{
     windows_11 = [bool]$probe.windows_11
     os_build = [int]$probe.os_build
@@ -111,11 +138,16 @@ $report = [ordered]@{
     xinput_slots = [bool[]]$probe.xinput_slots
     detected = [bool]$physicalControllerDetected
   }
+  installed_acceptance = [ordered]@{
+    path = $resolvedInstalledAcceptance
+    passed = [bool]$installedAcceptancePassed
+    output = $installedAcceptanceOutput
+  }
   manual_checks = $manualChecks
   evidence = [ordered]@{
     automated_json = (Resolve-Path $automatedJson).Path
     automated_markdown = (Resolve-Path $automatedMd).Path
-    zero_acceptance = $zeroAcceptance
+    build_acceptance = $buildAcceptance
     zero_shell = $zeroShell
     reference_game = $referenceExe
   }
@@ -133,8 +165,11 @@ $lines = New-Object System.Collections.Generic.List[string]
 [void]$lines.Add("- Commit: ``$commit``")
 [void]$lines.Add("- Qualification result: **$($report.qualification_result)**")
 [void]$lines.Add("- RC qualified: **$(if ($qualified) { 'YES' } else { 'NO' })**")
+[void]$lines.Add("- Shell SHA-256: ``$shellHash``")
+[void]$lines.Add("- Reference game SHA-256: ``$referenceHash``")
 [void]$lines.Add("- Windows build: $($probe.os_build) ($($probe.architecture))")
 [void]$lines.Add("- Controller: $(if ($ControllerModel) { $ControllerModel } else { 'not recorded' })")
+[void]$lines.Add("- Installed acceptance: **$(if ($installedAcceptancePassed) { 'PASS' } else { 'PENDING' })**")
 [void]$lines.Add("")
 [void]$lines.Add("## Manual qualification checks")
 [void]$lines.Add("")
