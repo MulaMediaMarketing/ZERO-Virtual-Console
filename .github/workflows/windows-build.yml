@@ -24,6 +24,10 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroStrictJsonAcceptance.exe
 
+      - name: Validate canonical platform database contract
+        shell: pwsh
+        run: ./build/Release/ZeroPlatformDatabaseAcceptance.exe
+
       - name: Validate production architecture and collect benchmarks
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
@@ -84,6 +88,7 @@ jobs:
             build/Release/ZeroPackageTrustAcceptance.exe
             build/Release/ZeroPackageRepairAcceptance.exe
             build/Release/ZeroStrictJsonAcceptance.exe
+            build/Release/ZeroPlatformDatabaseAcceptance.exe
             build/Release/ZeroInputAcceptance.exe
             build/Release/ZeroShellUxAcceptance.exe
             build/Release/ZeroProductionUxAcceptance.exe
