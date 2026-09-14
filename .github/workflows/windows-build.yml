@@ -44,6 +44,11 @@ jobs:
         timeout-minutes: 3
         run: ./build/Release/ZeroPackageRepairAcceptance.exe
 
+      - name: Verify ZERO input finalization
+        shell: pwsh
+        timeout-minutes: 2
+        run: ./build/Release/ZeroInputAcceptance.exe
+
       - name: Verify installer update uninstall V2
         shell: pwsh
         timeout-minutes: 3
@@ -66,6 +71,7 @@ jobs:
             build/Release/ZeroPackageIntegrityAcceptance.exe
             build/Release/ZeroPackageTrustAcceptance.exe
             build/Release/ZeroPackageRepairAcceptance.exe
+            build/Release/ZeroInputAcceptance.exe
             build/ReferencePackage/**
             tools/verify-rc-build.ps1
             tools/verify-installer-v2.ps1
