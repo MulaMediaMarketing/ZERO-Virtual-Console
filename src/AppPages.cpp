@@ -385,12 +385,12 @@ void App::Paint() {
         DrawTextLine(trustUi.shortLabel, 106, 337, split - 180, 30, false, white.Get());
         const auto playRect = D2D1::RectF(104, 430, 282, 488);
         DrawRoundedCard(playRect, 20, preferResume_ && resume ? brushCard_.Get() : white.Get());
-        DrawTextLine(detailAction == GameDetailPrimaryAction::Blocked ? L"Blocked" : L"Play", detailAction == GameDetailPrimaryAction::Blocked ? 151 : 166, 446, 110, 30, false, brushText_.Get());
+        DrawTextLine(detailAction == GameDetailPrimaryAction::Blocked ? L"Blocked" : L"Play", detailAction == GameDetailPrimaryAction::Blocked ? 151.0f : 166.0f, 446, 110, 30, false, brushText_.Get());
         if (!resume || !preferResume_) DrawFocusRing(playRect, 20, false);
         if (resume) {
             const auto resumeRect = D2D1::RectF(300, 430, 500, 488);
             DrawRoundedCard(resumeRect, 20, preferResume_ ? white.Get() : brushCard_.Get());
-            DrawTextLine(detailAction == GameDetailPrimaryAction::Blocked ? L"Blocked" : L"Resume", detailAction == GameDetailPrimaryAction::Blocked ? 345 : 354, 446, 120, 30, false, brushText_.Get());
+            DrawTextLine(detailAction == GameDetailPrimaryAction::Blocked ? L"Blocked" : L"Resume", detailAction == GameDetailPrimaryAction::Blocked ? 345.0f : 354.0f, 446, 120, 30, false, brushText_.Get());
             if (preferResume_) DrawFocusRing(resumeRect, 20, false);
         }
         const float cardLeft = split + 20.0f;
@@ -425,8 +425,8 @@ void App::Paint() {
         DrawTextLine(trustUi.blocked
             ? L"Launch blocked by package trust   ·   X Achievements   ·   B Library"
             : (resume ? L"Left / Right  Choose Play or Resume   ·   A Launch   ·   X Achievements   ·   B Library" : L"A Play   ·   X Achievements   ·   B Library"),
-            64, resume ? 730 : 670, width - 128, 32, false, brushMuted_.Get());
-        if (!status_.empty()) DrawTextLine(status_, 64, resume ? 770 : 716, width - 128, 42, false, brushMuted_.Get());
+            64, resume ? 730.0f : 670.0f, width - 128, 32, false, brushMuted_.Get());
+        if (!status_.empty()) DrawTextLine(status_, 64, resume ? 770.0f : 716.0f, width - 128, 42, false, brushMuted_.Get());
     } else if (page_ == Page::Import) {
         DrawTextLine(L"Import a game", 62, 154, 600, 60, true);
         DrawTextLine(L"Add a folder that contains a valid zero.manifest.json and native Windows game executable.", 64, 214, width - 128, 48, false, brushMuted_.Get());
