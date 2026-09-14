@@ -11,12 +11,6 @@
 namespace zero::v5 {
 namespace {
 
-std::wstring widen(const std::string& text) {
-    if (text.empty()) return {};
-    const auto path = PathFromUtf8(text);
-    return path ? path->wstring() : std::wstring{};
-}
-
 std::filesystem::path packagePath(const std::filesystem::path& root, const std::string& packageId) {
     const auto relative = PathFromUtf8(packageId);
     return relative ? root / *relative : std::filesystem::path{};
@@ -134,8 +128,11 @@ bool activate(const std::filesystem::path& staging,
 } // namespace
 
 ProductionPackagePlatform::ProductionPackagePlatform(std::filesystem::path libraryRoot,
-                                                     const IPublisherTrustProvider& trustProvider)
-    : libraryRoot_(std::move(libraryRoot)), trustProvider_(trustProvider) {}
+                                                     const IPublisherTrustProvider& trustProvider,
+                                                     std::filesystem::path databasePath)
+    : libraryRoot_(std::move(libraryRoot)),
+      trustProvider_(trustProvider),
+      databasePath_(std::move(databasePath)) {}
 
 PackageOperationResult ProductionPackagePlatform::Execute(const PackageOperationRequest& request) const {
     PackageOperationResult result;
@@ -183,14 +180,16 @@ PackageOperationResult ProductionPackagePlatform::Execute(const PackageOperation
     if (!stageSource(request.sourceRoot, staging, sourceInventory, result.error)) return result;
 
     const auto staged = PackageManifestParser::ParseFile(staging / L"zero.manifest.json", staging);
-    if (!staged.valid || staged.manifest.packageId != parsed.manifest.packageId || staged.manifest.version != parsed.manifest.version) {
+    if (!staged.valid || staged.manifest.packageId != parsed.manifest.packageId ||
+        staged.manifest.version != parsed.manifest.version) {
         removeBestEffort(staging);
         result.error = L"ZERO V5 rejected the staged package because its manifest identity changed.";
         return result;
     }
 
     result.finalStage = PackageStage::Commit;
-    if (!activate(staging, destination, rollback, request.operation == PackageOperation::Repair, result.error)) return result;
+    if (!activate(staging, destination, rollback,
+                  request.operation == PackageOperation::Repair, result.error)) return result;
 
     result.finalStage = PackageStage::Register;
     const auto installed = PackageManifestParser::ParseFile(destination / L"zero.manifest.json", destination);
@@ -198,7 +197,7 @@ PackageOperationResult ProductionPackagePlatform::Execute(const PackageOperation
         result.error = L"ZERO V5 could not register the committed package because its installed manifest is invalid.";
         return result;
     }
-    PlatformDatabase database;
+    PlatformDatabase database(databasePath_);
     if (!database.Initialize(result.error) || !database.UpsertGame(installed.manifest, result.error)) return result;
 
     result.success = true;
