@@ -5,6 +5,7 @@
 #include "RuntimeSession.h"
 #include <chrono>
 #include <string>
+#include <utility>
 
 namespace zero::v5 {
 
@@ -23,6 +24,7 @@ public:
     bool ClientAuthenticated() const noexcept { return ipc_.ClientAuthenticated(); }
     bool ReadyReceived() const noexcept { return ipc_.ReadyReceived(); }
     const std::wstring& PipeName() const noexcept { return ipc_.PipeName(); }
+    const zero::RuntimeSessionInfo& ProcessInfo() const noexcept { return process_.Info(); }
 
 private:
     zero::RuntimeSession process_;
