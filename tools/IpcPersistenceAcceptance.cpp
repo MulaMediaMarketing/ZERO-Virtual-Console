@@ -126,8 +126,9 @@ int wmain() {
         allPassed &= achievementSucceeded;
     }
 
-    client.Shutdown();
+    // Stop the server first so its pipe disconnect unblocks the SDK receiver's synchronous read.
     server.Stop();
+    client.Shutdown();
     SetEnvironmentVariableW(L"ZERO_TEMP_ROOT", nullptr);
     std::error_code ec;
     std::filesystem::remove_all(tempRoot, ec);
