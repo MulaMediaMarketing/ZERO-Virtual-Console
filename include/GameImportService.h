@@ -14,6 +14,8 @@ class GameImportService {
 public:
     explicit GameImportService(std::filesystem::path libraryRoot);
     ImportResult ImportFolder(const std::filesystem::path& sourceRoot) const;
+    ImportResult RepairFolder(const std::filesystem::path& sourceRoot,
+                              const std::string& expectedPackageId) const;
 private:
     std::filesystem::path libraryRoot_;
 };

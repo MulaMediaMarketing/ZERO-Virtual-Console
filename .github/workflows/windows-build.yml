@@ -39,6 +39,11 @@ jobs:
         timeout-minutes: 2
         run: ./build/Release/ZeroPackageTrustAcceptance.exe
 
+      - name: Verify installed package repair flow
+        shell: pwsh
+        timeout-minutes: 3
+        run: ./build/Release/ZeroPackageRepairAcceptance.exe
+
       - name: Verify Runtime V4.1 RC payload
         shell: pwsh
         run: ./tools/verify-rc-build.ps1 -BuildRoot ./build
@@ -55,6 +60,7 @@ jobs:
             build/Release/ZeroIpcPersistenceAcceptance.exe
             build/Release/ZeroPackageIntegrityAcceptance.exe
             build/Release/ZeroPackageTrustAcceptance.exe
+            build/Release/ZeroPackageRepairAcceptance.exe
             build/ReferencePackage/**
             tools/verify-rc-build.ps1
             docs/RUNTIME_V4_1_RC_GATE.md
