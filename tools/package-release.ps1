@@ -31,6 +31,8 @@ $files = @(
   "ReferencePackage/ZeroReferenceGame.exe",
   "ReferencePackage/zero.manifest.json",
   "ReferencePackage/zero.integrity.sha256",
+  "ArchitectureReports/production-architecture.json",
+  "ArchitectureReports/production-architecture.md",
   "AcceptanceReports/m1-automated-acceptance.json",
   "AcceptanceReports/m1-automated-acceptance.md",
   "QualificationEvidence/rc-qualification.json",
@@ -55,23 +57,35 @@ foreach ($relative in $files) {
   })
 }
 
+$architecture = Get-Content (Join-Path $BuildRoot "ArchitectureReports/production-architecture.json") -Raw | ConvertFrom-Json
+$acceptance = Get-Content (Join-Path $BuildRoot "AcceptanceReports/m1-automated-acceptance.json") -Raw | ConvertFrom-Json
+$qualification = Get-Content (Join-Path $BuildRoot "QualificationEvidence/rc-qualification.json") -Raw | ConvertFrom-Json
+
+if ($architecture.result -ne "PASS") { throw "Production architecture gate did not pass." }
+if ($acceptance.automated_result -ne "PASS") { throw "Automated M1 acceptance did not pass." }
+if ($qualification.rc_qualified -eq $true) { throw "CI/release packaging must not promote itself to physically qualified." }
+
 $commit = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else {
   try { (& git rev-parse HEAD 2>$null).Trim() } catch { "unknown" }
 }
 
 $manifest = [ordered]@{
-  schema = 1
+  schema = 2
   product = "ZERO Virtual Console"
-  milestone = "M1 / Runtime V4.1 / Production UX"
+  milestone = "M1 / Runtime V4.1 / Production Architecture"
   commit = $commit
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
+  architecture_result = $architecture.result
+  automated_acceptance_result = $acceptance.automated_result
+  architecture_metrics = $architecture.source_metrics
+  acceptance_metrics = $architecture.acceptance_metrics
   rc_qualified = $false
-  rc_qualification_note = "Bundle is release-candidate material only until physical Windows 11 x64 and controller qualification passes."
+  rc_qualification_note = "Bundle is release-candidate material only until physical Windows 11 x64 and controller qualification passes for this exact commit."
   files = $manifestEntries.ToArray()
 }
 
 $manifestPath = Join-Path $OutputDir "release-manifest.json"
-$manifest | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 -Path $manifestPath
+$manifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 -Path $manifestPath
 
 $zipPath = Join-Path (Split-Path -Parent $OutputDir) "ZERO-Virtual-Console-Windows-x64-RC.zip"
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
@@ -81,4 +95,6 @@ Require-File $zipPath
 Write-Host "ZERO release bundle: $OutputDir"
 Write-Host "ZERO release manifest: $manifestPath"
 Write-Host "ZERO RC archive: $zipPath"
+Write-Host "ZERO production architecture: $($architecture.result)"
+Write-Host "ZERO automated acceptance: $($acceptance.automated_result)"
 Write-Host "ZERO RC qualification: PENDING PHYSICAL ACCEPTANCE"
