@@ -1,0 +1,9 @@
+target_sources(ZeroVirtualConsole PRIVATE
+  src/v5/ProductionShellIntegration.cpp)
+
+add_executable(ZeroV5ProductionUxIntegrationAcceptance
+  tools/V5ProductionUxIntegrationAcceptance.cpp
+  src/v5/ProductionShellIntegration.cpp
+  src/v5/ShellKernel.cpp)
+target_include_directories(ZeroV5ProductionUxIntegrationAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5ProductionUxIntegrationAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)

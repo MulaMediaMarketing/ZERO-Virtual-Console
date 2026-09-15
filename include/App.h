@@ -9,6 +9,7 @@
 #include "IdentityProvider.h"
 #include "ResumeStore.h"
 #include "v5/ProductionRuntime.h"
+#include "v5/ProductionShellIntegration.h"
 #include "Settings.h"
 #include "ShellUxState.h"
 #include "StoreProvider.h"
@@ -63,6 +64,7 @@ private:
     UserSettings settings_;
     Input input_;
     ShellUxState shellUx_;
+    v5::ProductionShellIntegration productionShell_;
 
     FriendsExperienceState friendsUx_{};
     CaptureExperienceState capturesUx_{};
