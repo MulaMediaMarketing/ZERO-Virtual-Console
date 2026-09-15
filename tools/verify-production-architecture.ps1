@@ -80,7 +80,11 @@ if($appHeader -notmatch 'AuthoritativeNavProjection\s+navIndex_\{\*this,\s*produ
 if($appHeader -match '(?m)^\s*Page\s+page_\s*\{' -or $appHeader -match '(?m)^\s*size_t\s+navIndex_\s*\{'){Violate "parallel_legacy_navigation_state" "include/App.h" "Raw page/nav state may not coexist with the V5 ShellKernel authority."}
 if($shellBridge -match 'NavigateLegacy|ActiveLegacyPage|ToLegacyPage'){Violate "legacy_shell_bridge_api" "include/v5/ProductionShellIntegration.h" "Legacy shell bridge APIs are forbidden after live V5 cutover."}
 if($shellKernel -notmatch 'MoveTopLevel\s*\(int\s+direction' -or $shellKernel -notmatch 'ActiveTopLevelIndex\s*\(\)\s+const'){Violate "v5_navigation_traversal_authority" "include/v5/ShellKernel.h" "Top-level movement and selection must be owned by ShellKernel."}
-if($shellKernelSource -notmatch 'if\s*\(!controller->Execute\(activate,\s*error\)\)\s*return\s+false'){Violate "transactional_shell_navigation" "src/v5/ShellKernel.cpp" "Shell navigation must not publish state before controller activation succeeds."}
+$activateBody = [regex]::Match($shellKernelSource, '(?s)bool\s+ShellKernel::Activate\s*\([^)]*\)\s*\{(?<body>.*?)\n\}')
+$navigateBody = [regex]::Match($shellKernelSource, '(?s)bool\s+ShellKernel::Navigate\s*\([^)]*\)\s*\{(?<body>.*?)\n\}')
+if(-not $activateBody.Success -or $activateBody.Groups['body'].Value -notmatch 'return\s+controller->Execute\(activate,\s*error\)\s*;' -or -not $navigateBody.Success -or $navigateBody.Groups['body'].Value -notmatch 'if\s*\(!Activate\(page,\s*error\)\)\s*return\s+false\s*;'){
+  Violate "transactional_shell_navigation" "src/v5/ShellKernel.cpp" "Navigate must successfully execute controller activation before publishing shell state."
+}
 if($navContract -notmatch 'ProductionUxNavCount\(\)\s*==\s*12'){Violate "v5_permanent_navigation_contract" "include/ProductionUxContract.h" "Production navigation must expose all twelve V5 permanent destinations."}
 if($pages -match 'const\s+wchar_t\*\s+nav\s*\['){Violate "single_navigation_label_authority" "src/AppPages.cpp" "Use the mapped V5 production navigation labels."}
 foreach($legacy in @("selectedGame_","selectedCapture_","captureScroll_","selectedSetting_","captureViewerVisible_","captureDeleteConfirm_")){
@@ -117,7 +121,7 @@ if(-not(Test-Path $shell -PathType Leaf)){Violate "release_shell_present" $shell
 $commit=if($env:GITHUB_SHA){$env:GITHUB_SHA}else{try{(& git rev-parse HEAD 2>$null).Trim()}catch{"unknown"}}
 $failed=$violations.Count; $status=if($failed -eq 0){"PASS"}else{"FAIL"}
 $report=[ordered]@{
-  schema=6;generated_at_utc=[DateTime]::UtcNow.ToString("o");commit=$commit;result=$status
+  schema=7;generated_at_utc=[DateTime]::UtcNow.ToString("o");commit=$commit;result=$status
   policy=[ordered]@{max_source_lines=1000;minimum_acceptance_contracts=$minimumContracts;shell_binary_max_bytes=67108864;current_runtime="V5 ProductionRuntime";publisher_signature_algorithm="ecdsa-p256-sha256";navigation_authority="V5 ShellKernel via ProductionShellIntegration";navigation_commit_semantics="transactional-after-controller-activation";platform_path_authority="PlatformPaths";compiler_warnings="fatal";package_json_parser="StrictJson/PackageManifestParser"}
   source_metrics=[ordered]@{files=$sourceFiles.Count;total_lines=$totalLines;max_file_lines=$maxLines;max_file=$maxFile;files_detail=$fileMetrics.ToArray()}
   shell_metric=$shellMetric
