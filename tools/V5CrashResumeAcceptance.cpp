@@ -1,3 +1,5 @@
+#include "PlatformDatabase.h"
+#include "ZeroTypes.h"
 #include "v5/CrashSupervisor.h"
 #include "v5/ResumeCoordinator.h"
 #include <iostream>
@@ -16,6 +18,18 @@ RuntimeSessionGrant grant(std::vector<RuntimeCapability> capabilities) {
 }
 
 int main() {
+    // Resume rows are foreign-key bound to a registered package. Seed the same
+    // canonical package identity that a production launch registers before the
+    // runtime SDK is allowed to persist Resume state.
+    zero::PlatformDatabase database;
+    zero::GameManifest game;
+    game.packageId = "zero.v5.acceptance.resume";
+    game.title = "V5 Resume Acceptance";
+    game.version = "1.0.0";
+    game.executable = L"V5ResumeAcceptance.exe";
+    std::wstring databaseError;
+    if (!database.UpsertGame(game, databaseError)) return 1;
+
     ResumeCoordinator resume;
     std::string error;
 
