@@ -60,6 +60,8 @@ private:
     const ProductionRuntime& owner_;
 };
 
+ProductionRuntime::~ProductionRuntime() = default;
+
 ProductionRuntime::ProductionRuntime()
     : policy_(std::make_unique<LocalLaunchPolicy>()),
       capabilities_(std::make_unique<LocalCapabilityBroker>(*this)),
