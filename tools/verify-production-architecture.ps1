@@ -70,13 +70,17 @@ $app=Get-Content (Join-Path $SourceRoot "src/App.cpp") -Raw
 $pages=Get-Content (Join-Path $SourceRoot "src/AppPages.cpp") -Raw
 $appHeader=Get-Content (Join-Path $SourceRoot "include/App.h") -Raw
 $shellBridge=Get-Content (Join-Path $SourceRoot "include/v5/ProductionShellIntegration.h") -Raw
+$shellKernel=Get-Content (Join-Path $SourceRoot "include/v5/ShellKernel.h") -Raw
+$shellKernelSource=Get-Content (Join-Path $SourceRoot "src/v5/ShellKernel.cpp") -Raw
 $navContract=Get-Content (Join-Path $SourceRoot "include/ProductionUxContract.h") -Raw
 if($app -match 'App::Page pageForNavIndex' -or $app -match 'navIndex_\s*=\s*[34]\s*;'){Violate "single_navigation_authority" "src/App.cpp" "Live navigation must route through the V5 ShellKernel authority."}
 if($appHeader -notmatch 'v5::ProductionShellIntegration\s+productionShell_'){Violate "v5_shell_composition" "include/App.h" "App must compose ProductionShellIntegration as the live shell authority."}
 if($appHeader -notmatch 'AuthoritativePageProjection\s+page_\{productionShell_\}'){Violate "v5_active_page_authority" "include/App.h" "Live active-page state must project from ProductionShellIntegration/ShellKernel."}
-if($appHeader -notmatch 'AuthoritativeNavProjection\s+navIndex_\{productionShell_\}'){Violate "v5_navigation_selection_authority" "include/App.h" "Live navigation selection must project from ProductionShellIntegration/ShellKernel."}
+if($appHeader -notmatch 'AuthoritativeNavProjection\s+navIndex_\{\*this,\s*productionShell_\}'){Violate "v5_navigation_selection_authority" "include/App.h" "Live navigation selection and transition feedback must project from ProductionShellIntegration/ShellKernel."}
 if($appHeader -match '(?m)^\s*Page\s+page_\s*\{' -or $appHeader -match '(?m)^\s*size_t\s+navIndex_\s*\{'){Violate "parallel_legacy_navigation_state" "include/App.h" "Raw page/nav state may not coexist with the V5 ShellKernel authority."}
-if($shellBridge -notmatch 'MoveTopLevel\s*\(' -or $shellBridge -notmatch 'ActiveTopLevelIndex\s*\('){Violate "v5_navigation_traversal_authority" "include/v5/ProductionShellIntegration.h" "Top-level movement must be owned by the V5 shell integration."}
+if($shellBridge -match 'NavigateLegacy|ActiveLegacyPage|ToLegacyPage'){Violate "legacy_shell_bridge_api" "include/v5/ProductionShellIntegration.h" "Legacy shell bridge APIs are forbidden after live V5 cutover."}
+if($shellKernel -notmatch 'MoveTopLevel\s*\(int\s+direction' -or $shellKernel -notmatch 'ActiveTopLevelIndex\s*\(\)\s+const'){Violate "v5_navigation_traversal_authority" "include/v5/ShellKernel.h" "Top-level movement and selection must be owned by ShellKernel."}
+if($shellKernelSource -notmatch 'if\s*\(!controller->Execute\(activate,\s*error\)\)\s*return\s+false'){Violate "transactional_shell_navigation" "src/v5/ShellKernel.cpp" "Shell navigation must not publish state before controller activation succeeds."}
 if($navContract -notmatch 'ProductionUxNavCount\(\)\s*==\s*12'){Violate "v5_permanent_navigation_contract" "include/ProductionUxContract.h" "Production navigation must expose all twelve V5 permanent destinations."}
 if($pages -match 'const\s+wchar_t\*\s+nav\s*\['){Violate "single_navigation_label_authority" "src/AppPages.cpp" "Use the mapped V5 production navigation labels."}
 foreach($legacy in @("selectedGame_","selectedCapture_","captureScroll_","selectedSetting_","captureViewerVisible_","captureDeleteConfirm_")){
@@ -113,8 +117,8 @@ if(-not(Test-Path $shell -PathType Leaf)){Violate "release_shell_present" $shell
 $commit=if($env:GITHUB_SHA){$env:GITHUB_SHA}else{try{(& git rev-parse HEAD 2>$null).Trim()}catch{"unknown"}}
 $failed=$violations.Count; $status=if($failed -eq 0){"PASS"}else{"FAIL"}
 $report=[ordered]@{
-  schema=5;generated_at_utc=[DateTime]::UtcNow.ToString("o");commit=$commit;result=$status
-  policy=[ordered]@{max_source_lines=1000;minimum_acceptance_contracts=$minimumContracts;shell_binary_max_bytes=67108864;current_runtime="V5 ProductionRuntime";publisher_signature_algorithm="ecdsa-p256-sha256";navigation_authority="V5 ShellKernel via ProductionShellIntegration";platform_path_authority="PlatformPaths";compiler_warnings="fatal";package_json_parser="StrictJson/PackageManifestParser"}
+  schema=6;generated_at_utc=[DateTime]::UtcNow.ToString("o");commit=$commit;result=$status
+  policy=[ordered]@{max_source_lines=1000;minimum_acceptance_contracts=$minimumContracts;shell_binary_max_bytes=67108864;current_runtime="V5 ProductionRuntime";publisher_signature_algorithm="ecdsa-p256-sha256";navigation_authority="V5 ShellKernel via ProductionShellIntegration";navigation_commit_semantics="transactional-after-controller-activation";platform_path_authority="PlatformPaths";compiler_warnings="fatal";package_json_parser="StrictJson/PackageManifestParser"}
   source_metrics=[ordered]@{files=$sourceFiles.Count;total_lines=$totalLines;max_file_lines=$maxLines;max_file=$maxFile;files_detail=$fileMetrics.ToArray()}
   shell_metric=$shellMetric
   acceptance_metrics=[ordered]@{source_contracts=$acceptanceSources.Count;built_binaries=$acceptanceBinaries.Count;binaries=$binaryMetrics.ToArray()}
