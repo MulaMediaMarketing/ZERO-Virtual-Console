@@ -59,7 +59,8 @@ private:
 
     class AuthoritativeNavProjection final {
     public:
-        explicit AuthoritativeNavProjection(v5::ProductionShellIntegration& shell) noexcept : shell_(&shell) {}
+        AuthoritativeNavProjection(App& owner, v5::ProductionShellIntegration& shell) noexcept
+            : owner_(&owner), shell_(&shell) {}
 
         operator size_t() const noexcept {
             return shell_ ? shell_->ActiveTopLevelIndex() : ProductionUxIndex(ProductionUxDestination::Home);
@@ -68,16 +69,24 @@ private:
         AuthoritativeNavProjection& operator=(size_t index) noexcept {
             if (!shell_ || index >= ProductionUxNavCount()) return *this;
 
+            const auto beforeRevision = shell_->Snapshot().navigationRevision;
             std::string ignored;
-            if (shell_->Navigate(ProductionUxPageAt(index), ignored)) return *this;
+            if (!shell_->Navigate(ProductionUxPageAt(index), ignored)) {
+                const auto current = shell_->ActiveTopLevelIndex();
+                if (index > current) shell_->MoveTopLevel(1, ignored);
+                else if (index < current) shell_->MoveTopLevel(-1, ignored);
+            }
 
-            const auto current = shell_->ActiveTopLevelIndex();
-            if (index > current) shell_->MoveTopLevel(1, ignored);
-            else if (index < current) shell_->MoveTopLevel(-1, ignored);
+            const auto afterRevision = shell_->Snapshot().navigationRevision;
+            if (owner_ && afterRevision != beforeRevision) {
+                owner_->shellUx_.BeginPageTransition();
+                owner_->NotifyFocusMoved();
+            }
             return *this;
         }
 
     private:
+        App* owner_{nullptr};
         v5::ProductionShellIntegration* shell_{nullptr};
     };
 
@@ -124,7 +133,7 @@ private:
     RuntimeOutcome lastRuntimeOutcome_{RuntimeOutcome::None};
     size_t selectedAchievement_{0};
     size_t achievementScroll_{0};
-    AuthoritativeNavProjection navIndex_{productionShell_};
+    AuthoritativeNavProjection navIndex_{*this, productionShell_};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
     bool overlayClosing_{false};
