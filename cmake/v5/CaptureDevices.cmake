@@ -1,0 +1,8 @@
+target_sources(ZeroVirtualConsole PRIVATE
+  src/v5/CaptureDeviceDomain.cpp)
+
+add_executable(ZeroV5CaptureDeviceAcceptance
+  tools/V5CaptureDeviceAcceptance.cpp
+  src/v5/CaptureDeviceDomain.cpp)
+target_include_directories(ZeroV5CaptureDeviceAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5CaptureDeviceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
