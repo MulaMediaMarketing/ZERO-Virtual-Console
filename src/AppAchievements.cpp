@@ -5,21 +5,46 @@ using Microsoft::WRL::ComPtr;
 
 namespace zero {
 
+namespace {
+
+bool containsAuthoritativeUnlock(const std::vector<v5::AchievementUnlock>& unlocks,
+                                 const std::string& achievementId) {
+    return std::any_of(unlocks.begin(), unlocks.end(), [&](const v5::AchievementUnlock& unlock) {
+        return unlock.achievementId == achievementId;
+    });
+}
+
+const v5::AchievementUnlock* findAuthoritativeUnlock(const std::vector<v5::AchievementUnlock>& unlocks,
+                                                      const std::string& achievementId) {
+    const auto it = std::find_if(unlocks.begin(), unlocks.end(), [&](const v5::AchievementUnlock& unlock) {
+        return unlock.achievementId == achievementId;
+    });
+    return it == unlocks.end() ? nullptr : &*it;
+}
+
+} // namespace
+
 void App::ClampAchievementSelection() {
-    const auto records = achievementPackageId_.empty()
-        ? std::vector<AchievementRecord>{}
-        : runtime_.Achievements(achievementPackageId_);
-    if (records.empty()) {
+    if (achievementPackageId_.empty()) {
         selectedAchievement_ = 0;
         achievementScroll_ = 0;
         return;
     }
-    if (selectedAchievement_ >= records.size()) selectedAchievement_ = records.size() - 1;
+
+    const auto definitions = runtime_.AchievementDefinitions(achievementPackageId_);
+    const auto records = runtime_.Achievements(achievementPackageId_);
+    const size_t count = definitions.empty() ? records.size() : definitions.size();
+    if (count == 0) {
+        selectedAchievement_ = 0;
+        achievementScroll_ = 0;
+        return;
+    }
+    if (selectedAchievement_ >= count) selectedAchievement_ = count - 1;
     constexpr size_t visible = 6;
     if (selectedAchievement_ < achievementScroll_) achievementScroll_ = selectedAchievement_;
     if (selectedAchievement_ >= achievementScroll_ + visible)
         achievementScroll_ = selectedAchievement_ - visible + 1;
-    const size_t maxStart = records.size() > visible ? records.size() - visible : 0;
+    const size_t maxStart = count > visible ? count - visible : 0;
     achievementScroll_ = std::min(achievementScroll_, maxStart);
 }
 
@@ -48,10 +73,6 @@ void App::OpenAchievements(const std::string& packageId, Page returnPage, bool f
 }
 
 void App::HandleAchievementInput(const InputSnapshot& in) {
-    const auto records = achievementPackageId_.empty()
-        ? std::vector<AchievementRecord>{}
-        : runtime_.Achievements(achievementPackageId_);
-
     if (in.back || in.menu) {
         if (achievementsFromOverlay_) {
             achievementsFromOverlay_ = false;
@@ -72,13 +93,18 @@ void App::HandleAchievementInput(const InputSnapshot& in) {
         return;
     }
 
-    if (records.empty()) return;
+    if (achievementPackageId_.empty()) return;
+    const auto definitions = runtime_.AchievementDefinitions(achievementPackageId_);
+    const auto records = runtime_.Achievements(achievementPackageId_);
+    const size_t count = definitions.empty() ? records.size() : definitions.size();
+    if (count == 0) return;
+
     if (in.up && selectedAchievement_ > 0) {
         --selectedAchievement_;
         ClampAchievementSelection();
         NotifyFocusMoved();
     }
-    if (in.down && selectedAchievement_ + 1 < records.size()) {
+    if (in.down && selectedAchievement_ + 1 < count) {
         ++selectedAchievement_;
         ClampAchievementSelection();
         NotifyFocusMoved();
@@ -94,13 +120,11 @@ void App::DrawAchievements(float width, float height) {
 
         std::vector<GlobalAchievementRow> recent;
         std::uint64_t totalPlaytimeSeconds = 0;
-        std::uint64_t totalLaunches = 0;
         std::size_t gamesWithAchievements = 0;
 
         for (const auto& game : registry_.Games()) {
             const auto state = runtime_.PlatformState(game.packageId);
             totalPlaytimeSeconds += state.totalPlaytimeSeconds;
-            totalLaunches += state.launchCount;
 
             const auto records = runtime_.Achievements(game.packageId);
             if (!records.empty()) ++gamesWithAchievements;
@@ -111,23 +135,27 @@ void App::DrawAchievements(float width, float height) {
             return a.record.unlockedAtUtc > b.record.unlockedAtUtc;
         });
 
+        const auto identity = identity_.CurrentProfile();
+        const auto authoritativeScore = identity.localOnly ? 0ull : runtime_.AuthoritativeAchievementScore(identity.zeroId);
+
         DrawTextLine(L"Achievements", 62, 132, 500, 60, true);
-        DrawTextLine(L"YOUR VERIFIED LOCAL ACHIEVEMENT HISTORY", 64, 190, width - 128, 30, false, brushMuted_.Get());
+        DrawTextLine(L"YOUR VERIFIED ACHIEVEMENT HISTORY", 64, 190, width - 128, 30, false, brushMuted_.Get());
 
         const float gap = 16.0f;
-        const float cardWidth = (width - 124.0f - gap * 2.0f) / 3.0f;
-        const auto unlockedCard = D2D1::RectF(62, 245, 62 + cardWidth, 350);
-        const auto gamesCard = D2D1::RectF(62 + cardWidth + gap, 245, 62 + cardWidth * 2.0f + gap, 350);
-        const auto timeCard = D2D1::RectF(62 + cardWidth * 2.0f + gap * 2.0f, 245, width - 62, 350);
-        DrawRoundedCard(unlockedCard, 22, brushCard_.Get());
-        DrawRoundedCard(gamesCard, 22, brushCard_.Get());
-        DrawRoundedCard(timeCard, 22, brushCard_.Get());
-        DrawTextLine(std::to_wstring(recent.size()), unlockedCard.left + 24, 266, cardWidth - 48, 44, true);
-        DrawTextLine(L"UNLOCKED", unlockedCard.left + 24, 313, cardWidth - 48, 24, false, brushMuted_.Get());
-        DrawTextLine(std::to_wstring(gamesWithAchievements), gamesCard.left + 24, 266, cardWidth - 48, 44, true);
-        DrawTextLine(L"GAMES WITH UNLOCKS", gamesCard.left + 24, 313, cardWidth - 48, 24, false, brushMuted_.Get());
-        DrawTextLine(std::to_wstring(totalPlaytimeSeconds / 3600) + L"h", timeCard.left + 24, 266, cardWidth - 48, 44, true);
-        DrawTextLine(L"VERIFIED PLAYTIME", timeCard.left + 24, 313, cardWidth - 48, 24, false, brushMuted_.Get());
+        const float cardWidth = (width - 124.0f - gap * 3.0f) / 4.0f;
+        const std::wstring values[] = {
+            std::to_wstring(recent.size()),
+            std::to_wstring(gamesWithAchievements),
+            std::to_wstring(totalPlaytimeSeconds / 3600) + L"h",
+            identity.localOnly ? L"Offline" : std::to_wstring(authoritativeScore)
+        };
+        const wchar_t* labels[] = {L"LOCAL UNLOCKS", L"GAMES", L"PLAYTIME", L"ZERO SCORE"};
+        for (int i = 0; i < 4; ++i) {
+            const float x = 62.0f + i * (cardWidth + gap);
+            DrawRoundedCard(D2D1::RectF(x, 245, x + cardWidth, 350), 22, brushCard_.Get());
+            DrawTextLine(values[i], x + 22, 266, cardWidth - 44, 44, true);
+            DrawTextLine(labels[i], x + 22, 313, cardWidth - 44, 24, false, brushMuted_.Get());
+        }
 
         DrawTextLine(L"RECENT UNLOCKS", 64, 390, 320, 28, false, brushMuted_.Get());
         if (recent.empty()) {
@@ -146,22 +174,90 @@ void App::DrawAchievements(float width, float height) {
             }
         }
 
-        DrawTextLine(L"ZERO only displays persisted local unlocks until authoritative achievement definitions are synced.",
+        DrawTextLine(identity.localOnly
+                         ? L"ZERO Score and authoritative global completion require a connected ZERO identity."
+                         : L"ZERO Score is derived only from authoritative ZERO-service achievement definitions and unlocks.",
                      64, height - 70, width - 128, 28, false, brushMuted_.Get());
-        (void)totalLaunches;
         return;
     }
 
     const auto records = runtime_.Achievements(achievementPackageId_);
+    const auto definitions = runtime_.AchievementDefinitions(achievementPackageId_);
+    const auto identity = identity_.CurrentProfile();
+    const auto authorityUnlocks = identity.localOnly
+        ? std::vector<v5::AchievementUnlock>{}
+        : runtime_.AuthoritativeAchievementUnlocks(identity.zeroId, achievementPackageId_);
 
     DrawTextLine(L"Achievements", 62, 132, 500, 60, true);
     DrawTextLine(Widen(achievementPackageId_), 64, 190, width - 128, 30, false, brushMuted_.Get());
 
+    if (!definitions.empty()) {
+        std::uint64_t totalScore = 0;
+        std::uint64_t earnedScore = 0;
+        std::size_t unlocked = 0;
+        for (const auto& definition : definitions) {
+            totalScore += definition.score;
+            if (const auto* unlock = findAuthoritativeUnlock(authorityUnlocks, definition.achievementId)) {
+                ++unlocked;
+                earnedScore += definition.score;
+                (void)unlock;
+            }
+        }
+        const auto completion = definitions.empty() ? 0u : static_cast<unsigned>((unlocked * 100u) / definitions.size());
+
+        const float gap = 14.0f;
+        const float cardWidth = (width - 124.0f - gap * 2.0f) / 3.0f;
+        const std::wstring values[] = {
+            identity.localOnly ? L"Offline" : std::to_wstring(completion) + L"%",
+            identity.localOnly ? L"Offline" : std::to_wstring(earnedScore) + L" / " + std::to_wstring(totalScore),
+            std::to_wstring(definitions.size())
+        };
+        const wchar_t* labels[] = {L"COMPLETION", L"ZERO SCORE", L"TOTAL"};
+        for (int i = 0; i < 3; ++i) {
+            const float x = 62.0f + i * (cardWidth + gap);
+            DrawRoundedCard(D2D1::RectF(x, 238, x + cardWidth, 325), 20, brushCard_.Get());
+            DrawTextLine(values[i], x + 22, 252, cardWidth - 44, 34, true);
+            DrawTextLine(labels[i], x + 22, 292, cardWidth - 44, 22, false, brushMuted_.Get());
+        }
+
+        const size_t end = std::min(definitions.size(), achievementScroll_ + 6);
+        float y = 350.0f;
+        for (size_t i = achievementScroll_; i < end; ++i, y += 72.0f) {
+            const auto& definition = definitions[i];
+            const auto* unlock = findAuthoritativeUnlock(authorityUnlocks, definition.achievementId);
+            const bool isUnlocked = unlock != nullptr;
+            const bool hideSecret = definition.secret && !isUnlocked;
+            const auto rect = D2D1::RectF(62, y, width - 62, y + 58);
+            DrawRoundedCard(rect, 17, i == selectedAchievement_ ? brushAccent_.Get() : brushCard_.Get());
+            if (i == selectedAchievement_) DrawFocusRing(rect, 17, true);
+
+            const std::wstring title = hideSecret ? L"Secret achievement" : Widen(definition.title);
+            const std::wstring description = hideSecret ? L"Details hidden until unlocked" : Widen(definition.description);
+            DrawTextLine(title, 92, y + 5, width - 610, 25, false);
+            DrawTextLine(description, 92, y + 31, width - 610, 20, false, brushMuted_.Get());
+
+            std::wstring status = isUnlocked ? L"UNLOCKED" : L"LOCKED";
+            status += L"  ·  " + std::to_wstring(definition.score) + L" pts";
+            if (definition.targetProgress > 1) status += L"  ·  Target " + std::to_wstring(definition.targetProgress);
+            if (unlock) {
+                const double rarity = static_cast<double>(unlock->rarityBasisPoints) / 100.0;
+                status += L"  ·  " + std::to_wstring(rarity).substr(0, 4) + L"% rarity";
+            }
+            DrawTextLine(status, width - 500, y + 17, 410, 24, false, brushMuted_.Get());
+        }
+
+        DrawTextLine(identity.localOnly
+                         ? L"Authoritative definitions are synced, but account completion remains hidden until ZERO identity is connected."
+                         : L"Up/Down Browse   ·   B Back   ·   Secret details remain hidden until authoritative unlock.",
+                     64, height - 78, width - 128, 30, false, brushMuted_.Get());
+        return;
+    }
+
     DrawRoundedCard(D2D1::RectF(62, 238, width - 62, 325), 20, brushCard_.Get());
     DrawTextLine(std::to_wstring(records.size()), 88, 253, 160, 40, true);
-    DrawTextLine(L"UNLOCKED", 88, 292, 180, 22, false, brushMuted_.Get());
-    DrawTextLine(L"Completion %, rarity, ZERO Score, progress and locked/secret entries appear only when authoritative definitions are available.",
-                 270, 258, width - 360, 52, false, brushMuted_.Get());
+    DrawTextLine(L"LOCAL UNLOCKS", 88, 292, 200, 22, false, brushMuted_.Get());
+    DrawTextLine(L"Authoritative definitions are not currently available, so ZERO will not invent locked entries, rarity, score or completion.",
+                 300, 258, width - 390, 52, false, brushMuted_.Get());
 
     if (records.empty()) {
         DrawEmptyState(L"No achievements unlocked",
@@ -191,7 +287,7 @@ void App::DrawAchievements(float width, float height) {
         }
     }
 
-    DrawTextLine(std::to_wstring(records.size()) + L" unlocked   ·   Up/Down Browse   ·   B Back",
+    DrawTextLine(std::to_wstring(records.size()) + L" local unlocks   ·   Up/Down Browse   ·   B Back",
         64, height - 78, width - 128, 30, false, brushMuted_.Get());
 }
 
