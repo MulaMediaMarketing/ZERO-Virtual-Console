@@ -1,0 +1,8 @@
+target_sources(ZeroVirtualConsole PRIVATE
+  src/v5/CatalogEntitlementAuthority.cpp)
+
+add_executable(ZeroV5CatalogEntitlementAcceptance
+  tools/V5CatalogEntitlementAcceptance.cpp
+  src/v5/CatalogEntitlementAuthority.cpp)
+target_include_directories(ZeroV5CatalogEntitlementAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5CatalogEntitlementAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
