@@ -2,6 +2,7 @@
 #include "PackageIntegrityVerifier.h"
 #include <bcrypt.h>
 #include <algorithm>
+#include <ctime>
 #include <iomanip>
 #include <sstream>
 
@@ -22,6 +23,16 @@ const char* outcomeName(RuntimeOutcome outcome) {
         case RuntimeOutcome::Hung: return "hung";
     }
     return "unknown";
+}
+
+std::string nowUtc() {
+    const auto tp = std::chrono::system_clock::now();
+    const auto tt = std::chrono::system_clock::to_time_t(tp);
+    std::tm utc{};
+    gmtime_s(&utc, &tt);
+    std::ostringstream out;
+    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
+    return out.str();
 }
 
 } // namespace
@@ -68,7 +79,9 @@ ProductionRuntime::ProductionRuntime()
       host_(),
       authority_(std::make_unique<v5::RuntimeAuthority>(*policy_, *capabilities_, host_)),
       localDatabase_(),
-      sessions_(localDatabase_.Database()) {
+      sessions_(localDatabase_.Database()),
+      resumes_(localDatabase_.Database()),
+      achievements_(localDatabase_.Database()) {
     RuntimeIpcCallbacks callbacks;
     callbacks.onReady = [this]() {
         if (readyAt_.time_since_epoch().count() == 0) readyAt_ = std::chrono::steady_clock::now();
@@ -83,8 +96,9 @@ ProductionRuntime::ProductionRuntime()
         metadata.activityId = activityId;
         metadata.displayLabel = displayLabel;
         metadata.payload = payload;
-        std::wstring error;
-        return resumeStore_.Save(metadata, error);
+        metadata.updatedAtUtc = nowUtc();
+        std::string error;
+        return resumes_.Save(metadata, error);
     };
     callbacks.onAchievement = [this](const std::string& achievementId,
                                      const std::string& title) {
@@ -260,10 +274,6 @@ void ProductionRuntime::FinalizePersistence() {
                      outcome_ == RuntimeOutcome::ReadyTimeout;
     std::string repositoryError;
     if (!sessions_.Record(record, repositoryError)) return;
-
-    std::wstring mirrorError;
-    stateStore_.RecordSession(record.packageId, record.sessionId, record.playtimeSeconds,
-                              record.exitCode, record.crashed, mirrorError);
     sessionRecorded_ = true;
 }
 
@@ -340,26 +350,32 @@ bool ProductionRuntime::UnlockAchievement(const std::string& achievementId,
         error = L"The achievement identity is invalid.";
         return false;
     }
-    return achievements_.Unlock(activePackageId_, achievementId, title, error);
+    std::string repositoryError;
+    if (!achievements_.Save(activePackageId_, achievementId, title, nowUtc(), repositoryError)) {
+        error = Widen(repositoryError.empty() ? "achievement repository rejected the unlock" : repositoryError);
+        return false;
+    }
+    return true;
 }
 
 GamePlatformState ProductionRuntime::PlatformState(const std::string& packageId) const {
+    std::string repositoryError;
+    if (!localDatabase_.Initialize(repositoryError)) return {};
     std::wstring error;
-    if (const auto canonical = localDatabase_.Database()->LoadGameState(packageId, error)) return *canonical;
-    return stateStore_.Load(packageId);
+    const auto state = localDatabase_.Database()->LoadGameState(packageId, error);
+    return state.value_or(GamePlatformState{});
 }
 
 std::optional<ResumeMetadata> ProductionRuntime::Resume(const std::string& packageId) const {
-    std::wstring error;
-    if (const auto canonical = localDatabase_.Database()->LoadResume(packageId, error)) return canonical;
-    return resumeStore_.Load(packageId);
+    std::string repositoryError;
+    if (!localDatabase_.Initialize(repositoryError)) return std::nullopt;
+    return resumes_.Load(packageId, repositoryError);
 }
 
 std::vector<AchievementRecord> ProductionRuntime::Achievements(const std::string& packageId) const {
-    std::wstring error;
-    auto canonical = localDatabase_.Database()->LoadAchievements(packageId, error);
-    if (!canonical.empty()) return canonical;
-    return achievements_.Load(packageId);
+    std::string repositoryError;
+    if (!localDatabase_.Initialize(repositoryError)) return {};
+    return achievements_.Load(packageId, repositoryError);
 }
 
 PackageTrustResult ProductionRuntime::PackageTrust(const GameManifest& game) const {
