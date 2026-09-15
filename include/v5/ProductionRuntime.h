@@ -3,6 +3,7 @@
 #include "CrashReportStore.h"
 #include "PackageTrust.h"
 #include "RuntimeSession.h"
+#include "v5/AchievementProfileDomain.h"
 #include "v5/CrashSupervisor.h"
 #include "v5/DomainRepositories.h"
 #include "v5/NativeRuntimeProcessHost.h"
@@ -51,6 +52,14 @@ public:
     bool UnlockAchievement(const std::string& achievementId,
                            const std::string& title,
                            std::wstring& error);
+    bool ApplyAuthoritativeAchievementDefinition(v5::AchievementDefinition definition,
+                                                 std::string& error);
+    bool ApplyAuthoritativeAchievementUnlock(v5::AchievementUnlock unlock,
+                                             std::string& error);
+    std::vector<v5::AchievementDefinition> AchievementDefinitions(const std::string& packageId) const;
+    std::vector<v5::AchievementUnlock> AuthoritativeAchievementUnlocks(const std::string& accountId,
+                                                                       const std::string& packageId) const;
+    std::uint64_t AuthoritativeAchievementScore(const std::string& accountId) const;
     GamePlatformState PlatformState(const std::string& packageId) const;
     std::optional<ResumeMetadata> Resume(const std::string& packageId) const;
     std::vector<AchievementRecord> Achievements(const std::string& packageId) const;
@@ -65,6 +74,7 @@ private:
     v5::NativeRuntimeProcessHost host_;
     std::unique_ptr<v5::RuntimeAuthority> authority_;
     v5::CrashSupervisor crashSupervisor_;
+    v5::AchievementAuthority authoritativeAchievements_;
 
     v5::LocalDomainDatabase localDatabase_;
     v5::LocalSessionRepository sessions_;
