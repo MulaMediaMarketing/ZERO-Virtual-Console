@@ -39,6 +39,8 @@ Require-Text "include/v5/ShellKernel.h" 'ActiveTopLevelIndex\s*\(\)\s+const' "Sh
 Require-Text "src/v5/ShellKernel.cpp" 'if\s*\(!controller->Execute\(activate,\s*error\)\)\s*return\s+false' "ShellKernel navigation must commit only after controller activation succeeds."
 Require-Text "src/v5/ProductionShellIntegration.cpp" 'return\s+kernel_\.MoveTopLevel\(direction,\s*error\)' "ProductionShellIntegration must delegate top-level traversal to ShellKernel."
 Require-Text "include/ProductionUxContract.h" 'ProductionUxNavCount\(\)\s*==\s*12' "Live production navigation contract must expose all twelve V5 permanent destinations."
+Require-Text "src/AppPages.cpp" 'navEnd\s*=\s*std::max\(navStart,\s*width\s*-\s*122\.0f\)' "Twelve-destination navigation must use width-aware production layout."
+Forbid-Text "src/AppPages.cpp" 'const\s+float\s+navStep\s*=\s*128\.0f' "Legacy six-destination fixed navigation spacing must not return."
 Require-Text "tools/V5ProductionUxIntegrationAcceptance.cpp" 'ProductionUxNavCount\(\)\s*!=\s*std::size\(kTopLevelPages\)' "Production UX acceptance must prove the live navigation contract matches the V5 top-level shell."
 Require-Text "tools/V5ShellKernelAcceptance.cpp" 'MoveTopLevel\(1,\s*error\)' "ShellKernel acceptance must exercise authoritative top-level traversal."
 Require-Text "tools/V5ShellKernelAcceptance.cpp" 'afterFailure\.navigationRevision\s*!=\s*beforeFailure\.navigationRevision' "ShellKernel acceptance must prove failed activation cannot publish navigation state."
@@ -85,7 +87,7 @@ foreach ($header in $legacyHeaders) {
 
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 $report = [ordered]@{
-    schema = 4
+    schema = 5
     gate = "zero-v5-final-cutover"
     passed = ($errors.Count -eq 0)
     production_runtime = "src/v5/ProductionRuntime.cpp"
@@ -94,6 +96,7 @@ $report = [ordered]@{
     navigation_traversal_authority = "v5-shell-kernel"
     navigation_commit_semantics = "transactional-after-controller-activation"
     permanent_destinations = 12
+    navigation_layout = "width-aware"
     legacy_runtime_authority = "excluded-from-consumer-build"
     errors = @($errors)
 }
