@@ -33,9 +33,11 @@ public:
     const std::string& CompositionError() const noexcept { return kernel_.CompositionError(); }
 
     bool Navigate(ProductionUxPage page, std::string& error);
+    bool MoveTopLevel(int direction, std::string& error);
     bool Back(std::string& error);
     bool Dispatch(const ShellCommand& command, std::string& error) { return kernel_.Dispatch(command, error); }
     std::optional<ProductionUxPage> ActivePage() const noexcept;
+    std::size_t ActiveTopLevelIndex() const noexcept;
     ShellSnapshot Snapshot() const { return kernel_.Snapshot(); }
 
     static std::optional<ShellPage> ToShellPage(ProductionUxPage page) noexcept;
