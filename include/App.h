@@ -89,6 +89,16 @@ private:
         v5::ProductionShellIntegration* shell_{nullptr};
     };
 
+    class AuthoritativeResumeProjection final {
+    public:
+        explicit AuthoritativeResumeProjection(ProductionRuntime& runtime) noexcept : runtime_(&runtime) {}
+        std::optional<ResumeMetadata> Load(const std::string& packageId) const {
+            return runtime_ ? runtime_->Resume(packageId) : std::nullopt;
+        }
+    private:
+        ProductionRuntime* runtime_{nullptr};
+    };
+
     HINSTANCE instance_{};
     HWND hwnd_{};
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
@@ -107,12 +117,13 @@ private:
     std::filesystem::path cachedCapturePath_;
 
     GameRegistry registry_;
-    v5::ImportCoordinator importCoordinator_;
+    v5::ImportCoordinator importer_;
     CaptureLibrary captures_;
     LocalIdentityProvider identity_;
     DisconnectedFriendsProvider friends_;
     DisconnectedStoreProvider store_;
     ProductionRuntime runtime_;
+    AuthoritativeResumeProjection resumeStore_{runtime_};
     SettingsStore settingsStore_;
     UserSettings settings_;
     Input input_;
