@@ -15,6 +15,10 @@ struct AchievementDefinition {
     std::string title;
     std::uint32_t score{0};
     AuthoritySource authority{AuthoritySource::None};
+    std::string description;
+    std::string iconId;
+    bool secret{false};
+    std::uint32_t targetProgress{1};
 };
 
 struct AchievementUnlock {
@@ -37,12 +41,17 @@ struct ProfileSnapshot {
     std::uint64_t achievementCount{0};
     bool online{false};
     AuthoritySource authority{AuthoritySource::None};
+    std::string presence;
+    std::string statusMessage;
 };
 
 class AchievementAuthority {
 public:
     bool ApplyDefinition(AchievementDefinition definition, std::string& error);
     bool ApplyUnlock(AchievementUnlock unlock, std::string& error);
+    std::optional<AchievementDefinition> Definition(const std::string& contentId,
+                                                    const std::string& achievementId) const;
+    std::vector<AchievementDefinition> DefinitionsFor(const std::string& contentId) const;
     std::vector<AchievementUnlock> UnlocksFor(const std::string& accountId,
                                               const std::string& contentId = {}) const;
     std::uint64_t ScoreFor(const std::string& accountId) const;
