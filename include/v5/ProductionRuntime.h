@@ -56,9 +56,14 @@ public:
                                                  std::string& error);
     bool ApplyAuthoritativeAchievementUnlock(v5::AchievementUnlock unlock,
                                              std::string& error);
+    bool ApplyAuthoritativeAchievementProgress(v5::AchievementProgress progress,
+                                               std::string& error);
     std::vector<v5::AchievementDefinition> AchievementDefinitions(const std::string& packageId) const;
     std::vector<v5::AchievementUnlock> AuthoritativeAchievementUnlocks(const std::string& accountId,
                                                                        const std::string& packageId) const;
+    std::optional<v5::AchievementProgress> AuthoritativeAchievementProgress(const std::string& accountId,
+                                                                            const std::string& packageId,
+                                                                            const std::string& achievementId) const;
     std::uint64_t AuthoritativeAchievementScore(const std::string& accountId) const;
     GamePlatformState PlatformState(const std::string& packageId) const;
     std::optional<ResumeMetadata> Resume(const std::string& packageId) const;
