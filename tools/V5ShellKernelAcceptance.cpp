@@ -52,10 +52,11 @@ int main() {
     Controller devices(ShellPage::Devices);
     Controller settings(ShellPage::Settings);
     Controller detail(ShellPage::GameDetail);
+    Controller checkout(ShellPage::Checkout);
 
-    std::array<IShellPageController*, 13> controllers{
+    std::array<IShellPageController*, 14> controllers{
         &home, &discover, &store, &library, &cloud, &downloads,
-        &friends, &achievements, &capture, &profile, &devices, &settings, &detail
+        &friends, &achievements, &capture, &profile, &devices, &settings, &detail, &checkout
     };
     ShellKernel shell(controllers);
     if (!shell.Valid()) return 10;
@@ -73,8 +74,16 @@ int main() {
         !snapshot.contextualParent || *snapshot.contextualParent != ShellPage::Discover) return 15;
     if (shell.ActiveTopLevelIndex() != 1) return 16;
 
-    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Discover) return 17;
-    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Home) return 18;
+    // Nested contextual pages retain the permanent origin. Context may become
+    // deeper, but it may not replace the top-level navigation parent.
+    if (!shell.Navigate(ShellPage::Checkout, error)) return 17;
+    snapshot = shell.Snapshot();
+    if (snapshot.activePage != ShellPage::Checkout ||
+        !snapshot.contextualParent || *snapshot.contextualParent != ShellPage::Discover) return 18;
+    if (shell.ActiveTopLevelIndex() != 1) return 19;
+
+    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Discover) return 20;
+    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Home) return 21;
 
     // The kernel itself owns traversal across truthful fail-closed destinations.
     // This prevents presentation code from carrying a second navigation table
@@ -84,16 +93,16 @@ int main() {
     Controller unavailableDownloads(ShellPage::Downloads, false);
     Controller unavailableProfile(ShellPage::Profile, false);
     Controller unavailableDevices(ShellPage::Devices, false);
-    std::array<IShellPageController*, 13> productionLike{
+    std::array<IShellPageController*, 14> productionLike{
         &home, &unavailableDiscover, &store, &library, &unavailableCloud, &unavailableDownloads,
-        &friends, &achievements, &capture, &unavailableProfile, &unavailableDevices, &settings, &detail
+        &friends, &achievements, &capture, &unavailableProfile, &unavailableDevices, &settings, &detail, &checkout
     };
     ShellKernel traversal(productionLike);
-    if (!traversal.Valid()) return 19;
-    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Store) return 20;
-    if (!traversal.Navigate(ShellPage::Library, error)) return 21;
-    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Friends) return 22;
-    if (!traversal.MoveTopLevel(-1, error) || traversal.Snapshot().activePage != ShellPage::Library) return 23;
+    if (!traversal.Valid()) return 22;
+    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Store) return 23;
+    if (!traversal.Navigate(ShellPage::Library, error)) return 24;
+    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Friends) return 25;
+    if (!traversal.MoveTopLevel(-1, error) || traversal.Snapshot().activePage != ShellPage::Library) return 26;
 
     std::array<IShellPageController*, 11> incomplete{
         &home, &discover, &store, &library, &cloud, &downloads,
