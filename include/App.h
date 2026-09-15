@@ -35,6 +35,53 @@ public:
     int Run();
 
 private:
+    class AuthoritativePageProjection final {
+    public:
+        explicit AuthoritativePageProjection(v5::ProductionShellIntegration& shell) noexcept : shell_(&shell) {}
+
+        operator Page() const noexcept {
+            if (!shell_) return Page::Home;
+            const auto active = shell_->ActiveLegacyPage();
+            return active.value_or(Page::Home);
+        }
+
+        AuthoritativePageProjection& operator=(Page page) noexcept {
+            if (shell_) {
+                std::string ignored;
+                shell_->NavigateLegacy(page, ignored);
+            }
+            return *this;
+        }
+
+    private:
+        v5::ProductionShellIntegration* shell_{nullptr};
+    };
+
+    class AuthoritativeNavProjection final {
+    public:
+        explicit AuthoritativeNavProjection(v5::ProductionShellIntegration& shell) noexcept : shell_(&shell) {}
+
+        operator size_t() const noexcept {
+            if (!shell_) return ProductionUxIndex(ProductionUxDestination::Home);
+            const auto snapshot = shell_->Snapshot();
+            const auto shellPage = snapshot.contextualParent.value_or(snapshot.activePage);
+            const auto legacy = v5::ProductionShellIntegration::ToLegacyPage(shellPage);
+            return legacy ? ProductionUxNavIndexForPage(*legacy)
+                          : ProductionUxIndex(ProductionUxDestination::Home);
+        }
+
+        AuthoritativeNavProjection& operator=(size_t index) noexcept {
+            if (shell_) {
+                std::string ignored;
+                shell_->NavigateLegacy(ProductionUxPageAt(index), ignored);
+            }
+            return *this;
+        }
+
+    private:
+        v5::ProductionShellIntegration* shell_{nullptr};
+    };
+
     HINSTANCE instance_{};
     HWND hwnd_{};
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
@@ -72,13 +119,13 @@ private:
     StoreExperienceState storeUx_{};
     SettingsExperienceState settingsUx_{};
 
-    Page page_{Page::Home};
+    AuthoritativePageProjection page_{productionShell_};
     Page achievementsReturnPage_{Page::Home};
     LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
     RuntimeOutcome lastRuntimeOutcome_{RuntimeOutcome::None};
     size_t selectedAchievement_{0};
     size_t achievementScroll_{0};
-    size_t navIndex_{0};
+    AuthoritativeNavProjection navIndex_{productionShell_};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
     bool overlayClosing_{false};
