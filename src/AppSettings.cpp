@@ -45,6 +45,20 @@ size_t CountJsonReports(const std::filesystem::path& root) {
     }
     return count;
 }
+
+std::wstring PrivacyLabel(const UserSettings& settings) {
+    const int shared = static_cast<int>(settings.shareActivity) +
+                       static_cast<int>(settings.shareAchievements) +
+                       static_cast<int>(settings.sharePlaytime);
+    if (shared == 0) return L"Private";
+    if (shared == 3) return L"Share activity, achievements and playtime";
+    std::wstring label = L"Custom: ";
+    bool first = true;
+    if (settings.shareActivity) { label += L"activity"; first = false; }
+    if (settings.shareAchievements) { if (!first) label += L", "; label += L"achievements"; first = false; }
+    if (settings.sharePlaytime) { if (!first) label += L", "; label += L"playtime"; }
+    return label;
+}
 }
 
 void App::RefreshSettingsTelemetry() {
@@ -97,8 +111,20 @@ void App::HandleSettingsInput(const InputSnapshot& in) {
 
     switch (row) {
         case SettingsExperienceRow::Profile:
-            status_ = L"This build uses the local profile created during First Boot. Online profile editing is not connected.";
+            status_ = L"Local ZERO identity is active. Online identity editing appears only when the authoritative ZERO identity service is connected.";
             break;
+        case SettingsExperienceRow::Privacy: {
+            const bool allShared = settings_.shareActivity && settings_.shareAchievements && settings_.sharePlaytime;
+            settings_.shareActivity = !allShared;
+            settings_.shareAchievements = !allShared;
+            settings_.sharePlaytime = !allShared;
+            if (!settingsStore_.Save(settings_)) {
+                status_ = L"ZERO could not persist privacy controls.";
+            } else {
+                status_ = allShared ? L"Profile activity sharing disabled." : L"Profile activity sharing enabled for connected ZERO services.";
+            }
+            break;
+        }
         case SettingsExperienceRow::Volume:
             settings_.volume = AdjustVolume(settings_.volume, 5);
             if (!settingsStore_.Save(settings_)) {
@@ -132,7 +158,7 @@ void App::HandleSettingsInput(const InputSnapshot& in) {
             OpenSettingsLocation(true);
             break;
         case SettingsExperienceRow::About:
-            status_ = L"ZERO Virtual Console · Runtime V4.1 · Windows 11 x64 · local console shell.";
+            status_ = L"ZERO Player · ZERO Core V5 · Windows 11 x64 · authoritative V5 runtime and shell.";
             break;
         case SettingsExperienceRow::Count:
             break;
@@ -144,8 +170,8 @@ void App::DrawSettings(float width, float height) {
     ClampSettingsSelection(settingsUx_);
     const auto profile = identity_.CurrentProfile();
 
-    DrawTextLine(L"Settings", 62, 154, 500, 60, true);
-    DrawTextLine(L"System controls and truthful local console status", 64, 204, 720, 30, false, brushMuted_.Get());
+    DrawTextLine(L"Settings", 62, 132, 500, 60, true);
+    DrawTextLine(L"System controls and truthful local console status", 64, 190, 720, 30, false, brushMuted_.Get());
 
     struct Row {
         const wchar_t* label;
@@ -163,29 +189,30 @@ void App::DrawSettings(float width, float height) {
 
     Row rows[] = {
         {L"Profile", Widen(profile.displayName.empty() ? settings_.profileName : profile.displayName) + L" · " + identityLabel, L"A Info"},
+        {L"Privacy", PrivacyLabel(settings_), L"A Toggle sharing"},
         {L"ZERO Volume", std::to_wstring(settings_.volume) + L"% preference", L"Left / Right Adjust"},
         {L"Reduced Motion", settings_.reducedMotion ? L"On" : L"Off", L"A Toggle"},
         {L"Controller", settingsControllerConnected_ ? L"Controller 1 connected" : L"No XInput controller", L"A Refresh"},
         {L"Display", display, L"A Reapply fullscreen"},
         {L"Storage", storage, L"A Open ZERO data"},
         {L"Diagnostics", diagnostics, L"A Open crash reports"},
-        {L"System / About", L"Runtime V4.1 · Windows 11 x64", L"A Details"}
+        {L"System / About", L"ZERO Core V5 · Windows 11 x64", L"A Details"}
     };
 
-    const float startY = 258.0f;
-    const float rowHeight = 60.0f;
+    const float startY = 238.0f;
+    const float rowHeight = 55.0f;
     for (size_t i = 0; i < SettingsRowCount(); ++i) {
-        const float y = startY + static_cast<float>(i) * (rowHeight + 8.0f);
+        const float y = startY + static_cast<float>(i) * (rowHeight + 6.0f);
         const auto rect = D2D1::RectF(62, y, width - 62, y + rowHeight);
-        DrawRoundedCard(rect, 18, brushCard_.Get());
-        if (i == settingsUx_.selectedRow) DrawFocusRing(rect, 18);
-        DrawTextLine(rows[i].label, 88, y + 10, 210, 26, false);
-        DrawTextLine(rows[i].value, 300, y + 10, std::max(240.0f, width - 700.0f), 32, false, brushMuted_.Get());
-        DrawTextLine(rows[i].hint, width - 300, y + 10, 210, 28, false, brushMuted_.Get());
+        DrawRoundedCard(rect, 17, brushCard_.Get());
+        if (i == settingsUx_.selectedRow) DrawFocusRing(rect, 17);
+        DrawTextLine(rows[i].label, 88, y + 8, 210, 26, false);
+        DrawTextLine(rows[i].value, 300, y + 8, std::max(240.0f, width - 700.0f), 30, false, brushMuted_.Get());
+        DrawTextLine(rows[i].hint, width - 300, y + 8, 210, 28, false, brushMuted_.Get());
     }
 
-    DrawTextLine(L"Up / Down Navigate   ·   A Select   ·   LB / RB Switch destination   ·   B Home",
-                 64, height - 82, width - 128, 30, false, brushMuted_.Get());
+    DrawTextLine(L"Privacy defaults to Private. Up / Down Navigate · A Select · LB / RB Switch destination · B Home",
+                 64, height - 68, width - 128, 28, false, brushMuted_.Get());
 }
 
 } // namespace zero
