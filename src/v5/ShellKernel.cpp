@@ -1,12 +1,18 @@
 #include "v5/ShellKernel.h"
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <unordered_set>
 
 namespace zero::v5 {
 
 bool ShellKernel::IsTopLevel(ShellPage page) noexcept {
     return std::find(std::begin(kTopLevelPages), std::end(kTopLevelPages), page) != std::end(kTopLevelPages);
+}
+
+std::size_t ShellKernel::TopLevelIndex(ShellPage page) noexcept {
+    const auto it = std::find(std::begin(kTopLevelPages), std::end(kTopLevelPages), page);
+    return it == std::end(kTopLevelPages) ? 0 : static_cast<std::size_t>(std::distance(std::begin(kTopLevelPages), it));
 }
 
 ShellKernel::ShellKernel(std::span<IShellPageController* const> controllers) {
@@ -68,6 +74,36 @@ bool ShellKernel::Navigate(ShellPage page, std::string& error) {
     activate.type = ShellCommandType::Activate;
     activate.target = page;
     return controller->Execute(activate, error);
+}
+
+std::size_t ShellKernel::ActiveTopLevelIndex() const noexcept {
+    return TopLevelIndex(contextualParent_.value_or(activePage_));
+}
+
+bool ShellKernel::MoveTopLevel(int direction, std::string& error) {
+    if (!valid_) {
+        error = compositionError_;
+        return false;
+    }
+    if (direction == 0) return true;
+
+    const auto current = ActiveTopLevelIndex();
+    if (direction > 0) {
+        for (std::size_t candidate = current + 1; candidate < std::size(kTopLevelPages); ++candidate) {
+            error.clear();
+            if (Navigate(kTopLevelPages[candidate], error)) return true;
+        }
+    } else {
+        std::size_t candidate = current;
+        while (candidate > 0) {
+            --candidate;
+            error.clear();
+            if (Navigate(kTopLevelPages[candidate], error)) return true;
+        }
+    }
+
+    error.clear();
+    return true;
 }
 
 bool ShellKernel::Back(std::string& error) {
