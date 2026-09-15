@@ -358,6 +358,29 @@ bool ProductionRuntime::UnlockAchievement(const std::string& achievementId,
     return true;
 }
 
+bool ProductionRuntime::ApplyAuthoritativeAchievementDefinition(v5::AchievementDefinition definition,
+                                                                 std::string& error) {
+    return authoritativeAchievements_.ApplyDefinition(std::move(definition), error);
+}
+
+bool ProductionRuntime::ApplyAuthoritativeAchievementUnlock(v5::AchievementUnlock unlock,
+                                                             std::string& error) {
+    return authoritativeAchievements_.ApplyUnlock(std::move(unlock), error);
+}
+
+std::vector<v5::AchievementDefinition> ProductionRuntime::AchievementDefinitions(const std::string& packageId) const {
+    return authoritativeAchievements_.DefinitionsFor(packageId);
+}
+
+std::vector<v5::AchievementUnlock> ProductionRuntime::AuthoritativeAchievementUnlocks(const std::string& accountId,
+                                                                                       const std::string& packageId) const {
+    return authoritativeAchievements_.UnlocksFor(accountId, packageId);
+}
+
+std::uint64_t ProductionRuntime::AuthoritativeAchievementScore(const std::string& accountId) const {
+    return authoritativeAchievements_.ScoreFor(accountId);
+}
+
 GamePlatformState ProductionRuntime::PlatformState(const std::string& packageId) const {
     std::string repositoryError;
     if (!localDatabase_.Initialize(repositoryError)) return {};
