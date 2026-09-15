@@ -199,20 +199,21 @@ void App::DrawSettings(float width, float height) {
         {L"System / About", L"ZERO Core V5 · Windows 11 x64", L"A Details"}
     };
 
-    const float startY = 238.0f;
-    const float rowHeight = 55.0f;
+    const float startY = 228.0f;
+    const float rowHeight = 42.0f;
+    constexpr float rowGap = 4.0f;
     for (size_t i = 0; i < SettingsRowCount(); ++i) {
-        const float y = startY + static_cast<float>(i) * (rowHeight + 6.0f);
+        const float y = startY + static_cast<float>(i) * (rowHeight + rowGap);
         const auto rect = D2D1::RectF(62, y, width - 62, y + rowHeight);
-        DrawRoundedCard(rect, 17, brushCard_.Get());
-        if (i == settingsUx_.selectedRow) DrawFocusRing(rect, 17);
-        DrawTextLine(rows[i].label, 88, y + 8, 210, 26, false);
-        DrawTextLine(rows[i].value, 300, y + 8, std::max(240.0f, width - 700.0f), 30, false, brushMuted_.Get());
-        DrawTextLine(rows[i].hint, width - 300, y + 8, 210, 28, false, brushMuted_.Get());
+        DrawRoundedCard(rect, 14, brushCard_.Get());
+        if (i == settingsUx_.selectedRow) DrawFocusRing(rect, 14);
+        DrawTextLine(rows[i].label, 88, y + 5, 210, 25, false);
+        DrawTextLine(rows[i].value, 300, y + 5, std::max(240.0f, width - 700.0f), 28, false, brushMuted_.Get());
+        DrawTextLine(rows[i].hint, width - 300, y + 5, 210, 26, false, brushMuted_.Get());
     }
 
     DrawTextLine(L"Privacy defaults to Private. Up / Down Navigate · A Select · LB / RB Switch destination · B Home",
-                 64, height - 68, width - 128, 28, false, brushMuted_.Get());
+                 64, height - 46, width - 128, 26, false, brushMuted_.Get());
 }
 
 } // namespace zero
