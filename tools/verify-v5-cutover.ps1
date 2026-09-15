@@ -28,6 +28,14 @@ Require-Text "include/App.h" '#include\s+"v5/ProductionRuntime\.h"' "App must in
 Require-Text "include/App.h" 'ProductionRuntime\s+runtime_' "App runtime ownership must be ProductionRuntime."
 Forbid-Text "include/App.h" 'RuntimeV[34]' "App must not reference RuntimeV3 or RuntimeV4."
 
+Require-Text "include/App.h" 'v5::ProductionShellIntegration\s+productionShell_' "App must own the V5 production shell integration."
+Require-Text "include/App.h" 'AuthoritativePageProjection\s+page_\{productionShell_\}' "Live page state must project from the V5 ShellKernel authority."
+Require-Text "include/App.h" 'AuthoritativeNavProjection\s+navIndex_\{productionShell_\}' "Live navigation selection must project from the V5 ShellKernel authority."
+Forbid-Text "include/App.h" '(?m)^\s*Page\s+page_\s*\{' "App must not own a raw legacy page state authority."
+Forbid-Text "include/App.h" '(?m)^\s*size_t\s+navIndex_\s*\{' "App must not own a raw legacy navigation-index authority."
+Require-Text "include/ProductionUxContract.h" 'ProductionUxNavCount\(\)\s*==\s*12' "Live production navigation contract must expose all twelve V5 permanent destinations."
+Require-Text "tools/V5ProductionUxIntegrationAcceptance.cpp" 'ProductionUxNavCount\(\)\s*!=\s*std::size\(kTopLevelPages\)' "Production UX acceptance must prove the live navigation contract matches the V5 top-level shell."
+
 Require-Text "cmake/ZeroV5.cmake" 'src/v5/ProductionRuntime\.cpp' "ProductionRuntime.cpp must be compiled into ZeroVirtualConsole."
 Require-Text "cmake/ZeroV5.cmake" 'src/RuntimeV3\.cpp[\s\S]*src/RuntimeV4\.cpp[\s\S]*HEADER_FILE_ONLY' "Legacy runtime implementations must be excluded from the consumer executable."
 
@@ -70,10 +78,13 @@ foreach ($header in $legacyHeaders) {
 
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 $report = [ordered]@{
-    schema = 1
+    schema = 2
     gate = "zero-v5-final-cutover"
     passed = ($errors.Count -eq 0)
     production_runtime = "src/v5/ProductionRuntime.cpp"
+    production_shell = "src/v5/ProductionShellIntegration.cpp"
+    shell_authority = "v5-shell-kernel"
+    permanent_destinations = 12
     legacy_runtime_authority = "excluded-from-consumer-build"
     errors = @($errors)
 }
