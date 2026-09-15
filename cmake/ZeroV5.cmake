@@ -7,7 +7,8 @@ target_sources(ZeroVirtualConsole PRIVATE
   src/v5/NativeRuntimeProcessHost.cpp
   src/v5/CrashSupervisor.cpp
   src/v5/ResumeCoordinator.cpp
-  src/v5/ShellKernel.cpp)
+  src/v5/ShellKernel.cpp
+  src/v5/DiscoverDomain.cpp)
 
 add_executable(ZeroV5ProductionPackageAcceptance
   tools/V5ProductionPackageAcceptance.cpp
@@ -60,3 +61,9 @@ add_executable(ZeroV5ShellKernelAcceptance
   src/v5/ShellKernel.cpp)
 target_include_directories(ZeroV5ShellKernelAcceptance PRIVATE include)
 target_compile_definitions(ZeroV5ShellKernelAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+add_executable(ZeroV5DiscoverDomainAcceptance
+  tools/V5DiscoverDomainAcceptance.cpp
+  src/v5/DiscoverDomain.cpp)
+target_include_directories(ZeroV5DiscoverDomainAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5DiscoverDomainAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
