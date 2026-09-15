@@ -87,9 +87,10 @@ private:
     bool sessionRecorded_{true};
     bool crashReported_{false};
     bool userTermination_{false};
+    bool playtimeFinalized_{false};
     std::chrono::steady_clock::time_point launchedAt_{};
     std::chrono::steady_clock::time_point readyAt_{};
-    mutable uint64_t finalPlaytimeSeconds_{0};
+    uint64_t finalPlaytimeSeconds_{0};
 
     static constexpr std::chrono::seconds kReadyTimeout{20};
     static constexpr std::chrono::seconds kHeartbeatTimeout{10};
