@@ -176,6 +176,11 @@ private:
     void DrawFriends(float width, float height);
     void DrawCaptures(float width, float height);
     void DrawAchievements(float width, float height);
+    void DrawProfile(float width, float height);
+    void DrawDownloads(float width, float height);
+    void DrawDevices(float width, float height);
+    void DrawNotifications(float width, float height);
+    void DrawDiscover(float width, float height);
     void DrawSettings(float width, float height);
     void DrawLaunchRecovery(float width, float height);
     void DrawCaptureViewer(float width, float height);
