@@ -200,6 +200,7 @@ bool ProductionRuntime::Launch(const GameManifest& game,
     sessionRecorded_ = false;
     crashReported_ = false;
     userTermination_ = false;
+    playtimeFinalized_ = false;
     finalPlaytimeSeconds_ = 0;
     launchedAt_ = std::chrono::steady_clock::now();
     readyAt_ = {};
@@ -207,7 +208,7 @@ bool ProductionRuntime::Launch(const GameManifest& game,
 }
 
 uint64_t ProductionRuntime::PlaytimeSeconds() const noexcept {
-    if (finalPlaytimeSeconds_ != 0 || readyAt_.time_since_epoch().count() == 0) return finalPlaytimeSeconds_;
+    if (playtimeFinalized_ || readyAt_.time_since_epoch().count() == 0) return finalPlaytimeSeconds_;
     return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - readyAt_).count());
 }
@@ -248,6 +249,7 @@ void ProductionRuntime::RecordCrashIfNeeded() {
 void ProductionRuntime::FinalizePersistence() {
     if (sessionRecorded_ || activePackageId_.empty() || activeGrant_.identity.sessionId.empty()) return;
     finalPlaytimeSeconds_ = PlaytimeSeconds();
+    playtimeFinalized_ = true;
     v5::SessionRecord record;
     record.packageId = activePackageId_;
     record.sessionId = activeGrant_.identity.sessionId;
