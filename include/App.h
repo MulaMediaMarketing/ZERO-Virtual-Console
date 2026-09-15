@@ -41,14 +41,14 @@ private:
 
         operator Page() const noexcept {
             if (!shell_) return Page::Home;
-            const auto active = shell_->ActiveLegacyPage();
+            const auto active = shell_->ActivePage();
             return active.value_or(Page::Home);
         }
 
         AuthoritativePageProjection& operator=(Page page) noexcept {
             if (shell_) {
                 std::string ignored;
-                shell_->NavigateLegacy(page, ignored);
+                shell_->Navigate(page, ignored);
             }
             return *this;
         }
@@ -65,15 +65,15 @@ private:
             if (!shell_) return ProductionUxIndex(ProductionUxDestination::Home);
             const auto snapshot = shell_->Snapshot();
             const auto shellPage = snapshot.contextualParent.value_or(snapshot.activePage);
-            const auto legacy = v5::ProductionShellIntegration::ToLegacyPage(shellPage);
-            return legacy ? ProductionUxNavIndexForPage(*legacy)
-                          : ProductionUxIndex(ProductionUxDestination::Home);
+            const auto productionPage = v5::ProductionShellIntegration::ToProductionPage(shellPage);
+            return productionPage ? ProductionUxNavIndexForPage(*productionPage)
+                                  : ProductionUxIndex(ProductionUxDestination::Home);
         }
 
         AuthoritativeNavProjection& operator=(size_t index) noexcept {
             if (shell_) {
                 std::string ignored;
-                shell_->NavigateLegacy(ProductionUxPageAt(index), ignored);
+                shell_->Navigate(ProductionUxPageAt(index), ignored);
             }
             return *this;
         }
