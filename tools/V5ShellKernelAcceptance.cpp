@@ -76,24 +76,37 @@ int main() {
 
     if (!shell.Navigate(ShellPage::GameDetail, error)) return 14;
     auto snapshot = shell.Snapshot();
-    if (snapshot.activePage != ShellPage::GameDetail ||
+    if (snapshot.activePage != ShellPage::GameDetail || snapshot.contextDepth != 1 ||
         !snapshot.contextualParent || *snapshot.contextualParent != ShellPage::Discover) return 15;
     if (shell.ActiveTopLevelIndex() != 1) return 16;
 
-    // Nested contextual pages retain the permanent origin. Context may become
-    // deeper, but it may not replace the top-level navigation parent.
+    // Nested contextual pages keep an immediate Back parent while preserving
+    // the permanent top-level origin for navigation highlighting/traversal.
     if (!shell.Navigate(ShellPage::Checkout, error)) return 17;
     snapshot = shell.Snapshot();
-    if (snapshot.activePage != ShellPage::Checkout ||
-        !snapshot.contextualParent || *snapshot.contextualParent != ShellPage::Discover) return 18;
+    if (snapshot.activePage != ShellPage::Checkout || snapshot.contextDepth != 2 ||
+        !snapshot.contextualParent || *snapshot.contextualParent != ShellPage::GameDetail) return 18;
     if (shell.ActiveTopLevelIndex() != 1) return 19;
 
-    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Discover) return 20;
-    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Home) return 21;
+    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::GameDetail) return 20;
+    if (shell.Snapshot().contextDepth != 1) return 21;
+    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Discover) return 22;
+    if (shell.Snapshot().contextDepth != 0) return 23;
+    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Home) return 24;
+
+    // A normally top-level experience may also be opened contextually from a
+    // game-specific action. Its Back behavior must still be owned by the shell.
+    if (!shell.Navigate(ShellPage::Library, error)) return 25;
+    if (!shell.Navigate(ShellPage::GameDetail, error)) return 26;
+    if (!shell.NavigateContextual(ShellPage::Achievements, error)) return 27;
+    snapshot = shell.Snapshot();
+    if (snapshot.activePage != ShellPage::Achievements || snapshot.contextDepth != 2 ||
+        !snapshot.contextualParent || *snapshot.contextualParent != ShellPage::GameDetail) return 28;
+    if (shell.ActiveTopLevelIndex() != 3) return 29;
+    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::GameDetail) return 30;
+    if (!shell.Back(error) || shell.Snapshot().activePage != ShellPage::Library) return 31;
 
     // The kernel itself owns traversal across truthful fail-closed destinations.
-    // This prevents presentation code from carrying a second navigation table
-    // or deciding which unavailable destinations should be skipped.
     Controller unavailableDiscover(ShellPage::Discover, false);
     Controller unavailableCloud(ShellPage::CloudPlay, false);
     Controller unavailableDownloads(ShellPage::Downloads, false);
@@ -104,14 +117,14 @@ int main() {
         &friends, &achievements, &capture, &unavailableProfile, &unavailableDevices, &settings, &detail, &checkout
     };
     ShellKernel traversal(productionLike);
-    if (!traversal.Valid()) return 22;
-    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Store) return 23;
-    if (!traversal.Navigate(ShellPage::Library, error)) return 24;
-    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Friends) return 25;
-    if (!traversal.MoveTopLevel(-1, error) || traversal.Snapshot().activePage != ShellPage::Library) return 26;
+    if (!traversal.Valid()) return 32;
+    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Store) return 33;
+    if (!traversal.Navigate(ShellPage::Library, error)) return 34;
+    if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Friends) return 35;
+    if (!traversal.MoveTopLevel(-1, error) || traversal.Snapshot().activePage != ShellPage::Library) return 36;
 
     // Snapshot availability alone is not enough: controller activation can
-    // still fail. The kernel must not publish a page or parent change unless
+    // still fail. The kernel must not publish page/history changes unless
     // activation succeeds.
     Controller failingStore(ShellPage::Store, true, false);
     std::array<IShellPageController*, 14> transactionalControllers{
@@ -119,28 +132,29 @@ int main() {
         &friends, &achievements, &capture, &profile, &devices, &settings, &detail, &checkout
     };
     ShellKernel transactional(transactionalControllers);
-    if (!transactional.Valid()) return 27;
+    if (!transactional.Valid()) return 37;
     const auto beforeFailure = transactional.Snapshot();
     error.clear();
-    if (transactional.Navigate(ShellPage::Store, error)) return 28;
+    if (transactional.Navigate(ShellPage::Store, error)) return 38;
     const auto afterFailure = transactional.Snapshot();
     if (afterFailure.activePage != beforeFailure.activePage ||
         afterFailure.contextualParent != beforeFailure.contextualParent ||
-        afterFailure.navigationRevision != beforeFailure.navigationRevision) return 29;
+        afterFailure.contextDepth != beforeFailure.contextDepth ||
+        afterFailure.navigationRevision != beforeFailure.navigationRevision) return 39;
 
     std::array<IShellPageController*, 11> incomplete{
         &home, &discover, &store, &library, &cloud, &downloads,
         &friends, &achievements, &capture, &profile, &devices
     };
     ShellKernel missing(incomplete);
-    if (missing.Valid()) return 30;
+    if (missing.Valid()) return 40;
 
     std::array<IShellPageController*, 13> duplicate{
         &home, &discover, &store, &library, &cloud, &downloads,
         &friends, &achievements, &capture, &profile, &devices, &settings, &settings
     };
     ShellKernel duplicates(duplicate);
-    if (duplicates.Valid()) return 31;
+    if (duplicates.Valid()) return 41;
 
     std::cout << "ZERO V5 shell kernel + controller architecture acceptance: PASS\n";
     return 0;
