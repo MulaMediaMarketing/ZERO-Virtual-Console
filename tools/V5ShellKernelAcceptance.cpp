@@ -9,7 +9,8 @@ using namespace zero::v5;
 namespace {
 class Controller final : public IShellPageController {
 public:
-    explicit Controller(ShellPage page, bool available = true) : page_(page), available_(available) {}
+    explicit Controller(ShellPage page, bool available = true, bool executeSucceeds = true)
+        : page_(page), available_(available), executeSucceeds_(executeSucceeds) {}
 
     ShellPage Page() const noexcept override { return page_; }
     PageSnapshot Snapshot() const override {
@@ -18,6 +19,10 @@ public:
     bool Execute(const ShellCommand& command, std::string& error) override {
         if (!available_) {
             error = status_.empty() ? "unavailable" : status_;
+            return false;
+        }
+        if (!executeSucceeds_) {
+            error = "activation failed";
             return false;
         }
         last_ = command.type;
@@ -30,6 +35,7 @@ public:
 private:
     ShellPage page_;
     bool available_{true};
+    bool executeSucceeds_{true};
     std::string status_;
     std::uint64_t revision_{0};
     ShellCommandType last_{ShellCommandType::Activate};
@@ -103,6 +109,24 @@ int main() {
     if (!traversal.Navigate(ShellPage::Library, error)) return 24;
     if (!traversal.MoveTopLevel(1, error) || traversal.Snapshot().activePage != ShellPage::Friends) return 25;
     if (!traversal.MoveTopLevel(-1, error) || traversal.Snapshot().activePage != ShellPage::Library) return 26;
+
+    // Snapshot availability alone is not enough: controller activation can
+    // still fail. The kernel must not publish a page or parent change unless
+    // activation succeeds.
+    Controller failingStore(ShellPage::Store, true, false);
+    std::array<IShellPageController*, 14> transactionalControllers{
+        &home, &discover, &failingStore, &library, &cloud, &downloads,
+        &friends, &achievements, &capture, &profile, &devices, &settings, &detail, &checkout
+    };
+    ShellKernel transactional(transactionalControllers);
+    if (!transactional.Valid()) return 27;
+    const auto beforeFailure = transactional.Snapshot();
+    error.clear();
+    if (transactional.Navigate(ShellPage::Store, error)) return 28;
+    const auto afterFailure = transactional.Snapshot();
+    if (afterFailure.activePage != beforeFailure.activePage ||
+        afterFailure.contextualParent != beforeFailure.contextualParent ||
+        afterFailure.navigationRevision != beforeFailure.navigationRevision) return 29;
 
     std::array<IShellPageController*, 11> incomplete{
         &home, &discover, &store, &library, &cloud, &downloads,
