@@ -1,5 +1,6 @@
 #include "v5/ProductionShellIntegration.h"
 #include <iostream>
+#include <iterator>
 #include <string>
 
 using namespace zero;
