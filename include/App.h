@@ -128,7 +128,6 @@ private:
     SettingsExperienceState settingsUx_{};
 
     AuthoritativePageProjection page_{productionShell_};
-    Page achievementsReturnPage_{Page::Home};
     LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
     RuntimeOutcome lastRuntimeOutcome_{RuntimeOutcome::None};
     size_t selectedAchievement_{0};
