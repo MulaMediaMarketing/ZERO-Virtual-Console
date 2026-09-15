@@ -72,6 +72,10 @@ jobs:
         shell: pwsh
         run: ./tools/verify-production-closure.ps1 -SourceRoot .
 
+      - name: Validate locked ZERO Player UX and input parity
+        shell: pwsh
+        run: ./tools/verify-zero-player-ux.ps1 -SourceRoot .
+
       - name: Validate all ZERO Core Architecture V5 migrations
         shell: pwsh
         run: ./tools/run-v5-acceptance.ps1 -BuildRoot ./build
