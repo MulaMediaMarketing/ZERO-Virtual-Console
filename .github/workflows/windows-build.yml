@@ -55,25 +55,13 @@ jobs:
         shell: pwsh
         run: ./build/Release/ZeroServerAuthorityAcceptance.exe
 
-      - name: Validate ZERO Core Architecture V5 foundation
+      - name: Validate all ZERO Core Architecture V5 migrations
         shell: pwsh
-        run: ./build/Release/ZeroV5CoreArchitectureAcceptance.exe
+        run: ./tools/run-v5-acceptance.ps1 -BuildRoot ./build
 
-      - name: Validate V5 production package migration
+      - name: Validate final V5 runtime cutover
         shell: pwsh
-        run: ./build/Release/ZeroV5ProductionPackageAcceptance.exe
-
-      - name: Validate V5 runtime authority migration
-        shell: pwsh
-        run: ./build/Release/ZeroV5RuntimeAuthorityAcceptance.exe
-
-      - name: Validate V5 native process supervisor and secure IPC
-        shell: pwsh
-        run: ./build/Release/ZeroV5NativeRuntimeAcceptance.exe
-
-      - name: Validate V5 crash supervisor and resume coordinator
-        shell: pwsh
-        run: ./build/Release/ZeroV5CrashResumeAcceptance.exe
+        run: ./tools/verify-v5-cutover.ps1 -SourceRoot . -ReportDir ./build/V5CutoverReports
 
       - name: Validate production shell navigation contract
         shell: pwsh
@@ -148,22 +136,21 @@ jobs:
             build/Release/ZeroStoreSettingsFirstBootAcceptance.exe
             build/Release/ZeroFirstBootPersistenceAcceptance.exe
             build/Release/ZeroServerAuthorityAcceptance.exe
-            build/Release/ZeroV5CoreArchitectureAcceptance.exe
-            build/Release/ZeroV5ProductionPackageAcceptance.exe
-            build/Release/ZeroV5RuntimeAuthorityAcceptance.exe
-            build/Release/ZeroV5NativeRuntimeAcceptance.exe
-            build/Release/ZeroV5CrashResumeAcceptance.exe
+            build/Release/ZeroV5*Acceptance.exe
             build/Release/ZeroV5RuntimeChild.exe
             build/Release/ZeroQualificationProbe.exe
             build/ReferencePackage/**
             build/DependencyReports/**
             build/ArchitectureReports/**
             build/GovernanceReports/**
+            build/V5CutoverReports/**
             build/AcceptanceReports/**
             build/QualificationEvidence/**
             build/SBOM/**
             build/ReleaseBundle/**
             build/ZERO-Virtual-Console-Windows-x64-RC.zip
+            tools/run-v5-acceptance.ps1
+            tools/verify-v5-cutover.ps1
             tools/verify-dependency-surface.ps1
             tools/verify-production-architecture.ps1
             tools/verify-release-governance.ps1

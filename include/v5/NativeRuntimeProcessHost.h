@@ -1,9 +1,11 @@
 #pragma once
 
+#include "ResumeStore.h"
 #include "RuntimeAuthority.h"
 #include "RuntimeIpcServer.h"
 #include "RuntimeSession.h"
 #include <chrono>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -21,6 +23,16 @@ public:
     void Terminate() override;
 
     void SetCallbacks(zero::RuntimeIpcCallbacks callbacks) { callbacks_ = std::move(callbacks); }
+    void SetLaunchResume(std::optional<zero::ResumeMetadata> resume) {
+        if (resume) {
+            resume->activityId = HexEncode(resume->activityId);
+            resume->displayLabel = HexEncode(resume->displayLabel);
+            resume->payload = HexEncode(resume->payload);
+        }
+        launchResume_ = std::move(resume);
+    }
+    bool SendOverlayFocus(bool visible) { return ipc_.SendOverlayFocus(visible); }
+    std::chrono::milliseconds ClientSilence() const noexcept { return ipc_.ClientSilence(); }
     bool CaptureDiagnosticDump() { return process_.CaptureDiagnosticDump(); }
     bool ClientAuthenticated() const noexcept { return ipc_.ClientAuthenticated(); }
     bool ReadyReceived() const noexcept { return ipc_.ReadyReceived(); }
@@ -32,7 +44,19 @@ private:
     zero::RuntimeIpcServer ipc_;
     zero::RuntimeIpcCallbacks callbacks_{};
     RuntimeSessionGrant activeGrant_{};
+    std::optional<zero::ResumeMetadata> launchResume_;
     bool started_{false};
+
+    static std::string HexEncode(const std::string& value) {
+        static constexpr char lut[] = "0123456789abcdef";
+        std::string encoded;
+        encoded.reserve(value.size() * 2);
+        for (const unsigned char byte : value) {
+            encoded.push_back(lut[(byte >> 4) & 0x0f]);
+            encoded.push_back(lut[byte & 0x0f]);
+        }
+        return encoded;
+    }
 
     static bool ValidateGrant(const LaunchDescriptor& launch,
                               const RuntimeSessionGrant& grant,

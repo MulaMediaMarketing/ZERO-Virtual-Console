@@ -8,7 +8,7 @@
 #include "GameImportService.h"
 #include "IdentityProvider.h"
 #include "ResumeStore.h"
-#include "RuntimeV4.h"
+#include "v5/ProductionRuntime.h"
 #include "Settings.h"
 #include "ShellUxState.h"
 #include "StoreProvider.h"
@@ -58,7 +58,7 @@ private:
     DisconnectedFriendsProvider friends_;
     DisconnectedStoreProvider store_;
     ResumeStore resumeStore_;
-    RuntimeV4 runtime_;
+    ProductionRuntime runtime_;
     SettingsStore settingsStore_;
     UserSettings settings_;
     Input input_;

@@ -4,9 +4,11 @@
 #include <windows.h>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <thread>
+#include <vector>
 
 using namespace zero::v5;
 
@@ -73,6 +75,25 @@ std::filesystem::path currentDirectory() {
     return std::filesystem::path(path).parent_path();
 }
 
+std::string hexEncode(const std::string& value) {
+    static constexpr char lut[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(value.size() * 2);
+    for (const unsigned char byte : value) {
+        out.push_back(lut[(byte >> 4) & 0x0f]);
+        out.push_back(lut[byte & 0x0f]);
+    }
+    return out;
+}
+
+std::vector<std::string> readLines(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(file, line)) lines.push_back(line);
+    return lines;
+}
+
 } // namespace
 
 int main() {
@@ -118,10 +139,17 @@ int main() {
 
     RuntimeSessionGrant grant;
     grant.identity = {"v5-native-session", launch.packageId, "acct-1"};
-    grant.grantedCapabilities = {RuntimeCapability::Input};
+    grant.grantedCapabilities = {RuntimeCapability::Input, RuntimeCapability::SaveRead};
     grant.ipcAuthenticationToken = std::string(64, 'b');
 
+    zero::ResumeMetadata resume;
+    resume.packageId = launch.packageId;
+    resume.activityId = "chapter:2";
+    resume.displayLabel = "Chapter Two";
+    resume.payload = "{\"checkpoint\":7}";
+
     NativeRuntimeProcessHost host;
+    host.SetLaunchResume(resume);
     std::string error;
     if (!host.Start(launch, grant, error)) {
         std::cerr << error << '\n';
@@ -130,10 +158,18 @@ int main() {
     if (host.ProcessInfo().sessionId != grant.identity.sessionId) return 23;
     if (host.ProcessInfo().packageId != grant.identity.packageId) return 24;
     if (host.PipeName().empty()) return 25;
-    if (!std::filesystem::exists(host.ProcessInfo().tempRoot / L"runtime-v4.bootstrap")) return 26;
+
+    const auto bootstrap = host.ProcessInfo().tempRoot / L"runtime-v4.bootstrap";
+    if (!std::filesystem::exists(bootstrap)) return 26;
+    const auto lines = readLines(bootstrap);
+    if (lines.size() < 10) return 27;
+    if (lines[5] != "1") return 28;
+    if (lines[6] != hexEncode(resume.activityId)) return 29;
+    if (lines[7] != hexEncode(resume.displayLabel)) return 30;
+    if (lines[8] != hexEncode(resume.payload)) return 31;
 
     host.Terminate();
-    if (host.Poll().state != RuntimeProcessState::Exited) return 27;
+    if (host.Poll().state != RuntimeProcessState::Exited) return 32;
 
     std::cout << "ZERO V5 native runtime + secure IPC acceptance: PASS\n";
     return 0;

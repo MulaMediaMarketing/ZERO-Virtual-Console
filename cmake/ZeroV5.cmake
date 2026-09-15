@@ -1,12 +1,22 @@
 # ZERO Core Architecture V5 production migration targets.
 # Kept separate from the V4.1 target list so migration ownership remains visible.
 
+# Runtime V3/V4 remain in repository history only. They are explicitly excluded
+# from the consumer executable so there is one production runtime authority.
+set_source_files_properties(
+  src/RuntimeV3.cpp
+  src/RuntimeV4.cpp
+  PROPERTIES HEADER_FILE_ONLY TRUE)
+
 target_sources(ZeroVirtualConsole PRIVATE
   src/v5/ProductionPackagePlatform.cpp
   src/v5/RuntimeAuthority.cpp
   src/v5/NativeRuntimeProcessHost.cpp
   src/v5/CrashSupervisor.cpp
-  src/v5/ResumeCoordinator.cpp)
+  src/v5/ResumeCoordinator.cpp
+  src/v5/ShellKernel.cpp
+  src/v5/DiscoverDomain.cpp
+  src/v5/ProductionRuntime.cpp)
 
 add_executable(ZeroV5ProductionPackageAcceptance
   tools/V5ProductionPackageAcceptance.cpp
@@ -53,3 +63,24 @@ add_executable(ZeroV5CrashResumeAcceptance
 target_include_directories(ZeroV5CrashResumeAcceptance PRIVATE include)
 target_compile_definitions(ZeroV5CrashResumeAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroV5CrashResumeAcceptance PRIVATE shell32 ole32 winsqlite3)
+
+add_executable(ZeroV5ShellKernelAcceptance
+  tools/V5ShellKernelAcceptance.cpp
+  src/v5/ShellKernel.cpp)
+target_include_directories(ZeroV5ShellKernelAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5ShellKernelAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+add_executable(ZeroV5DiscoverDomainAcceptance
+  tools/V5DiscoverDomainAcceptance.cpp
+  src/v5/DiscoverDomain.cpp)
+target_include_directories(ZeroV5DiscoverDomainAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5DiscoverDomainAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+# V5 domain build ownership lives in one file per subsystem. CONFIGURE_DEPENDS
+# ensures a newly added migration fragment becomes part of the build without
+# growing this composition root back into a monolithic target list.
+file(GLOB ZERO_V5_DOMAIN_FRAGMENTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/v5/*.cmake")
+list(SORT ZERO_V5_DOMAIN_FRAGMENTS)
+foreach(fragment IN LISTS ZERO_V5_DOMAIN_FRAGMENTS)
+  include("${fragment}")
+endforeach()
