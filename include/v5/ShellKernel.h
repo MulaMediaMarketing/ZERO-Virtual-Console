@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -90,6 +91,8 @@ public:
     const std::string& CompositionError() const noexcept { return compositionError_; }
 
     bool Navigate(ShellPage page, std::string& error);
+    bool MoveTopLevel(int direction, std::string& error);
+    std::size_t ActiveTopLevelIndex() const noexcept;
     bool Back(std::string& error);
     bool Dispatch(const ShellCommand& command, std::string& error);
     ShellSnapshot Snapshot() const;
@@ -104,6 +107,7 @@ private:
 
     IShellPageController* Find(ShellPage page) const noexcept;
     static bool IsTopLevel(ShellPage page) noexcept;
+    static std::size_t TopLevelIndex(ShellPage page) noexcept;
 };
 
 } // namespace zero::v5
