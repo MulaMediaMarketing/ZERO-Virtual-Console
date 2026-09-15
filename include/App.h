@@ -71,9 +71,29 @@ private:
         }
 
         AuthoritativeNavProjection& operator=(size_t index) noexcept {
-            if (shell_) {
-                std::string ignored;
-                shell_->Navigate(ProductionUxPageAt(index), ignored);
+            if (!shell_ || index >= ProductionUxNavCount()) return *this;
+
+            std::string ignored;
+            if (shell_->Navigate(ProductionUxPageAt(index), ignored)) return *this;
+
+            // Shoulder/left/right navigation must not become trapped behind a
+            // truthful fail-closed destination. If the requested adjacent page
+            // is unavailable, continue in the same direction until the next
+            // available V5 destination. Direct jumps to available pages still
+            // resolve immediately through the authoritative ShellKernel.
+            const auto current = static_cast<size_t>(*this);
+            if (index > current) {
+                for (size_t candidate = index + 1; candidate < ProductionUxNavCount(); ++candidate) {
+                    ignored.clear();
+                    if (shell_->Navigate(ProductionUxPageAt(candidate), ignored)) break;
+                }
+            } else if (index < current) {
+                size_t candidate = index;
+                while (candidate > 0) {
+                    --candidate;
+                    ignored.clear();
+                    if (shell_->Navigate(ProductionUxPageAt(candidate), ignored)) break;
+                }
             }
             return *this;
         }
