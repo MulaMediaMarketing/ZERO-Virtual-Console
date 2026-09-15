@@ -33,6 +33,7 @@ public:
     const std::string& CompositionError() const noexcept { return kernel_.CompositionError(); }
 
     bool Navigate(ProductionUxPage page, std::string& error);
+    bool NavigateContextual(ProductionUxPage page, std::string& error);
     bool MoveTopLevel(int direction, std::string& error);
     bool Back(std::string& error);
     bool Dispatch(const ShellCommand& command, std::string& error) { return kernel_.Dispatch(command, error); }
