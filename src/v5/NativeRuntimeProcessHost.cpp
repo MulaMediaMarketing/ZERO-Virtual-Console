@@ -218,7 +218,12 @@ bool NativeRuntimeProcessHost::Start(const LaunchDescriptor& launch,
 
 RuntimeProcessStatus NativeRuntimeProcessHost::Poll() {
     if (!started_) return {RuntimeProcessState::Exited, 0};
+
+    // Capture diagnostics while the abnormal process still has a live handle and
+    // address space. RuntimeSession::Poll finalizes and closes those handles.
+    if (process_.HasAbnormalExit()) process_.CaptureDiagnosticDump();
     process_.Poll();
+
     switch (process_.State()) {
         case zero::RuntimeState::Launching:
             return {RuntimeProcessState::Starting, process_.ExitCode()};
