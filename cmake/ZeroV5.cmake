@@ -1,6 +1,13 @@
 # ZERO Core Architecture V5 production migration targets.
 # Kept separate from the V4.1 target list so migration ownership remains visible.
 
+# Runtime V3/V4 remain in repository history only. They are explicitly excluded
+# from the consumer executable so there is one production runtime authority.
+set_source_files_properties(
+  src/RuntimeV3.cpp
+  src/RuntimeV4.cpp
+  PROPERTIES HEADER_FILE_ONLY TRUE)
+
 target_sources(ZeroVirtualConsole PRIVATE
   src/v5/ProductionPackagePlatform.cpp
   src/v5/RuntimeAuthority.cpp
@@ -8,7 +15,8 @@ target_sources(ZeroVirtualConsole PRIVATE
   src/v5/CrashSupervisor.cpp
   src/v5/ResumeCoordinator.cpp
   src/v5/ShellKernel.cpp
-  src/v5/DiscoverDomain.cpp)
+  src/v5/DiscoverDomain.cpp
+  src/v5/ProductionRuntime.cpp)
 
 add_executable(ZeroV5ProductionPackageAcceptance
   tools/V5ProductionPackageAcceptance.cpp
