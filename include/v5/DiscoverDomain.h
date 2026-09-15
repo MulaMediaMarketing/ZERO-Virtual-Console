@@ -2,7 +2,6 @@
 
 #include "ContentModel.h"
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -47,6 +46,9 @@ struct DiscoverItem {
     std::uint32_t ageRating{0};
     std::uint64_t popularityScore{0};
     std::uint64_t friendActivityScore{0};
+    std::uint64_t recentPlayScore{0};
+    std::uint64_t recommendationScore{0};
+    std::uint64_t publishedEpochSeconds{0};
     std::uint64_t updatedEpochSeconds{0};
     bool multiplayer{false};
     bool twoDimensional{false};
