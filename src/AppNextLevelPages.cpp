@@ -2,6 +2,29 @@
 #include <algorithm>
 
 namespace zero {
+namespace {
+
+std::wstring DownloadStateLabel(v5::DownloadState state) {
+    switch (state) {
+        case v5::DownloadState::Queued: return L"Queued";
+        case v5::DownloadState::Downloading: return L"Downloading";
+        case v5::DownloadState::Paused: return L"Paused";
+        case v5::DownloadState::Verifying: return L"Verifying";
+        case v5::DownloadState::Staging: return L"Installing";
+        case v5::DownloadState::Ready: return L"Ready";
+        case v5::DownloadState::Failed: return L"Failed";
+        case v5::DownloadState::Cancelled: return L"Cancelled";
+    }
+    return L"Unknown";
+}
+
+std::wstring PrivacySummary(const UserSettings& settings) {
+    if (!settings.shareActivity && !settings.shareAchievements && !settings.sharePlaytime) return L"PRIVATE";
+    if (settings.shareActivity && settings.shareAchievements && settings.sharePlaytime) return L"SHARING ENABLED";
+    return L"CUSTOM PRIVACY";
+}
+
+} // namespace
 
 void App::DrawProfile(float width, float height) {
     const auto profile = identity_.CurrentProfile();
@@ -20,7 +43,8 @@ void App::DrawProfile(float width, float height) {
     DrawRoundedCard(D2D1::RectF(62, 245, width - 62, 390), 24, brushCard_.Get());
     DrawTextLine(profile.displayName.empty() ? L"Player" : Widen(profile.displayName), 94, 274, width - 380, 44, true);
     DrawTextLine(profile.zeroId.empty() ? L"Local identity unavailable" : Widen(profile.zeroId), 94, 326, width - 380, 28, false, brushMuted_.Get());
-    DrawTextLine(profile.localOnly ? L"Local-first identity" : L"Connected identity", width - 300, 286, 210, 28, false, brushMuted_.Get());
+    DrawTextLine(profile.localOnly ? L"Local-first identity" : L"Connected identity", width - 300, 276, 210, 28, false, brushMuted_.Get());
+    DrawTextLine(PrivacySummary(settings_), width - 300, 318, 210, 24, false, brushMuted_.Get());
 
     const float gap = 14.0f;
     const float cardWidth = (width - 124.0f - gap * 3.0f) / 4.0f;
@@ -58,30 +82,46 @@ void App::DrawProfile(float width, float height) {
         }
     }
 
-    DrawTextLine(L"Online-only profile fields stay hidden until ZERO identity is authoritative.", 64, height - 70, width - 128, 28, false, brushMuted_.Get());
+    DrawTextLine(L"Privacy defaults to private. Online-only fields stay hidden until ZERO identity is authoritative.", 64, height - 70, width - 128, 28, false, brushMuted_.Get());
 }
 
 void App::DrawDownloads(float width, float height) {
     DrawTextLine(L"Downloads", 62, 132, 500, 60, true);
     DrawTextLine(L"INSTALLS, UPDATES AND TRANSFERS", 64, 190, 520, 28, false, brushMuted_.Get());
 
-    DrawRoundedCard(D2D1::RectF(62, 245, width - 62, 360), 22, brushCard_.Get());
-    DrawTextLine(L"No active transfers", 90, 274, 420, 38, true);
-    DrawTextLine(L"ZERO will only show real queued, downloading, verifying, installing or failed jobs here.", 90, 318, width - 180, 30, false, brushMuted_.Get());
-
-    DrawTextLine(L"LOCAL INSTALLS", 64, 405, 300, 28, false, brushMuted_.Get());
-    if (registry_.Games().empty()) {
-        DrawTextLine(L"No installed packages.", 64, 450, width - 128, 30, false, brushMuted_.Get());
+    const auto jobs = downloads_.Queue();
+    if (jobs.empty()) {
+        DrawRoundedCard(D2D1::RectF(62, 245, width - 62, 360), 22, brushCard_.Get());
+        DrawTextLine(L"No active transfers", 90, 274, 420, 38, true);
+        DrawTextLine(L"ZERO will only show real queued, downloading, paused, verifying, installing, ready or failed jobs here.", 90, 318, width - 180, 30, false, brushMuted_.Get());
     } else {
-        float y = 450.0f;
-        for (size_t i = 0; i < std::min<size_t>(6, registry_.Games().size()); ++i, y += 64.0f) {
+        DrawTextLine(std::to_wstring(jobs.size()) + L" ACTIVE / RECENT JOBS", 64, 245, 360, 28, false, brushMuted_.Get());
+        float y = 285.0f;
+        for (size_t i = 0; i < std::min<size_t>(5, jobs.size()); ++i, y += 72.0f) {
+            const auto& job = jobs[i];
+            const auto rect = D2D1::RectF(62, y, width - 62, y + 58);
+            DrawRoundedCard(rect, 17, brushCard_.Get());
+            DrawTextLine(Widen(job.packageId), 88, y + 6, width - 600, 25, false);
+            const unsigned percent = job.totalBytes == 0 ? 0u : static_cast<unsigned>((job.completedBytes * 100ull) / job.totalBytes);
+            DrawTextLine(DownloadStateLabel(job.state) + L"  ·  " + std::to_wstring(percent) + L"%", width - 430, y + 8, 340, 24, false, brushMuted_.Get());
+            if (!job.failure.empty()) DrawTextLine(Widen(job.failure), 88, y + 31, width - 176, 20, false, brushMuted_.Get());
+        }
+    }
+
+    const float installsY = jobs.empty() ? 405.0f : 665.0f;
+    DrawTextLine(L"LOCAL INSTALLS", 64, installsY, 300, 28, false, brushMuted_.Get());
+    if (registry_.Games().empty()) {
+        DrawTextLine(L"No installed packages.", 64, installsY + 45, width - 128, 30, false, brushMuted_.Get());
+    } else if (jobs.empty()) {
+        float y = installsY + 45.0f;
+        for (size_t i = 0; i < std::min<size_t>(5, registry_.Games().size()); ++i, y += 64.0f) {
             const auto& game = registry_.Games()[i];
             DrawRoundedCard(D2D1::RectF(62, y, width - 62, y + 50), 14, brushCard_.Get());
             DrawTextLine(Widen(game.title), 86, y + 9, width - 460, 26, false);
             DrawTextLine(L"Installed  ·  " + Widen(game.version), width - 360, y + 10, 270, 24, false, brushMuted_.Get());
         }
     }
-    DrawTextLine(L"Remote transfer controls activate only for authoritative download jobs; local import remains available in Library.",
+    DrawTextLine(L"The V5 DownloadAuthority owns queue state. Jobs appear only after an authoritative source creates them.",
                  64, height - 70, width - 128, 28, false, brushMuted_.Get());
 }
 
