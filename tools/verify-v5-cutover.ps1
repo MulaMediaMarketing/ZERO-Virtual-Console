@@ -47,7 +47,14 @@ Require-Text "src/v5/ProductionShellIntegration.cpp" 'return\s+kernel_\.MoveTopL
 Require-Text "src/AppAchievements.cpp" 'productionShell_\.NavigateContextual\(Page::Achievements' "Game-scoped Achievements must use authoritative contextual shell navigation."
 Require-Text "src/AppAchievements.cpp" 'productionShell_\.Back\(error\)' "Achievements Back must use authoritative shell history."
 Require-Text "include/ProductionUxContract.h" 'ProductionUxNavCount\(\)\s*==\s*12' "Live production navigation contract must expose all twelve V5 permanent destinations."
-Require-Text "src/AppPages.cpp" 'navEnd\s*=\s*std::max\(navStart,\s*width\s*-\s*122\.0f\)' "Twelve-destination navigation must use width-aware production layout."
+
+# The locked ZERO Player shell uses a permanent vertical sidebar. The cutover
+# gate therefore verifies that content width is derived from the live client
+# width minus the sidebar rather than preserving the removed horizontal nav.
+Require-Text "src/AppPages.cpp" 'constexpr\s+float\s+sidebarWidth\s*=\s*230\.0f' "Twelve-destination navigation must use the locked permanent sidebar."
+Require-Text "src/AppPages.cpp" 'contentWidth\s*=\s*std::max\(720\.0f,\s*width\s*-\s*sidebarWidth\)' "Production content layout must remain width-aware beside the permanent sidebar."
+Require-Text "src/AppPages.cpp" 'for\s*\(size_t\s+i\s*=\s*0;\s*i\s*<\s*ProductionUxNavCount\(\);\s*\+\+i,\s*navY\s*\+=\s*52\.0f\)' "Permanent sidebar must render all twelve destinations from the production navigation contract."
+Forbid-Text "src/AppPages.cpp" 'navEnd\s*=\s*std::max\(navStart' "Removed horizontal top-navigation layout must not return."
 Forbid-Text "src/AppPages.cpp" 'const\s+float\s+navStep\s*=\s*128\.0f' "Legacy six-destination fixed navigation spacing must not return."
 Require-Text "tools/V5ProductionUxIntegrationAcceptance.cpp" 'ProductionUxNavCount\(\)\s*!=\s*std::size\(kTopLevelPages\)' "Production UX acceptance must prove the live navigation contract matches the V5 top-level shell."
 Require-Text "tools/V5ShellKernelAcceptance.cpp" 'NavigateContextual\(ShellPage::Achievements' "ShellKernel acceptance must exercise contextual top-level experiences."
@@ -96,7 +103,7 @@ foreach ($header in $legacyHeaders) {
 
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 $report = [ordered]@{
-    schema = 6
+    schema = 7
     gate = "zero-v5-final-cutover"
     passed = ($errors.Count -eq 0)
     production_runtime = "src/v5/ProductionRuntime.cpp"
@@ -106,7 +113,7 @@ $report = [ordered]@{
     contextual_navigation_authority = "v5-shell-kernel-stack"
     navigation_commit_semantics = "transactional-after-controller-activation"
     permanent_destinations = 12
-    navigation_layout = "width-aware"
+    navigation_layout = "permanent-sidebar-width-aware-content"
     legacy_runtime_authority = "excluded-from-consumer-build"
     errors = @($errors)
 }
