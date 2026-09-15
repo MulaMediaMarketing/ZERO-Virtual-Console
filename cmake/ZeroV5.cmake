@@ -68,5 +68,11 @@ add_executable(ZeroV5DiscoverDomainAcceptance
 target_include_directories(ZeroV5DiscoverDomainAcceptance PRIVATE include)
 target_compile_definitions(ZeroV5DiscoverDomainAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
-include(cmake/v5/LibraryDownloads.cmake)
-include(cmake/v5/ZeroId.cmake)
+# V5 domain build ownership lives in one file per subsystem. CONFIGURE_DEPENDS
+# ensures a newly added migration fragment becomes part of the build without
+# growing this composition root back into a monolithic target list.
+file(GLOB ZERO_V5_DOMAIN_FRAGMENTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/v5/*.cmake")
+list(SORT ZERO_V5_DOMAIN_FRAGMENTS)
+foreach(fragment IN LISTS ZERO_V5_DOMAIN_FRAGMENTS)
+  include("${fragment}")
+endforeach()
