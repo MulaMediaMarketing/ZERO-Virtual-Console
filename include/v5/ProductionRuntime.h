@@ -35,6 +35,7 @@ enum class RuntimeOutcome {
 class ProductionRuntime {
 public:
     ProductionRuntime();
+    ~ProductionRuntime();
 
     bool Launch(const GameManifest& game,
                 std::wstring& error,
