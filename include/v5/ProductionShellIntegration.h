@@ -32,13 +32,17 @@ public:
     bool Valid() const noexcept { return kernel_.Valid(); }
     const std::string& CompositionError() const noexcept { return kernel_.CompositionError(); }
 
-    bool NavigateLegacy(ProductionUxPage page, std::string& error);
+    bool Navigate(ProductionUxPage page, std::string& error);
+    bool NavigateContextual(ProductionUxPage page, std::string& error);
+    bool MoveTopLevel(int direction, std::string& error);
     bool Back(std::string& error);
-    std::optional<ProductionUxPage> ActiveLegacyPage() const noexcept;
+    bool Dispatch(const ShellCommand& command, std::string& error) { return kernel_.Dispatch(command, error); }
+    std::optional<ProductionUxPage> ActivePage() const noexcept;
+    std::size_t ActiveTopLevelIndex() const noexcept;
     ShellSnapshot Snapshot() const { return kernel_.Snapshot(); }
 
     static std::optional<ShellPage> ToShellPage(ProductionUxPage page) noexcept;
-    static std::optional<ProductionUxPage> ToLegacyPage(ShellPage page) noexcept;
+    static std::optional<ProductionUxPage> ToProductionPage(ShellPage page) noexcept;
 
 private:
     std::array<ProductionShellPageController, 17> controllers_;

@@ -1,5 +1,6 @@
 #include "v5/CommerceDomain.h"
 #include <algorithm>
+#include <limits>
 
 namespace zero::v5 {
 
@@ -84,14 +85,18 @@ bool CheckoutAuthority::ValidateQuote(const CheckoutQuote& quote,
             error = "checkout amount overflow";
             return false;
         }
-        subtotal += lineTotal;
-        if (subtotal < lineTotal) {
+        if (lineTotal > std::numeric_limits<std::uint64_t>::max() - subtotal) {
             error = "checkout subtotal overflow";
             return false;
         }
+        subtotal += lineTotal;
     }
-    if (subtotal != quote.subtotalMinor || quote.totalMinor != quote.subtotalMinor + quote.taxMinor ||
-        quote.totalMinor < quote.subtotalMinor) {
+    if (quote.taxMinor > std::numeric_limits<std::uint64_t>::max() - quote.subtotalMinor) {
+        error = "checkout total overflow";
+        return false;
+    }
+    const auto expectedTotal = quote.subtotalMinor + quote.taxMinor;
+    if (subtotal != quote.subtotalMinor || quote.totalMinor != expectedTotal) {
         error = "checkout totals do not reconcile";
         return false;
     }

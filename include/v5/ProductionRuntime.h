@@ -1,15 +1,11 @@
 #pragma once
 
-#include "AchievementStore.h"
 #include "CrashReportStore.h"
 #include "PackageTrust.h"
-#include "PlatformStateStore.h"
-#include "ResumeStore.h"
 #include "RuntimeSession.h"
 #include "v5/CrashSupervisor.h"
 #include "v5/DomainRepositories.h"
 #include "v5/NativeRuntimeProcessHost.h"
-#include "v5/ResumeCoordinator.h"
 #include "v5/RuntimeAuthority.h"
 #include <chrono>
 #include <memory>
@@ -72,9 +68,8 @@ private:
 
     v5::LocalDomainDatabase localDatabase_;
     v5::LocalSessionRepository sessions_;
-    PlatformStateStore stateStore_;
-    AchievementStore achievements_;
-    ResumeStore resumeStore_;
+    v5::LocalResumeRepository resumes_;
+    v5::LocalAchievementRepository achievements_;
     CrashReportStore crashReports_;
     CngPublisherTrustProvider trustProvider_;
     PackageTrustPolicy trustPolicy_{PackageTrustPolicy::AllowLocalUnsigned};
@@ -87,9 +82,10 @@ private:
     bool sessionRecorded_{true};
     bool crashReported_{false};
     bool userTermination_{false};
+    bool playtimeFinalized_{false};
     std::chrono::steady_clock::time_point launchedAt_{};
     std::chrono::steady_clock::time_point readyAt_{};
-    mutable uint64_t finalPlaytimeSeconds_{0};
+    uint64_t finalPlaytimeSeconds_{0};
 
     static constexpr std::chrono::seconds kReadyTimeout{20};
     static constexpr std::chrono::seconds kHeartbeatTimeout{10};

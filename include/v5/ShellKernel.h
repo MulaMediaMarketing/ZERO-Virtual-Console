@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -70,6 +71,7 @@ struct PageSnapshot {
 struct ShellSnapshot {
     ShellPage activePage{ShellPage::Home};
     std::optional<ShellPage> contextualParent;
+    std::size_t contextDepth{0};
     std::uint64_t navigationRevision{0};
     std::vector<PageSnapshot> pages;
 };
@@ -90,20 +92,25 @@ public:
     const std::string& CompositionError() const noexcept { return compositionError_; }
 
     bool Navigate(ShellPage page, std::string& error);
+    bool NavigateContextual(ShellPage page, std::string& error);
+    bool MoveTopLevel(int direction, std::string& error);
+    std::size_t ActiveTopLevelIndex() const noexcept;
     bool Back(std::string& error);
     bool Dispatch(const ShellCommand& command, std::string& error);
     ShellSnapshot Snapshot() const;
 
 private:
     std::vector<IShellPageController*> controllers_;
+    std::vector<ShellPage> contextStack_;
     ShellPage activePage_{ShellPage::Home};
-    std::optional<ShellPage> contextualParent_;
     std::uint64_t navigationRevision_{0};
     bool valid_{false};
     std::string compositionError_;
 
     IShellPageController* Find(ShellPage page) const noexcept;
+    bool Activate(ShellPage page, std::string& error);
     static bool IsTopLevel(ShellPage page) noexcept;
+    static std::size_t TopLevelIndex(ShellPage page) noexcept;
 };
 
 } // namespace zero::v5

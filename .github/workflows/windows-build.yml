@@ -47,6 +47,14 @@ jobs:
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
 
+      - name: Validate production closure ownership
+        shell: pwsh
+        run: ./tools/verify-production-closure.ps1 -SourceRoot .
+
+      - name: Validate locked ZERO Player UX and input parity
+        shell: pwsh
+        run: ./tools/verify-zero-player-ux.ps1 -SourceRoot .
+
       - name: Validate release governance and supply-chain controls
         shell: pwsh
         run: ./tools/verify-release-governance.ps1 -SourceRoot . -ReportDir ./build/GovernanceReports
@@ -151,6 +159,8 @@ jobs:
             build/ZERO-Virtual-Console-Windows-x64-RC.zip
             tools/run-v5-acceptance.ps1
             tools/verify-v5-cutover.ps1
+            tools/verify-production-closure.ps1
+            tools/verify-zero-player-ux.ps1
             tools/verify-dependency-surface.ps1
             tools/verify-production-architecture.ps1
             tools/verify-release-governance.ps1
