@@ -7,13 +7,6 @@ namespace zero {
 
 namespace {
 
-bool containsAuthoritativeUnlock(const std::vector<v5::AchievementUnlock>& unlocks,
-                                 const std::string& achievementId) {
-    return std::any_of(unlocks.begin(), unlocks.end(), [&](const v5::AchievementUnlock& unlock) {
-        return unlock.achievementId == achievementId;
-    });
-}
-
 const v5::AchievementUnlock* findAuthoritativeUnlock(const std::vector<v5::AchievementUnlock>& unlocks,
                                                       const std::string& achievementId) {
     const auto it = std::find_if(unlocks.begin(), unlocks.end(), [&](const v5::AchievementUnlock& unlock) {
@@ -40,7 +33,7 @@ void App::ClampAchievementSelection() {
         return;
     }
     if (selectedAchievement_ >= count) selectedAchievement_ = count - 1;
-    constexpr size_t visible = 6;
+    constexpr size_t visible = 4;
     if (selectedAchievement_ < achievementScroll_) achievementScroll_ = selectedAchievement_;
     if (selectedAchievement_ >= achievementScroll_ + visible)
         achievementScroll_ = selectedAchievement_ - visible + 1;
@@ -162,22 +155,22 @@ void App::DrawAchievements(float width, float height) {
             DrawEmptyState(L"No achievements unlocked",
                 L"ZERO will show real persisted unlocks here after a compatible game reports them. Nothing is fabricated.", width);
         } else {
-            const size_t count = std::min<std::size_t>(6, recent.size());
+            const size_t count = std::min<std::size_t>(4, recent.size());
             float y = 430.0f;
-            for (size_t i = 0; i < count; ++i, y += 68.0f) {
+            for (size_t i = 0; i < count; ++i, y += 62.0f) {
                 const auto& row = recent[i];
-                const auto rect = D2D1::RectF(62, y, width - 62, y + 54);
-                DrawRoundedCard(rect, 16, brushCard_.Get());
-                DrawTextLine(row.record.title.empty() ? Widen(row.record.id) : Widen(row.record.title), 88, y + 6, width - 560, 26, false);
-                DrawTextLine(Widen(row.gameTitle), 88, y + 29, width - 560, 21, false, brushMuted_.Get());
-                DrawTextLine(Widen(row.record.unlockedAtUtc), width - 390, y + 14, 300, 24, false, brushMuted_.Get());
+                const auto rect = D2D1::RectF(62, y, width - 62, y + 50);
+                DrawRoundedCard(rect, 15, brushCard_.Get());
+                DrawTextLine(row.record.title.empty() ? Widen(row.record.id) : Widen(row.record.title), 88, y + 5, width - 560, 24, false);
+                DrawTextLine(Widen(row.gameTitle), 88, y + 27, width - 560, 20, false, brushMuted_.Get());
+                DrawTextLine(Widen(row.record.unlockedAtUtc), width - 390, y + 12, 300, 22, false, brushMuted_.Get());
             }
         }
 
         DrawTextLine(identity.localOnly
                          ? L"ZERO Score and authoritative global completion require a connected ZERO identity."
                          : L"ZERO Score is derived only from authoritative ZERO-service achievement definitions and unlocks.",
-                     64, height - 70, width - 128, 28, false, brushMuted_.Get());
+                     64, height - 46, width - 128, 26, false, brushMuted_.Get());
         return;
     }
 
@@ -197,13 +190,12 @@ void App::DrawAchievements(float width, float height) {
         std::size_t unlocked = 0;
         for (const auto& definition : definitions) {
             totalScore += definition.score;
-            if (const auto* unlock = findAuthoritativeUnlock(authorityUnlocks, definition.achievementId)) {
+            if (findAuthoritativeUnlock(authorityUnlocks, definition.achievementId)) {
                 ++unlocked;
                 earnedScore += definition.score;
-                (void)unlock;
             }
         }
-        const auto completion = definitions.empty() ? 0u : static_cast<unsigned>((unlocked * 100u) / definitions.size());
+        const auto completion = static_cast<unsigned>((unlocked * 100u) / definitions.size());
 
         const float gap = 14.0f;
         const float cardWidth = (width - 124.0f - gap * 2.0f) / 3.0f;
@@ -220,75 +212,85 @@ void App::DrawAchievements(float width, float height) {
             DrawTextLine(labels[i], x + 22, 292, cardWidth - 44, 22, false, brushMuted_.Get());
         }
 
-        const size_t end = std::min(definitions.size(), achievementScroll_ + 6);
+        const size_t end = std::min(definitions.size(), achievementScroll_ + 4);
         float y = 350.0f;
-        for (size_t i = achievementScroll_; i < end; ++i, y += 72.0f) {
+        for (size_t i = achievementScroll_; i < end; ++i, y += 68.0f) {
             const auto& definition = definitions[i];
             const auto* unlock = findAuthoritativeUnlock(authorityUnlocks, definition.achievementId);
             const bool isUnlocked = unlock != nullptr;
             const bool hideSecret = definition.secret && !isUnlocked;
-            const auto rect = D2D1::RectF(62, y, width - 62, y + 58);
-            DrawRoundedCard(rect, 17, i == selectedAchievement_ ? brushAccent_.Get() : brushCard_.Get());
-            if (i == selectedAchievement_) DrawFocusRing(rect, 17, true);
+            const auto rect = D2D1::RectF(62, y, width - 62, y + 54);
+            DrawRoundedCard(rect, 16, i == selectedAchievement_ ? brushAccent_.Get() : brushCard_.Get());
+            if (i == selectedAchievement_) DrawFocusRing(rect, 16, true);
 
             const std::wstring title = hideSecret ? L"Secret achievement" : Widen(definition.title);
             const std::wstring description = hideSecret ? L"Details hidden until unlocked" : Widen(definition.description);
-            DrawTextLine(title, 92, y + 5, width - 610, 25, false);
-            DrawTextLine(description, 92, y + 31, width - 610, 20, false, brushMuted_.Get());
+            DrawTextLine(title, 92, y + 4, width - 610, 24, false);
+            DrawTextLine(description, 92, y + 28, width - 610, 19, false, brushMuted_.Get());
 
-            std::wstring status = isUnlocked ? L"UNLOCKED" : L"LOCKED";
-            status += L"  ·  " + std::to_wstring(definition.score) + L" pts";
-            if (definition.targetProgress > 1) status += L"  ·  Target " + std::to_wstring(definition.targetProgress);
-            if (unlock) {
-                const double rarity = static_cast<double>(unlock->rarityBasisPoints) / 100.0;
-                status += L"  ·  " + std::to_wstring(rarity).substr(0, 4) + L"% rarity";
+            std::wstring status;
+            if (hideSecret) {
+                status = L"SECRET  ·  LOCKED";
+            } else {
+                status = isUnlocked ? L"UNLOCKED" : L"LOCKED";
+                status += L"  ·  " + std::to_wstring(definition.score) + L" pts";
+                if (definition.targetProgress > 1 && !identity.localOnly) {
+                    const auto progress = runtime_.AuthoritativeAchievementProgress(
+                        identity.zeroId, achievementPackageId_, definition.achievementId);
+                    const auto current = progress ? progress->currentProgress : 0u;
+                    status += L"  ·  " + std::to_wstring(current) + L"/" + std::to_wstring(definition.targetProgress);
+                }
+                if (unlock) {
+                    const double rarity = static_cast<double>(unlock->rarityBasisPoints) / 100.0;
+                    status += L"  ·  " + std::to_wstring(rarity).substr(0, 4) + L"% rarity";
+                }
             }
-            DrawTextLine(status, width - 500, y + 17, 410, 24, false, brushMuted_.Get());
+            DrawTextLine(status, width - 500, y + 15, 410, 22, false, brushMuted_.Get());
         }
 
         DrawTextLine(identity.localOnly
-                         ? L"Authoritative definitions are synced, but account completion remains hidden until ZERO identity is connected."
-                         : L"Up/Down Browse   ·   B Back   ·   Secret details remain hidden until authoritative unlock.",
-                     64, height - 78, width - 128, 30, false, brushMuted_.Get());
+                         ? L"Authoritative definitions are synced, but account completion/progress stays hidden until ZERO identity is connected."
+                         : L"Up/Down Browse · B Back · Progress, rarity and secret details come only from authoritative ZERO data.",
+                     64, height - 46, width - 128, 26, false, brushMuted_.Get());
         return;
     }
 
     DrawRoundedCard(D2D1::RectF(62, 238, width - 62, 325), 20, brushCard_.Get());
     DrawTextLine(std::to_wstring(records.size()), 88, 253, 160, 40, true);
     DrawTextLine(L"LOCAL UNLOCKS", 88, 292, 200, 22, false, brushMuted_.Get());
-    DrawTextLine(L"Authoritative definitions are not currently available, so ZERO will not invent locked entries, rarity, score or completion.",
+    DrawTextLine(L"Authoritative definitions are not currently available, so ZERO will not invent locked entries, rarity, score, progress or completion.",
                  300, 258, width - 390, 52, false, brushMuted_.Get());
 
     if (records.empty()) {
         DrawEmptyState(L"No achievements unlocked",
             L"ZERO only shows achievements actually reported and persisted by this game. Locked or unreported achievements are not fabricated.", width);
-        DrawTextLine(L"B Back", 64, height - 78, 180, 30, false, brushMuted_.Get());
+        DrawTextLine(L"B Back", 64, height - 46, 180, 26, false, brushMuted_.Get());
         return;
     }
 
-    const size_t end = std::min(records.size(), achievementScroll_ + 6);
+    const size_t end = std::min(records.size(), achievementScroll_ + 4);
     float y = 350.0f;
-    for (size_t i = achievementScroll_; i < end; ++i, y += 72.0f) {
+    for (size_t i = achievementScroll_; i < end; ++i, y += 68.0f) {
         const auto& record = records[i];
-        const auto rect = D2D1::RectF(62, y, width - 62, y + 58);
+        const auto rect = D2D1::RectF(62, y, width - 62, y + 54);
         if (i == selectedAchievement_) {
-            DrawRoundedCard(rect, 17, brushAccent_.Get());
+            DrawRoundedCard(rect, 16, brushAccent_.Get());
             ComPtr<ID2D1SolidColorBrush> white;
             target_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), white.GetAddressOf());
-            DrawTextLine(record.title.empty() ? Widen(record.id) : Widen(record.title), 92, y + 6, width - 470, 26, false, white.Get());
-            DrawTextLine(Widen(record.id), 92, y + 31, width - 470, 20, false, white.Get());
-            DrawTextLine(Widen(record.unlockedAtUtc), width - 360, y + 16, 270, 24, false, white.Get());
-            DrawFocusRing(rect, 17, true);
+            DrawTextLine(record.title.empty() ? Widen(record.id) : Widen(record.title), 92, y + 5, width - 470, 24, false, white.Get());
+            DrawTextLine(Widen(record.id), 92, y + 29, width - 470, 19, false, white.Get());
+            DrawTextLine(Widen(record.unlockedAtUtc), width - 360, y + 14, 270, 22, false, white.Get());
+            DrawFocusRing(rect, 16, true);
         } else {
-            DrawRoundedCard(rect, 17, brushCard_.Get());
-            DrawTextLine(record.title.empty() ? Widen(record.id) : Widen(record.title), 92, y + 6, width - 470, 26, false);
-            DrawTextLine(Widen(record.id), 92, y + 31, width - 470, 20, false, brushMuted_.Get());
-            DrawTextLine(Widen(record.unlockedAtUtc), width - 360, y + 16, 270, 24, false, brushMuted_.Get());
+            DrawRoundedCard(rect, 16, brushCard_.Get());
+            DrawTextLine(record.title.empty() ? Widen(record.id) : Widen(record.title), 92, y + 5, width - 470, 24, false);
+            DrawTextLine(Widen(record.id), 92, y + 29, width - 470, 19, false, brushMuted_.Get());
+            DrawTextLine(Widen(record.unlockedAtUtc), width - 360, y + 14, 270, 22, false, brushMuted_.Get());
         }
     }
 
-    DrawTextLine(std::to_wstring(records.size()) + L" local unlocks   ·   Up/Down Browse   ·   B Back",
-        64, height - 78, width - 128, 30, false, brushMuted_.Get());
+    DrawTextLine(std::to_wstring(records.size()) + L" local unlocks · Up/Down Browse · B Back",
+        64, height - 46, width - 128, 26, false, brushMuted_.Get());
 }
 
 } // namespace zero
