@@ -33,16 +33,25 @@ Require-Text "include/App.h" 'AuthoritativePageProjection\s+page_\{productionShe
 Require-Text "include/App.h" 'AuthoritativeNavProjection\s+navIndex_\{\*this,\s*productionShell_\}' "Live navigation selection and transition feedback must project from the V5 ShellKernel authority."
 Forbid-Text "include/App.h" '(?m)^\s*Page\s+page_\s*\{' "App must not own a raw legacy page state authority."
 Forbid-Text "include/App.h" '(?m)^\s*size_t\s+navIndex_\s*\{' "App must not own a raw legacy navigation-index authority."
+Forbid-Text "include/App.h" 'achievementsReturnPage_' "Achievements return navigation must be owned by the V5 shell context stack."
 Forbid-Text "include/v5/ProductionShellIntegration.h" 'NavigateLegacy|ActiveLegacyPage|ToLegacyPage' "Legacy shell bridge APIs must not remain after V5 live-shell cutover."
+Require-Text "include/v5/ShellKernel.h" 'NavigateContextual\s*\(ShellPage\s+page' "ShellKernel must own contextual navigation."
+Require-Text "include/v5/ShellKernel.h" 'std::vector<ShellPage>\s+contextStack_' "ShellKernel must own contextual navigation history."
 Require-Text "include/v5/ShellKernel.h" 'MoveTopLevel\s*\(int\s+direction' "ShellKernel must own top-level traversal."
 Require-Text "include/v5/ShellKernel.h" 'ActiveTopLevelIndex\s*\(\)\s+const' "ShellKernel must expose its authoritative top-level position."
-Require-Text "src/v5/ShellKernel.cpp" 'if\s*\(!controller->Execute\(activate,\s*error\)\)\s*return\s+false' "ShellKernel navigation must commit only after controller activation succeeds."
+Require-Text "src/v5/ShellKernel.cpp" 'return\s+controller->Execute\(activate,\s*error\)' "ShellKernel activation must be isolated behind the transactional Activate boundary."
+Require-Text "src/v5/ShellKernel.cpp" 'contextStack_\.push_back\(activePage_\)' "ShellKernel must record contextual history before publishing contextual navigation."
+Require-Text "src/v5/ShellKernel.cpp" 'contextStack_\.pop_back\(\)' "ShellKernel Back must unwind contextual history."
+Require-Text "src/v5/ProductionShellIntegration.cpp" 'return\s+kernel_\.NavigateContextual\(\*shellPage,\s*error\)' "ProductionShellIntegration must delegate contextual navigation to ShellKernel."
 Require-Text "src/v5/ProductionShellIntegration.cpp" 'return\s+kernel_\.MoveTopLevel\(direction,\s*error\)' "ProductionShellIntegration must delegate top-level traversal to ShellKernel."
+Require-Text "src/AppAchievements.cpp" 'productionShell_\.NavigateContextual\(Page::Achievements' "Game-scoped Achievements must use authoritative contextual shell navigation."
+Require-Text "src/AppAchievements.cpp" 'productionShell_\.Back\(error\)' "Achievements Back must use authoritative shell history."
 Require-Text "include/ProductionUxContract.h" 'ProductionUxNavCount\(\)\s*==\s*12' "Live production navigation contract must expose all twelve V5 permanent destinations."
 Require-Text "src/AppPages.cpp" 'navEnd\s*=\s*std::max\(navStart,\s*width\s*-\s*122\.0f\)' "Twelve-destination navigation must use width-aware production layout."
 Forbid-Text "src/AppPages.cpp" 'const\s+float\s+navStep\s*=\s*128\.0f' "Legacy six-destination fixed navigation spacing must not return."
 Require-Text "tools/V5ProductionUxIntegrationAcceptance.cpp" 'ProductionUxNavCount\(\)\s*!=\s*std::size\(kTopLevelPages\)' "Production UX acceptance must prove the live navigation contract matches the V5 top-level shell."
-Require-Text "tools/V5ShellKernelAcceptance.cpp" 'MoveTopLevel\(1,\s*error\)' "ShellKernel acceptance must exercise authoritative top-level traversal."
+Require-Text "tools/V5ShellKernelAcceptance.cpp" 'NavigateContextual\(ShellPage::Achievements' "ShellKernel acceptance must exercise contextual top-level experiences."
+Require-Text "tools/V5ShellKernelAcceptance.cpp" 'contextDepth\s*!=\s*2' "ShellKernel acceptance must prove nested contextual history."
 Require-Text "tools/V5ShellKernelAcceptance.cpp" 'afterFailure\.navigationRevision\s*!=\s*beforeFailure\.navigationRevision' "ShellKernel acceptance must prove failed activation cannot publish navigation state."
 
 Require-Text "cmake/ZeroV5.cmake" 'src/v5/ProductionRuntime\.cpp' "ProductionRuntime.cpp must be compiled into ZeroVirtualConsole."
@@ -87,13 +96,14 @@ foreach ($header in $legacyHeaders) {
 
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 $report = [ordered]@{
-    schema = 5
+    schema = 6
     gate = "zero-v5-final-cutover"
     passed = ($errors.Count -eq 0)
     production_runtime = "src/v5/ProductionRuntime.cpp"
     production_shell = "src/v5/ProductionShellIntegration.cpp"
     shell_authority = "v5-shell-kernel"
     navigation_traversal_authority = "v5-shell-kernel"
+    contextual_navigation_authority = "v5-shell-kernel-stack"
     navigation_commit_semantics = "transactional-after-controller-activation"
     permanent_destinations = 12
     navigation_layout = "width-aware"
