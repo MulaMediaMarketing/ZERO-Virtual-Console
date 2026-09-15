@@ -126,6 +126,15 @@ bool ProductionShellIntegration::Navigate(ProductionUxPage page, std::string& er
     return kernel_.Navigate(*shellPage, error);
 }
 
+bool ProductionShellIntegration::NavigateContextual(ProductionUxPage page, std::string& error) {
+    const auto shellPage = ToShellPage(page);
+    if (!shellPage) {
+        error = "production UX page has no V5 shell mapping";
+        return false;
+    }
+    return kernel_.NavigateContextual(*shellPage, error);
+}
+
 std::size_t ProductionShellIntegration::ActiveTopLevelIndex() const noexcept {
     return kernel_.ActiveTopLevelIndex();
 }
