@@ -25,6 +25,19 @@ foreach($name in @('Discover','CloudPlay','Downloads','Profile','Devices','Wishl
   Need "src/v5/ProductionShellIntegration.cpp" "ShellPage::$name, true" "$name is not reachable in production shell"
 }
 
+Need "src/AppPages.cpp" 'Page::Discover\) DrawDiscover' "Discover must render the local-first production experience"
+Need "src/AppPages.cpp" 'Page::Downloads\) DrawDownloads' "Downloads must render the local-first production experience"
+Need "src/AppPages.cpp" 'Page::Profile\) DrawProfile' "Profile must render the local-first production experience"
+Need "src/AppPages.cpp" 'Page::Devices\) DrawDevices' "Devices must render the local-first production experience"
+Need "src/AppPages.cpp" 'Page::Notifications\) DrawNotifications' "Notifications must render the local-first production experience"
+Need "src/AppNextLevelPages.cpp" 'void App::DrawProfile' "Profile renderer implementation missing"
+Need "src/AppNextLevelPages.cpp" 'void App::DrawDownloads' "Downloads renderer implementation missing"
+Need "src/AppNextLevelPages.cpp" 'void App::DrawDevices' "Devices renderer implementation missing"
+Need "src/AppNextLevelPages.cpp" 'void App::DrawNotifications' "Notifications renderer implementation missing"
+Need "src/AppNextLevelPages.cpp" 'void App::DrawDiscover' "Discover renderer implementation missing"
+Need "src/AppAchievements.cpp" 'YOUR VERIFIED LOCAL ACHIEVEMENT HISTORY' "top-level Achievements dashboard missing"
+Need "CMakeLists.txt" 'src/AppNextLevelPages\.cpp' "next-level page renderer must be linked into ZERO Player"
+
 Need "src/Input.cpp" 'XInputGetState' "controller input path missing"
 Need "src/Input.cpp" 'VK_UP' "keyboard directional input path missing"
 Need "src/App.cpp" 'WM_LBUTTONDOWN' "mouse sidebar navigation path missing"
