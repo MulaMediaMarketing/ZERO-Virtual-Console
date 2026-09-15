@@ -298,17 +298,21 @@ void App::Paint() {
     DrawTextLine(L"ZERO", 42, 28, 180, 54, true);
     DrawTextLine(L"VIRTUAL CONSOLE", 44, 68, 210, 28, false, brushMuted_.Get());
 
-    const float navStart = 300.0f;
-    const float navStep = 128.0f;
+    const float navStart = std::min(270.0f, std::max(220.0f, width * 0.17f));
+    const float navEnd = std::max(navStart, width - 122.0f);
+    const float navStep = ProductionUxNavCount() > 1
+        ? (navEnd - navStart) / static_cast<float>(ProductionUxNavCount() - 1)
+        : 0.0f;
+    const float navLabelWidth = std::max(72.0f, std::min(104.0f, navStep - 6.0f));
     const bool topLevel = ProductionUxIsTopLevelPage(page_);
     for (size_t i = 0; i < ProductionUxNavCount(); ++i) {
         const float x = navStart + static_cast<float>(i) * navStep;
-        const auto rect = D2D1::RectF(x - 16, 38, x + 102, 82);
+        const auto rect = D2D1::RectF(x - 12, 38, x + navLabelWidth + 10, 82);
         if (navIndex_ == i) {
             DrawRoundedCard(rect, 18, brushCard_.Get());
             if (topLevel) DrawFocusRing(rect, 18);
         }
-        DrawTextLine(std::wstring(kProductionUxNavigation[i].label), x, 48, 104, 30, false);
+        DrawTextLine(std::wstring(kProductionUxNavigation[i].label), x, 48, navLabelWidth, 30, false);
     }
 
     target_->SetTransform(D2D1::Matrix3x2F::Translation(0.0f, shellUx_.PageOffsetY()));
