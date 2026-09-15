@@ -33,6 +33,8 @@ Need "src/AppPages.cpp" 'Page::Devices\) DrawDevices' "Devices must render the l
 Need "src/AppPages.cpp" 'Page::Notifications\) DrawNotifications' "Notifications must render the local-first production experience"
 Need "src/AppNextLevelPages.cpp" 'void App::DrawProfile' "Profile renderer implementation missing"
 Need "src/AppNextLevelPages.cpp" 'void App::DrawDownloads' "Downloads renderer implementation missing"
+Need "src/AppNextLevelPages.cpp" 'downloads_\.Queue\(\)' "Downloads must project the live V5 download queue"
+Need "include/App.h" 'v5::DownloadAuthority\s+downloads_' "App must own the live V5 download state projection"
 Need "src/AppNextLevelPages.cpp" 'void App::DrawDevices' "Devices renderer implementation missing"
 Need "src/AppNextLevelPages.cpp" 'void App::DrawNotifications' "Notifications renderer implementation missing"
 Need "src/AppNextLevelPages.cpp" 'void App::DrawDiscover' "Discover renderer implementation missing"
