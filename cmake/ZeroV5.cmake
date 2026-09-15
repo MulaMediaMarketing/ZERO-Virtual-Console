@@ -67,3 +67,5 @@ add_executable(ZeroV5DiscoverDomainAcceptance
   src/v5/DiscoverDomain.cpp)
 target_include_directories(ZeroV5DiscoverDomainAcceptance PRIVATE include)
 target_compile_definitions(ZeroV5DiscoverDomainAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+
+include(cmake/v5/LibraryDownloads.cmake)
