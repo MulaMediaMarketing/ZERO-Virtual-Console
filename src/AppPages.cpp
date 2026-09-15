@@ -38,22 +38,12 @@ std::wstring pageTitle(ProductionUxPage page) {
 
 std::wstring pageDisconnectedMessage(ProductionUxPage page) {
     switch (page) {
-        case ProductionUxPage::Discover:
-            return L"Discover is ready for authoritative ZERO catalog and recommendation data. No recommendations are fabricated while that service is disconnected.";
         case ProductionUxPage::CloudPlay:
             return L"ZERO Cloud is not connected. Cloud sessions, regions, queue state, and latency are hidden until authoritative cloud service data is available.";
-        case ProductionUxPage::Downloads:
-            return L"There are no authoritative download jobs to show. Local package imports remain available from Library.";
-        case ProductionUxPage::Profile:
-            return L"Online ZERO identity is not connected. Local identity remains available without inventing account statistics, progression, or activity.";
-        case ProductionUxPage::Devices:
-            return L"No authoritative ZERO devices are connected. Device cards appear only after verified device discovery or pairing.";
         case ProductionUxPage::Wishlist:
             return L"Wishlist requires the ZERO commerce service. No products are synthesized while commerce is disconnected.";
         case ProductionUxPage::Checkout:
             return L"Checkout requires a server-authoritative quote and payment flow. ZERO will not display a fake order or payment state.";
-        case ProductionUxPage::Notifications:
-            return L"No authoritative notifications are available. ZERO does not create synthetic alerts.";
         default:
             return L"This destination is currently unavailable.";
     }
@@ -369,7 +359,8 @@ void App::Paint() {
             if (resume) DrawTextLine(L"Continue: " + Widen(resume->displayLabel), 330, 515, 500, 30, false);
             DrawRecentGames(contentWidth, height);
         }
-    } else if (page_ == Page::Library) {
+    } else if (page_ == Page::Discover) DrawDiscover(contentWidth, height);
+    else if (page_ == Page::Library) {
         DrawTextLine(L"Library", 62, 132, 500, 60, true);
         DrawTextLine(std::to_wstring(games.size()) + L" INSTALLED   ·   A OPEN   ·   X IMPORT GAME", 64, 190, 620, 30, false, brushMuted_.Get());
         if (coreShellUx_.libraryMode == LibraryExperienceMode::Empty) {
@@ -385,9 +376,13 @@ void App::Paint() {
                 DrawTextLine(Widen(games[i].version), contentWidth - 250, y + 14, 120, 30, false, brushMuted_.Get());
             }
         }
-    } else if (page_ == Page::Store) DrawStore(contentWidth, height);
+    } else if (page_ == Page::Downloads) DrawDownloads(contentWidth, height);
+    else if (page_ == Page::Store) DrawStore(contentWidth, height);
     else if (page_ == Page::Friends) DrawFriends(contentWidth, height);
     else if (page_ == Page::Captures) DrawCaptures(contentWidth, height);
+    else if (page_ == Page::Profile) DrawProfile(contentWidth, height);
+    else if (page_ == Page::Devices) DrawDevices(contentWidth, height);
+    else if (page_ == Page::Notifications) DrawNotifications(contentWidth, height);
     else if (page_ == Page::Settings) DrawSettings(contentWidth, height);
     else if (page_ == Page::Achievements) DrawAchievements(contentWidth, height);
     else if (page_ == Page::GameDetail && !games.empty()) {
