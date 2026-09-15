@@ -37,6 +37,9 @@ public:
 
     bool Launch(const GameManifest& game, std::wstring& error);
     bool PrepareLaunch(const GameManifest& game, std::wstring& error);
+    bool PrepareLaunchWithSession(const GameManifest& game,
+                                  const std::string& authoritativeSessionId,
+                                  std::wstring& error);
     bool ResumePrepared(std::wstring& error);
     void FailPrepared(DWORD code, const char* phase = "launch_failed");
 

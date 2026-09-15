@@ -17,6 +17,12 @@ struct RuntimeIpcCallbacks {
     std::function<void(bool)> onOverlayFocus;
 };
 
+struct RuntimeIpcPermissions {
+    bool resumeWrite{true};
+    bool achievements{true};
+    bool overlay{true};
+};
+
 class RuntimeIpcServer {
 public:
     RuntimeIpcServer();
@@ -24,11 +30,19 @@ public:
     RuntimeIpcServer(const RuntimeIpcServer&) = delete;
     RuntimeIpcServer& operator=(const RuntimeIpcServer&) = delete;
 
+    // Compatibility entry point for Runtime V4.1. V5 uses StartSecure with an
+    // explicit capability-derived permission set.
     bool Start(const std::string& sessionId,
                const std::string& packageId,
                const std::string& authToken,
                RuntimeIpcCallbacks callbacks,
                std::wstring& error);
+    bool StartSecure(const std::string& sessionId,
+                     const std::string& packageId,
+                     const std::string& authToken,
+                     RuntimeIpcCallbacks callbacks,
+                     RuntimeIpcPermissions permissions,
+                     std::wstring& error);
     void Stop();
     bool SendOverlayFocus(bool focused);
 
@@ -48,6 +62,7 @@ private:
     std::string packageId_;
     std::string authToken_;
     RuntimeIpcCallbacks callbacks_;
+    RuntimeIpcPermissions permissions_{};
     std::thread thread_;
     std::atomic<bool> stop_{false};
     std::atomic<bool> authenticated_{false};
