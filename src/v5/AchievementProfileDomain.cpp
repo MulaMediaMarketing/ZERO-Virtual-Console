@@ -13,6 +13,10 @@ std::string AchievementAuthority::UnlockKey(const AchievementUnlock& unlock) {
     return unlock.accountId + "\n" + unlock.contentId + "\n" + unlock.achievementId;
 }
 
+std::string AchievementAuthority::ProgressKey(const AchievementProgress& progress) {
+    return progress.accountId + "\n" + progress.contentId + "\n" + progress.achievementId;
+}
+
 bool AchievementAuthority::ApplyDefinition(AchievementDefinition definition, std::string& error) {
     if (definition.authority != AuthoritySource::ZeroService) {
         error = "achievement definition was not issued by ZERO service";
@@ -55,6 +59,29 @@ bool AchievementAuthority::ApplyUnlock(AchievementUnlock unlock, std::string& er
     return true;
 }
 
+bool AchievementAuthority::ApplyProgress(AchievementProgress progress, std::string& error) {
+    if (progress.authority != AuthoritySource::ZeroService) {
+        error = "achievement progress was not validated by ZERO service";
+        return false;
+    }
+    if (progress.achievementId.empty() || progress.contentId.empty() || progress.accountId.empty()) {
+        error = "achievement progress is missing identity";
+        return false;
+    }
+    const auto definition = Definition(progress.contentId, progress.achievementId);
+    if (!definition) {
+        error = "achievement progress has no authoritative definition";
+        return false;
+    }
+    if (progress.currentProgress > definition->targetProgress) {
+        error = "achievement progress exceeds authoritative target";
+        return false;
+    }
+    progress_[ProgressKey(progress)] = std::move(progress);
+    error.clear();
+    return true;
+}
+
 std::optional<AchievementDefinition> AchievementAuthority::Definition(const std::string& contentId,
                                                                       const std::string& achievementId) const {
     const auto it = definitions_.find(DefinitionKeyFor(contentId, achievementId));
@@ -84,6 +111,17 @@ std::vector<AchievementUnlock> AchievementAuthority::UnlocksFor(const std::strin
         return a.unlockedEpochSeconds > b.unlockedEpochSeconds;
     });
     return result;
+}
+
+std::optional<AchievementProgress> AchievementAuthority::ProgressFor(const std::string& accountId,
+                                                                     const std::string& contentId,
+                                                                     const std::string& achievementId) const {
+    AchievementProgress key;
+    key.accountId = accountId;
+    key.contentId = contentId;
+    key.achievementId = achievementId;
+    const auto it = progress_.find(ProgressKey(key));
+    return it == progress_.end() ? std::nullopt : std::optional<AchievementProgress>{it->second};
 }
 
 std::uint64_t AchievementAuthority::ScoreFor(const std::string& accountId) const {
