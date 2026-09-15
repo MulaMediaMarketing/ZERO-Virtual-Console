@@ -59,6 +59,21 @@ int main() {
         if (!shellPage || *shellPage != kTopLevelPages[i]) return 25;
     }
 
+    // Navigation traversal must remain usable even when some destinations are
+    // truthfully unavailable. From Home, moving right skips disconnected
+    // Discover and lands on Store. From Library, moving right skips Cloud Play
+    // and Downloads and lands on Friends.
+    error.clear();
+    if (!shell.Navigate(ProductionUxPage::Home, error)) return 26;
+    if (shell.ActiveTopLevelIndex() != ProductionUxIndex(ProductionUxDestination::Home)) return 27;
+    if (!shell.MoveTopLevel(1, error)) return 28;
+    if (shell.ActivePage() != ProductionUxPage::Store) return 29;
+    if (!shell.Navigate(ProductionUxPage::Library, error)) return 30;
+    if (!shell.MoveTopLevel(1, error)) return 31;
+    if (shell.ActivePage() != ProductionUxPage::Friends) return 32;
+    if (!shell.MoveTopLevel(-1, error)) return 33;
+    if (shell.ActivePage() != ProductionUxPage::Library) return 34;
+
     std::cout << "ZERO V5 production UX shell integration acceptance: PASS\n";
     return 0;
 }
