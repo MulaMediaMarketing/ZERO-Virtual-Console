@@ -24,14 +24,27 @@ void App::ClampAchievementSelection() {
 }
 
 void App::OpenAchievements(const std::string& packageId, Page returnPage, bool fromOverlay) {
+    (void)returnPage;
     achievementPackageId_ = packageId;
-    achievementsReturnPage_ = returnPage;
     achievementsFromOverlay_ = fromOverlay;
     selectedAchievement_ = 0;
     achievementScroll_ = 0;
     ClampAchievementSelection();
     NotifyFocusMoved();
-    if (!fromOverlay) NavigateTo(Page::Achievements);
+
+    if (!fromOverlay) {
+        const auto beforeRevision = productionShell_.Snapshot().navigationRevision;
+        std::string error;
+        if (!productionShell_.NavigateContextual(Page::Achievements, error)) {
+            status_ = Widen(error.empty() ? "ZERO could not open Achievements." : error);
+            return;
+        }
+        if (productionShell_.Snapshot().navigationRevision != beforeRevision) {
+            shellUx_.BeginPageTransition();
+            NotifyFocusMoved();
+        }
+        status_.clear();
+    }
 }
 
 void App::HandleAchievementInput(const InputSnapshot& in) {
@@ -44,8 +57,17 @@ void App::HandleAchievementInput(const InputSnapshot& in) {
             achievementsFromOverlay_ = false;
             NotifyFocusMoved();
         } else {
-            const auto returnPage = achievementsReturnPage_;
-            NavigateTo(returnPage);
+            const auto beforeRevision = productionShell_.Snapshot().navigationRevision;
+            std::string error;
+            if (!productionShell_.Back(error)) {
+                status_ = Widen(error.empty() ? "ZERO could not return from Achievements." : error);
+                return;
+            }
+            if (productionShell_.Snapshot().navigationRevision != beforeRevision) {
+                shellUx_.BeginPageTransition();
+                NotifyFocusMoved();
+            }
+            status_.clear();
         }
         return;
     }
