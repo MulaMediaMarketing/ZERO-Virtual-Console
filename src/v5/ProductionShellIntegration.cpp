@@ -1,0 +1,121 @@
+#include "v5/ProductionShellIntegration.h"
+
+namespace zero::v5 {
+
+ProductionShellPageController::ProductionShellPageController(ShellPage page, bool available, std::string status)
+    : page_(page), available_(available), status_(std::move(status)) {}
+
+PageSnapshot ProductionShellPageController::Snapshot() const {
+    PageSnapshot snapshot;
+    snapshot.page = page_;
+    snapshot.revision = revision_;
+    snapshot.available = available_;
+    snapshot.status = status_;
+    return snapshot;
+}
+
+bool ProductionShellPageController::Execute(const ShellCommand& command, std::string& error) {
+    if (command.target != page_) {
+        error = "shell command was routed to the wrong page controller";
+        return false;
+    }
+    if (!available_) {
+        error = status_.empty() ? "shell page is unavailable" : status_;
+        return false;
+    }
+    if (command.type == ShellCommandType::Activate || command.type == ShellCommandType::Refresh ||
+        command.type == ShellCommandType::Select || command.type == ShellCommandType::Search ||
+        command.type == ShellCommandType::PrimaryAction || command.type == ShellCommandType::SecondaryAction) {
+        ++revision_;
+        return true;
+    }
+    error = "unsupported shell command for production page controller";
+    return false;
+}
+
+void ProductionShellPageController::SetAvailable(bool available, std::string status) {
+    available_ = available;
+    status_ = std::move(status);
+    ++revision_;
+}
+
+namespace {
+constexpr const char* kNotIntegrated = "This ZERO Player destination is not integrated into the production renderer yet.";
+}
+
+ProductionShellIntegration::ProductionShellIntegration()
+    : controllers_{{
+          {ShellPage::Home, true},
+          {ShellPage::Discover, false, kNotIntegrated},
+          {ShellPage::Store, true},
+          {ShellPage::Library, true},
+          {ShellPage::CloudPlay, false, kNotIntegrated},
+          {ShellPage::Downloads, false, kNotIntegrated},
+          {ShellPage::Friends, true},
+          {ShellPage::Achievements, true},
+          {ShellPage::Capture, true},
+          {ShellPage::Profile, false, kNotIntegrated},
+          {ShellPage::Devices, false, kNotIntegrated},
+          {ShellPage::Settings, true},
+          {ShellPage::GameDetail, true},
+          {ShellPage::Wishlist, false, kNotIntegrated},
+          {ShellPage::Checkout, false, kNotIntegrated},
+          {ShellPage::Notifications, false, kNotIntegrated},
+          {ShellPage::Import, true},
+      }},
+      controllerRefs_{{
+          &controllers_[0], &controllers_[1], &controllers_[2], &controllers_[3], &controllers_[4],
+          &controllers_[5], &controllers_[6], &controllers_[7], &controllers_[8], &controllers_[9],
+          &controllers_[10], &controllers_[11], &controllers_[12], &controllers_[13], &controllers_[14],
+          &controllers_[15], &controllers_[16],
+      }},
+      kernel_(controllerRefs_) {}
+
+std::optional<ShellPage> ProductionShellIntegration::ToShellPage(ProductionUxPage page) noexcept {
+    switch (page) {
+        case ProductionUxPage::Home: return ShellPage::Home;
+        case ProductionUxPage::Library: return ShellPage::Library;
+        case ProductionUxPage::Store: return ShellPage::Store;
+        case ProductionUxPage::Friends: return ShellPage::Friends;
+        case ProductionUxPage::Captures: return ShellPage::Capture;
+        case ProductionUxPage::Settings: return ShellPage::Settings;
+        case ProductionUxPage::GameDetail: return ShellPage::GameDetail;
+        case ProductionUxPage::Import: return ShellPage::Import;
+        case ProductionUxPage::Achievements: return ShellPage::Achievements;
+    }
+    return std::nullopt;
+}
+
+std::optional<ProductionUxPage> ProductionShellIntegration::ToLegacyPage(ShellPage page) noexcept {
+    switch (page) {
+        case ShellPage::Home: return ProductionUxPage::Home;
+        case ShellPage::Library: return ProductionUxPage::Library;
+        case ShellPage::Store: return ProductionUxPage::Store;
+        case ShellPage::Friends: return ProductionUxPage::Friends;
+        case ShellPage::Capture: return ProductionUxPage::Captures;
+        case ShellPage::Settings: return ProductionUxPage::Settings;
+        case ShellPage::GameDetail: return ProductionUxPage::GameDetail;
+        case ShellPage::Import: return ProductionUxPage::Import;
+        case ShellPage::Achievements: return ProductionUxPage::Achievements;
+        default: return std::nullopt;
+    }
+}
+
+bool ProductionShellIntegration::NavigateLegacy(ProductionUxPage page, std::string& error) {
+    const auto shellPage = ToShellPage(page);
+    if (!shellPage) {
+        error = "production UX page has no V5 shell mapping";
+        return false;
+    }
+    return kernel_.Navigate(*shellPage, error);
+}
+
+bool ProductionShellIntegration::Back(std::string& error) {
+    return kernel_.Back(error);
+}
+
+std::optional<ProductionUxPage> ProductionShellIntegration::ActiveLegacyPage() const noexcept {
+    return ToLegacyPage(kernel_.Snapshot().activePage);
+}
+
+} // namespace zero::v5
