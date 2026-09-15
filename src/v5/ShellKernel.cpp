@@ -63,6 +63,15 @@ bool ShellKernel::Navigate(ShellPage page, std::string& error) {
         return false;
     }
 
+    // Navigation is transactional. The page controller must successfully
+    // activate before the kernel publishes a new active page or parent. A
+    // refresh/activation failure therefore cannot leave the shell claiming it
+    // navigated to a destination that never became usable.
+    ShellCommand activate;
+    activate.type = ShellCommandType::Activate;
+    activate.target = page;
+    if (!controller->Execute(activate, error)) return false;
+
     if (!IsTopLevel(page) && activePage_ != page) {
         // Preserve the top-level origin across chains of contextual pages.
         // Game Detail -> Checkout -> Back must return to the same permanent
@@ -76,11 +85,7 @@ bool ShellKernel::Navigate(ShellPage page, std::string& error) {
         activePage_ = page;
         ++navigationRevision_;
     }
-
-    ShellCommand activate;
-    activate.type = ShellCommandType::Activate;
-    activate.target = page;
-    return controller->Execute(activate, error);
+    return true;
 }
 
 std::size_t ShellKernel::ActiveTopLevelIndex() const noexcept {
@@ -116,8 +121,10 @@ bool ShellKernel::MoveTopLevel(int direction, std::string& error) {
 bool ShellKernel::Back(std::string& error) {
     if (contextualParent_) {
         const auto parent = *contextualParent_;
-        contextualParent_.reset();
-        return Navigate(parent, error);
+        // Do not erase the parent until the parent activation succeeds. This
+        // keeps Back transactional for a temporarily unavailable parent.
+        if (!Navigate(parent, error)) return false;
+        return true;
     }
     if (activePage_ == ShellPage::Home) return true;
     return Navigate(ShellPage::Home, error);
