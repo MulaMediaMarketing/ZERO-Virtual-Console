@@ -1,5 +1,7 @@
 #include "v5/CommerceDomain.h"
+#include <cstdint>
 #include <iostream>
+#include <limits>
 
 using namespace zero::v5;
 
@@ -50,9 +52,27 @@ int main() {
     badTotals.totalMinor = 9999;
     if (CheckoutAuthority::ValidateQuote(badTotals, "acct-1", 1000, error)) return 24;
 
+    auto overflowingTotal = quote;
+    overflowingTotal.subtotalMinor = std::numeric_limits<std::uint64_t>::max() - 5;
+    overflowingTotal.taxMinor = 10;
+    overflowingTotal.totalMinor = 4;
+    if (CheckoutAuthority::ValidateQuote(overflowingTotal, "acct-1", 1000, error)) return 25;
+    if (error != "checkout total overflow") return 26;
+
+    auto overflowingSubtotal = quote;
+    StoreOffer huge = offer();
+    huge.unitAmountMinor = std::numeric_limits<std::uint64_t>::max();
+    huge.originalAmountMinor = 0;
+    overflowingSubtotal.lines = {CheckoutLine{huge, 1}, CheckoutLine{offer(), 1}};
+    overflowingSubtotal.subtotalMinor = 0;
+    overflowingSubtotal.taxMinor = 0;
+    overflowingSubtotal.totalMinor = 0;
+    if (CheckoutAuthority::ValidateQuote(overflowingSubtotal, "acct-1", 1000, error)) return 27;
+    if (error != "checkout subtotal overflow") return 28;
+
     DisconnectedCommerceTransport disconnected;
     CheckoutAuthority offline(disconnected);
-    if (offline.CreateQuote("acct-1", {line}, 1000, error)) return 25;
+    if (offline.CreateQuote("acct-1", {line}, 1000, error)) return 29;
 
     std::cout << "ZERO V5 Store + Wishlist + Checkout acceptance: PASS\n";
     return 0;
