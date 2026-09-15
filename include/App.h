@@ -7,6 +7,7 @@
 #include "GameRegistry.h"
 #include "IdentityProvider.h"
 #include "v5/ImportCoordinator.h"
+#include "v5/LibraryDownloadAuthority.h"
 #include "v5/ProductionRuntime.h"
 #include "v5/ProductionShellIntegration.h"
 #include "Settings.h"
@@ -119,6 +120,7 @@ private:
 
     GameRegistry registry_;
     v5::ImportCoordinator importer_;
+    v5::DownloadAuthority downloads_;
     CaptureLibrary captures_;
     LocalIdentityProvider identity_;
     DisconnectedFriendsProvider friends_;
