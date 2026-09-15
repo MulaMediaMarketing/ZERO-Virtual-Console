@@ -63,7 +63,14 @@ bool ShellKernel::Navigate(ShellPage page, std::string& error) {
         return false;
     }
 
-    if (!IsTopLevel(page) && activePage_ != page) contextualParent_ = activePage_;
+    if (!IsTopLevel(page) && activePage_ != page) {
+        // Preserve the top-level origin across chains of contextual pages.
+        // Game Detail -> Checkout -> Back must return to the same permanent
+        // destination rather than turning another contextual page into a
+        // second navigation authority.
+        if (IsTopLevel(activePage_)) contextualParent_ = activePage_;
+        else if (!contextualParent_) contextualParent_ = ShellPage::Home;
+    }
     if (IsTopLevel(page)) contextualParent_.reset();
     if (activePage_ != page) {
         activePage_ = page;
