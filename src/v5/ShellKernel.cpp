@@ -47,7 +47,7 @@ IShellPageController* ShellKernel::Find(ShellPage page) const noexcept {
     return it == controllers_.end() ? nullptr : *it;
 }
 
-bool ShellKernel::Navigate(ShellPage page, std::string& error) {
+bool ShellKernel::Activate(ShellPage page, std::string& error) {
     if (!valid_) {
         error = compositionError_;
         return false;
@@ -63,24 +63,21 @@ bool ShellKernel::Navigate(ShellPage page, std::string& error) {
         return false;
     }
 
-    // Navigation is transactional. The page controller must successfully
-    // activate before the kernel publishes a new active page or parent. A
-    // refresh/activation failure therefore cannot leave the shell claiming it
-    // navigated to a destination that never became usable.
     ShellCommand activate;
     activate.type = ShellCommandType::Activate;
     activate.target = page;
-    if (!controller->Execute(activate, error)) return false;
+    return controller->Execute(activate, error);
+}
 
-    if (!IsTopLevel(page) && activePage_ != page) {
-        // Preserve the top-level origin across chains of contextual pages.
-        // Game Detail -> Checkout -> Back must return to the same permanent
-        // destination rather than turning another contextual page into a
-        // second navigation authority.
-        if (IsTopLevel(activePage_)) contextualParent_ = activePage_;
-        else if (!contextualParent_) contextualParent_ = ShellPage::Home;
+bool ShellKernel::Navigate(ShellPage page, std::string& error) {
+    if (!Activate(page, error)) return false;
+
+    if (IsTopLevel(page)) {
+        contextStack_.clear();
+    } else if (activePage_ != page) {
+        contextStack_.push_back(activePage_);
     }
-    if (IsTopLevel(page)) contextualParent_.reset();
+
     if (activePage_ != page) {
         activePage_ = page;
         ++navigationRevision_;
@@ -88,8 +85,23 @@ bool ShellKernel::Navigate(ShellPage page, std::string& error) {
     return true;
 }
 
+bool ShellKernel::NavigateContextual(ShellPage page, std::string& error) {
+    if (!Activate(page, error)) return false;
+
+    if (activePage_ != page) {
+        contextStack_.push_back(activePage_);
+        activePage_ = page;
+        ++navigationRevision_;
+    }
+    return true;
+}
+
 std::size_t ShellKernel::ActiveTopLevelIndex() const noexcept {
-    return TopLevelIndex(contextualParent_.value_or(activePage_));
+    if (IsTopLevel(activePage_) && contextStack_.empty()) return TopLevelIndex(activePage_);
+    for (const auto page : contextStack_) {
+        if (IsTopLevel(page)) return TopLevelIndex(page);
+    }
+    return IsTopLevel(activePage_) ? TopLevelIndex(activePage_) : TopLevelIndex(ShellPage::Home);
 }
 
 bool ShellKernel::MoveTopLevel(int direction, std::string& error) {
@@ -119,11 +131,14 @@ bool ShellKernel::MoveTopLevel(int direction, std::string& error) {
 }
 
 bool ShellKernel::Back(std::string& error) {
-    if (contextualParent_) {
-        const auto parent = *contextualParent_;
-        // Do not erase the parent until the parent activation succeeds. This
-        // keeps Back transactional for a temporarily unavailable parent.
-        if (!Navigate(parent, error)) return false;
+    if (!contextStack_.empty()) {
+        const auto parent = contextStack_.back();
+        if (!Activate(parent, error)) return false;
+        contextStack_.pop_back();
+        if (activePage_ != parent) {
+            activePage_ = parent;
+            ++navigationRevision_;
+        }
         return true;
     }
     if (activePage_ == ShellPage::Home) return true;
@@ -148,7 +163,8 @@ bool ShellKernel::Dispatch(const ShellCommand& command, std::string& error) {
 ShellSnapshot ShellKernel::Snapshot() const {
     ShellSnapshot snapshot;
     snapshot.activePage = activePage_;
-    snapshot.contextualParent = contextualParent_;
+    if (!contextStack_.empty()) snapshot.contextualParent = contextStack_.back();
+    snapshot.contextDepth = contextStack_.size();
     snapshot.navigationRevision = navigationRevision_;
     snapshot.pages.reserve(controllers_.size());
     for (const auto* controller : controllers_) {
