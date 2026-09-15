@@ -68,6 +68,22 @@ jobs:
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
 
+      - name: Validate production closure ownership
+        shell: pwsh
+        run: ./tools/verify-production-closure.ps1 -SourceRoot .
+
+      - name: Validate locked ZERO Player UX and input parity
+        shell: pwsh
+        run: ./tools/verify-zero-player-ux.ps1 -SourceRoot .
+
+      - name: Validate all ZERO Core Architecture V5 migrations
+        shell: pwsh
+        run: ./tools/run-v5-acceptance.ps1 -BuildRoot ./build
+
+      - name: Validate final V5 runtime cutover
+        shell: pwsh
+        run: ./tools/verify-v5-cutover.ps1 -SourceRoot . -ReportDir ./build/V5CutoverReports
+
       - name: Build ZERO reference package
         shell: pwsh
         run: ./sample_game/reference/build-reference-package.ps1 -ReferenceExe ./build/Release/ZeroReferenceGame.exe -Output ./build/ReferencePackage

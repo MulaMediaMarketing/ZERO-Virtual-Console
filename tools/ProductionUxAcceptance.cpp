@@ -14,18 +14,25 @@ int main() {
     using namespace zero;
     bool ok = true;
 
-    ok &= expect(ProductionUxNavCount() == 6, "production navigation must expose exactly six permanent destinations");
+    ok &= expect(ProductionUxNavCount() == 12, "production navigation must expose all twelve permanent V5 destinations");
 
     constexpr std::wstring_view expected[] = {
-        L"Home", L"Library", L"Store", L"Friends", L"Captures", L"Settings"
+        L"Home", L"Discover", L"Store", L"Library", L"Cloud Play", L"Downloads",
+        L"Friends", L"Achievements", L"Capture", L"Profile", L"Devices", L"Settings"
     };
 
     constexpr ProductionUxPage expectedPages[] = {
         ProductionUxPage::Home,
-        ProductionUxPage::Library,
+        ProductionUxPage::Discover,
         ProductionUxPage::Store,
+        ProductionUxPage::Library,
+        ProductionUxPage::CloudPlay,
+        ProductionUxPage::Downloads,
         ProductionUxPage::Friends,
+        ProductionUxPage::Achievements,
         ProductionUxPage::Captures,
+        ProductionUxPage::Profile,
+        ProductionUxPage::Devices,
         ProductionUxPage::Settings
     };
 
@@ -48,13 +55,16 @@ int main() {
     ok &= expect(ProductionUxPageAt(999) == ProductionUxPage::Home, "out-of-range page fallback must remain Home");
     ok &= expect(ProductionUxMoveLeft(0) == 0, "left navigation must clamp at Home");
     ok &= expect(ProductionUxMoveRight(ProductionUxNavCount() - 1) == ProductionUxNavCount() - 1, "right navigation must clamp at Settings");
-    ok &= expect(ProductionUxMoveRight(ProductionUxIndex(ProductionUxDestination::Store)) == ProductionUxIndex(ProductionUxDestination::Friends), "Store must navigate directly to Friends");
-    ok &= expect(ProductionUxMoveRight(ProductionUxIndex(ProductionUxDestination::Friends)) == ProductionUxIndex(ProductionUxDestination::Captures), "Friends must navigate directly to Captures");
-    ok &= expect(ProductionUxMoveLeft(ProductionUxIndex(ProductionUxDestination::Captures)) == ProductionUxIndex(ProductionUxDestination::Friends), "Captures must navigate directly back to Friends");
+    ok &= expect(ProductionUxMoveRight(ProductionUxIndex(ProductionUxDestination::Home)) == ProductionUxIndex(ProductionUxDestination::Discover), "Home must be followed by Discover");
+    ok &= expect(ProductionUxMoveRight(ProductionUxIndex(ProductionUxDestination::Store)) == ProductionUxIndex(ProductionUxDestination::Library), "Store must be followed by Library");
+    ok &= expect(ProductionUxMoveRight(ProductionUxIndex(ProductionUxDestination::Friends)) == ProductionUxIndex(ProductionUxDestination::Achievements), "Friends must be followed by Achievements");
+    ok &= expect(ProductionUxMoveRight(ProductionUxIndex(ProductionUxDestination::Achievements)) == ProductionUxIndex(ProductionUxDestination::Captures), "Achievements must be followed by Capture");
 
-    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::GameDetail).has_value(), "Game Detail must remain secondary, not permanent top navigation");
-    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::Import).has_value(), "Import must remain secondary, not permanent top navigation");
-    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::Achievements).has_value(), "Achievements must remain secondary, not permanent top navigation");
+    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::GameDetail).has_value(), "Game Detail must remain contextual, not permanent top navigation");
+    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::Wishlist).has_value(), "Wishlist must remain contextual, not permanent top navigation");
+    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::Checkout).has_value(), "Checkout must remain contextual, not permanent top navigation");
+    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::Notifications).has_value(), "Notifications must remain contextual, not permanent top navigation");
+    ok &= expect(!ProductionUxDestinationForPage(ProductionUxPage::Import).has_value(), "Import must remain contextual, not permanent top navigation");
 
     if (!ok) return 1;
     std::cout << "PASS: ZERO production UX navigation and page integration\n";

@@ -17,6 +17,7 @@ enum class StoreExperienceMode {
 
 enum class SettingsExperienceRow : std::size_t {
     Profile = 0,
+    Privacy,
     Volume,
     ReducedMotion,
     Controller,

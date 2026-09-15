@@ -1,12 +1,18 @@
 #include "v5/ShellKernel.h"
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <unordered_set>
 
 namespace zero::v5 {
 
 bool ShellKernel::IsTopLevel(ShellPage page) noexcept {
     return std::find(std::begin(kTopLevelPages), std::end(kTopLevelPages), page) != std::end(kTopLevelPages);
+}
+
+std::size_t ShellKernel::TopLevelIndex(ShellPage page) noexcept {
+    const auto it = std::find(std::begin(kTopLevelPages), std::end(kTopLevelPages), page);
+    return it == std::end(kTopLevelPages) ? 0 : static_cast<std::size_t>(std::distance(std::begin(kTopLevelPages), it));
 }
 
 ShellKernel::ShellKernel(std::span<IShellPageController* const> controllers) {
@@ -41,7 +47,7 @@ IShellPageController* ShellKernel::Find(ShellPage page) const noexcept {
     return it == controllers_.end() ? nullptr : *it;
 }
 
-bool ShellKernel::Navigate(ShellPage page, std::string& error) {
+bool ShellKernel::Activate(ShellPage page, std::string& error) {
     if (!valid_) {
         error = compositionError_;
         return false;
@@ -57,24 +63,83 @@ bool ShellKernel::Navigate(ShellPage page, std::string& error) {
         return false;
     }
 
-    if (!IsTopLevel(page) && activePage_ != page) contextualParent_ = activePage_;
-    if (IsTopLevel(page)) contextualParent_.reset();
-    if (activePage_ != page) {
-        activePage_ = page;
-        ++navigationRevision_;
-    }
-
     ShellCommand activate;
     activate.type = ShellCommandType::Activate;
     activate.target = page;
     return controller->Execute(activate, error);
 }
 
+bool ShellKernel::Navigate(ShellPage page, std::string& error) {
+    if (!Activate(page, error)) return false;
+
+    if (IsTopLevel(page)) {
+        contextStack_.clear();
+    } else if (activePage_ != page) {
+        contextStack_.push_back(activePage_);
+    }
+
+    if (activePage_ != page) {
+        activePage_ = page;
+        ++navigationRevision_;
+    }
+    return true;
+}
+
+bool ShellKernel::NavigateContextual(ShellPage page, std::string& error) {
+    if (!Activate(page, error)) return false;
+
+    if (activePage_ != page) {
+        contextStack_.push_back(activePage_);
+        activePage_ = page;
+        ++navigationRevision_;
+    }
+    return true;
+}
+
+std::size_t ShellKernel::ActiveTopLevelIndex() const noexcept {
+    if (IsTopLevel(activePage_) && contextStack_.empty()) return TopLevelIndex(activePage_);
+    for (const auto page : contextStack_) {
+        if (IsTopLevel(page)) return TopLevelIndex(page);
+    }
+    return IsTopLevel(activePage_) ? TopLevelIndex(activePage_) : TopLevelIndex(ShellPage::Home);
+}
+
+bool ShellKernel::MoveTopLevel(int direction, std::string& error) {
+    if (!valid_) {
+        error = compositionError_;
+        return false;
+    }
+    if (direction == 0) return true;
+
+    const auto current = ActiveTopLevelIndex();
+    if (direction > 0) {
+        for (std::size_t candidate = current + 1; candidate < std::size(kTopLevelPages); ++candidate) {
+            error.clear();
+            if (Navigate(kTopLevelPages[candidate], error)) return true;
+        }
+    } else {
+        std::size_t candidate = current;
+        while (candidate > 0) {
+            --candidate;
+            error.clear();
+            if (Navigate(kTopLevelPages[candidate], error)) return true;
+        }
+    }
+
+    error.clear();
+    return true;
+}
+
 bool ShellKernel::Back(std::string& error) {
-    if (contextualParent_) {
-        const auto parent = *contextualParent_;
-        contextualParent_.reset();
-        return Navigate(parent, error);
+    if (!contextStack_.empty()) {
+        const auto parent = contextStack_.back();
+        if (!Activate(parent, error)) return false;
+        contextStack_.pop_back();
+        if (activePage_ != parent) {
+            activePage_ = parent;
+            ++navigationRevision_;
+        }
+        return true;
     }
     if (activePage_ == ShellPage::Home) return true;
     return Navigate(ShellPage::Home, error);
@@ -98,7 +163,8 @@ bool ShellKernel::Dispatch(const ShellCommand& command, std::string& error) {
 ShellSnapshot ShellKernel::Snapshot() const {
     ShellSnapshot snapshot;
     snapshot.activePage = activePage_;
-    snapshot.contextualParent = contextualParent_;
+    if (!contextStack_.empty()) snapshot.contextualParent = contextStack_.back();
+    snapshot.contextDepth = contextStack_.size();
     snapshot.navigationRevision = navigationRevision_;
     snapshot.pages.reserve(controllers_.size());
     for (const auto* controller : controllers_) {

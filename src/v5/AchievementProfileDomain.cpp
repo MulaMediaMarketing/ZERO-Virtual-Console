@@ -3,8 +3,18 @@
 
 namespace zero::v5 {
 
+namespace {
+std::string DefinitionKeyFor(const std::string& contentId, const std::string& achievementId) {
+    return contentId + "\n" + achievementId;
+}
+}
+
 std::string AchievementAuthority::UnlockKey(const AchievementUnlock& unlock) {
     return unlock.accountId + "\n" + unlock.contentId + "\n" + unlock.achievementId;
+}
+
+std::string AchievementAuthority::ProgressKey(const AchievementProgress& progress) {
+    return progress.accountId + "\n" + progress.contentId + "\n" + progress.achievementId;
 }
 
 bool AchievementAuthority::ApplyDefinition(AchievementDefinition definition, std::string& error) {
@@ -16,8 +26,13 @@ bool AchievementAuthority::ApplyDefinition(AchievementDefinition definition, std
         error = "achievement definition is missing identity or title";
         return false;
     }
-    const auto key = definition.contentId + "\n" + definition.achievementId;
+    if (definition.targetProgress == 0) {
+        error = "achievement target progress must be greater than zero";
+        return false;
+    }
+    const auto key = DefinitionKeyFor(definition.contentId, definition.achievementId);
     definitions_[key] = std::move(definition);
+    error.clear();
     return true;
 }
 
@@ -34,13 +49,55 @@ bool AchievementAuthority::ApplyUnlock(AchievementUnlock unlock, std::string& er
         error = "achievement rarity is out of range";
         return false;
     }
-    const auto definitionKey = unlock.contentId + "\n" + unlock.achievementId;
+    const auto definitionKey = DefinitionKeyFor(unlock.contentId, unlock.achievementId);
     if (!definitions_.contains(definitionKey)) {
         error = "achievement unlock has no authoritative definition";
         return false;
     }
     unlocks_[UnlockKey(unlock)] = std::move(unlock);
+    error.clear();
     return true;
+}
+
+bool AchievementAuthority::ApplyProgress(AchievementProgress progress, std::string& error) {
+    if (progress.authority != AuthoritySource::ZeroService) {
+        error = "achievement progress was not validated by ZERO service";
+        return false;
+    }
+    if (progress.achievementId.empty() || progress.contentId.empty() || progress.accountId.empty()) {
+        error = "achievement progress is missing identity";
+        return false;
+    }
+    const auto definition = Definition(progress.contentId, progress.achievementId);
+    if (!definition) {
+        error = "achievement progress has no authoritative definition";
+        return false;
+    }
+    if (progress.currentProgress > definition->targetProgress) {
+        error = "achievement progress exceeds authoritative target";
+        return false;
+    }
+    progress_[ProgressKey(progress)] = std::move(progress);
+    error.clear();
+    return true;
+}
+
+std::optional<AchievementDefinition> AchievementAuthority::Definition(const std::string& contentId,
+                                                                      const std::string& achievementId) const {
+    const auto it = definitions_.find(DefinitionKeyFor(contentId, achievementId));
+    return it == definitions_.end() ? std::nullopt : std::optional<AchievementDefinition>{it->second};
+}
+
+std::vector<AchievementDefinition> AchievementAuthority::DefinitionsFor(const std::string& contentId) const {
+    std::vector<AchievementDefinition> result;
+    for (const auto& [_, definition] : definitions_) {
+        if (definition.contentId == contentId) result.push_back(definition);
+    }
+    std::stable_sort(result.begin(), result.end(), [](const AchievementDefinition& a, const AchievementDefinition& b) {
+        if (a.score != b.score) return a.score > b.score;
+        return a.title < b.title;
+    });
+    return result;
 }
 
 std::vector<AchievementUnlock> AchievementAuthority::UnlocksFor(const std::string& accountId,
@@ -56,12 +113,22 @@ std::vector<AchievementUnlock> AchievementAuthority::UnlocksFor(const std::strin
     return result;
 }
 
+std::optional<AchievementProgress> AchievementAuthority::ProgressFor(const std::string& accountId,
+                                                                     const std::string& contentId,
+                                                                     const std::string& achievementId) const {
+    AchievementProgress key;
+    key.accountId = accountId;
+    key.contentId = contentId;
+    key.achievementId = achievementId;
+    const auto it = progress_.find(ProgressKey(key));
+    return it == progress_.end() ? std::nullopt : std::optional<AchievementProgress>{it->second};
+}
+
 std::uint64_t AchievementAuthority::ScoreFor(const std::string& accountId) const {
     std::uint64_t total = 0;
     for (const auto& [_, unlock] : unlocks_) {
         if (unlock.accountId != accountId) continue;
-        const auto key = unlock.contentId + "\n" + unlock.achievementId;
-        const auto definition = definitions_.find(key);
+        const auto definition = definitions_.find(DefinitionKeyFor(unlock.contentId, unlock.achievementId));
         if (definition != definitions_.end()) total += definition->second.score;
     }
     return total;
@@ -77,6 +144,7 @@ bool ProfileAuthority::Apply(ProfileSnapshot snapshot, std::string& error) {
         return false;
     }
     profiles_[snapshot.accountId] = std::move(snapshot);
+    error.clear();
     return true;
 }
 

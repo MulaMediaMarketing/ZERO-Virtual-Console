@@ -5,9 +5,9 @@
 #include "CoreShellExperience.h"
 #include "StoreSettingsFirstBootExperience.h"
 #include "GameRegistry.h"
-#include "GameImportService.h"
 #include "IdentityProvider.h"
-#include "ResumeStore.h"
+#include "v5/ImportCoordinator.h"
+#include "v5/LibraryDownloadAuthority.h"
 #include "v5/ProductionRuntime.h"
 #include "v5/ProductionShellIntegration.h"
 #include "Settings.h"
@@ -16,6 +16,7 @@
 #include "Input.h"
 #include "ProductionUxContract.h"
 #include <windows.h>
+#include <windowsx.h>
 #include <d2d1.h>
 #include <dwrite.h>
 #include <wincodec.h>
@@ -35,6 +36,71 @@ public:
     int Run();
 
 private:
+    class AuthoritativePageProjection final {
+    public:
+        explicit AuthoritativePageProjection(v5::ProductionShellIntegration& shell) noexcept : shell_(&shell) {}
+
+        operator Page() const noexcept {
+            if (!shell_) return Page::Home;
+            const auto active = shell_->ActivePage();
+            return active.value_or(Page::Home);
+        }
+
+        AuthoritativePageProjection& operator=(Page page) noexcept {
+            if (shell_) {
+                std::string ignored;
+                shell_->Navigate(page, ignored);
+            }
+            return *this;
+        }
+
+    private:
+        v5::ProductionShellIntegration* shell_{nullptr};
+    };
+
+    class AuthoritativeNavProjection final {
+    public:
+        AuthoritativeNavProjection(App& owner, v5::ProductionShellIntegration& shell) noexcept
+            : owner_(&owner), shell_(&shell) {}
+
+        operator size_t() const noexcept {
+            return shell_ ? shell_->ActiveTopLevelIndex() : ProductionUxIndex(ProductionUxDestination::Home);
+        }
+
+        AuthoritativeNavProjection& operator=(size_t index) noexcept {
+            if (!shell_ || index >= ProductionUxNavCount()) return *this;
+
+            const auto beforeRevision = shell_->Snapshot().navigationRevision;
+            std::string ignored;
+            if (!shell_->Navigate(ProductionUxPageAt(index), ignored)) {
+                const auto current = shell_->ActiveTopLevelIndex();
+                if (index > current) shell_->MoveTopLevel(1, ignored);
+                else if (index < current) shell_->MoveTopLevel(-1, ignored);
+            }
+
+            const auto afterRevision = shell_->Snapshot().navigationRevision;
+            if (owner_ && afterRevision != beforeRevision) {
+                owner_->shellUx_.BeginPageTransition();
+                owner_->NotifyFocusMoved();
+            }
+            return *this;
+        }
+
+    private:
+        App* owner_{nullptr};
+        v5::ProductionShellIntegration* shell_{nullptr};
+    };
+
+    class AuthoritativeResumeProjection final {
+    public:
+        explicit AuthoritativeResumeProjection(ProductionRuntime& runtime) noexcept : runtime_(&runtime) {}
+        std::optional<ResumeMetadata> Load(const std::string& packageId) const {
+            return runtime_ ? runtime_->Resume(packageId) : std::nullopt;
+        }
+    private:
+        ProductionRuntime* runtime_{nullptr};
+    };
+
     HINSTANCE instance_{};
     HWND hwnd_{};
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
@@ -53,13 +119,14 @@ private:
     std::filesystem::path cachedCapturePath_;
 
     GameRegistry registry_;
-    GameImportService importer_;
+    v5::ImportCoordinator importer_;
+    v5::DownloadAuthority downloads_;
     CaptureLibrary captures_;
     LocalIdentityProvider identity_;
     DisconnectedFriendsProvider friends_;
     DisconnectedStoreProvider store_;
-    ResumeStore resumeStore_;
     ProductionRuntime runtime_;
+    AuthoritativeResumeProjection resumeStore_{runtime_};
     SettingsStore settingsStore_;
     UserSettings settings_;
     Input input_;
@@ -72,13 +139,12 @@ private:
     StoreExperienceState storeUx_{};
     SettingsExperienceState settingsUx_{};
 
-    Page page_{Page::Home};
-    Page achievementsReturnPage_{Page::Home};
+    AuthoritativePageProjection page_{productionShell_};
     LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
     RuntimeOutcome lastRuntimeOutcome_{RuntimeOutcome::None};
     size_t selectedAchievement_{0};
     size_t achievementScroll_{0};
-    size_t navIndex_{0};
+    AuthoritativeNavProjection navIndex_{*this, productionShell_};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
     bool overlayClosing_{false};
@@ -112,6 +178,11 @@ private:
     void DrawFriends(float width, float height);
     void DrawCaptures(float width, float height);
     void DrawAchievements(float width, float height);
+    void DrawProfile(float width, float height);
+    void DrawDownloads(float width, float height);
+    void DrawDevices(float width, float height);
+    void DrawNotifications(float width, float height);
+    void DrawDiscover(float width, float height);
     void DrawSettings(float width, float height);
     void DrawLaunchRecovery(float width, float height);
     void DrawCaptureViewer(float width, float height);
