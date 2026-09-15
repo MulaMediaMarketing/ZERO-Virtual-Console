@@ -1,0 +1,8 @@
+target_sources(ZeroVirtualConsole PRIVATE
+  src/v5/AchievementProfileDomain.cpp)
+
+add_executable(ZeroV5AchievementProfileAcceptance
+  tools/V5AchievementProfileAcceptance.cpp
+  src/v5/AchievementProfileDomain.cpp)
+target_include_directories(ZeroV5AchievementProfileAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5AchievementProfileAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)

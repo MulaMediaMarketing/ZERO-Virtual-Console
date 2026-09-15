@@ -1,0 +1,8 @@
+target_sources(ZeroVirtualConsole PRIVATE
+  src/v5/LibraryDownloadAuthority.cpp)
+
+add_executable(ZeroV5LibraryDownloadsAcceptance
+  tools/V5LibraryDownloadsAcceptance.cpp
+  src/v5/LibraryDownloadAuthority.cpp)
+target_include_directories(ZeroV5LibraryDownloadsAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5LibraryDownloadsAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
