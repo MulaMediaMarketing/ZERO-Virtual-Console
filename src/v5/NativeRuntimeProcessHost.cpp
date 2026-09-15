@@ -176,15 +176,22 @@ bool NativeRuntimeProcessHost::Start(const LaunchDescriptor& launch,
         return false;
     }
 
-    // Protocol 4 is retained during the V5 migration so existing SDK games can
-    // launch while authority moves to V5. The final line is ignored by the V4
-    // SDK and records the V5 capability scope for forward-compatible SDK work.
+    const bool hasResume = launchResume_.has_value();
+    const std::string resumeActivity = hasResume ? launchResume_->activityId : std::string{};
+    const std::string resumeLabel = hasResume ? launchResume_->displayLabel : std::string{};
+    const std::string resumePayload = hasResume ? launchResume_->payload : std::string{};
+
+    // Protocol 4 remains wire-compatible for existing SDK games while all
+    // process/session authority is V5. The final line is ignored by V4 SDKs.
     file << "4\n"
          << grant.identity.sessionId << "\n"
          << grant.identity.packageId << "\n"
          << pipe << "\n"
          << grant.ipcAuthenticationToken << "\n"
-         << "0\n\n\n\n"
+         << (hasResume ? "1" : "0") << "\n"
+         << resumeActivity << "\n"
+         << resumeLabel << "\n"
+         << resumePayload << "\n"
          << capabilityList(grant.grantedCapabilities) << "\n";
     file.flush();
     if (!file.good()) {
@@ -204,6 +211,7 @@ bool NativeRuntimeProcessHost::Start(const LaunchDescriptor& launch,
     }
 
     activeGrant_ = grant;
+    launchResume_.reset();
     started_ = true;
     return true;
 }
@@ -236,6 +244,7 @@ void NativeRuntimeProcessHost::Terminate() {
     process_.Terminate();
     started_ = false;
     activeGrant_ = {};
+    launchResume_.reset();
 }
 
 } // namespace zero::v5
