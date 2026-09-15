@@ -1,15 +1,11 @@
 #pragma once
 
-#include "AchievementStore.h"
 #include "CrashReportStore.h"
 #include "PackageTrust.h"
-#include "PlatformStateStore.h"
-#include "ResumeStore.h"
 #include "RuntimeSession.h"
 #include "v5/CrashSupervisor.h"
 #include "v5/DomainRepositories.h"
 #include "v5/NativeRuntimeProcessHost.h"
-#include "v5/ResumeCoordinator.h"
 #include "v5/RuntimeAuthority.h"
 #include <chrono>
 #include <memory>
@@ -72,9 +68,8 @@ private:
 
     v5::LocalDomainDatabase localDatabase_;
     v5::LocalSessionRepository sessions_;
-    PlatformStateStore stateStore_;
-    AchievementStore achievements_;
-    ResumeStore resumeStore_;
+    v5::LocalResumeRepository resumes_;
+    v5::LocalAchievementRepository achievements_;
     CrashReportStore crashReports_;
     CngPublisherTrustProvider trustProvider_;
     PackageTrustPolicy trustPolicy_{PackageTrustPolicy::AllowLocalUnsigned};
