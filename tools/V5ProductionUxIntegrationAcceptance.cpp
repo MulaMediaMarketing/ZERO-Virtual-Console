@@ -10,12 +10,12 @@ int main() {
     if (!shell.Valid()) return 1;
 
     std::string error;
-    if (!shell.NavigateLegacy(ProductionUxPage::Library, error)) return 2;
+    if (!shell.Navigate(ProductionUxPage::Library, error)) return 2;
     if (shell.Snapshot().activePage != ShellPage::Library) return 3;
-    if (shell.ActiveLegacyPage() != ProductionUxPage::Library) return 4;
+    if (shell.ActivePage() != ProductionUxPage::Library) return 4;
 
     error.clear();
-    if (!shell.NavigateLegacy(ProductionUxPage::GameDetail, error)) return 5;
+    if (!shell.Navigate(ProductionUxPage::GameDetail, error)) return 5;
     const auto detail = shell.Snapshot();
     if (detail.activePage != ShellPage::GameDetail || detail.contextualParent != ShellPage::Library) return 6;
 
@@ -24,22 +24,21 @@ int main() {
     if (shell.Snapshot().activePage != ShellPage::Library) return 8;
 
     error.clear();
-    if (!shell.NavigateLegacy(ProductionUxPage::Achievements, error)) return 9;
+    if (!shell.Navigate(ProductionUxPage::Achievements, error)) return 9;
     if (shell.Snapshot().activePage != ShellPage::Achievements) return 10;
 
-    const auto discover = ProductionShellIntegration::ToLegacyPage(ShellPage::Discover);
-    if (discover.has_value()) return 11;
+    if (ProductionShellIntegration::ToProductionPage(ShellPage::Discover) != ProductionUxPage::Discover) return 11;
+    if (ProductionShellIntegration::ToProductionPage(ShellPage::CloudPlay) != ProductionUxPage::CloudPlay) return 12;
+    if (ProductionShellIntegration::ToProductionPage(ShellPage::Downloads) != ProductionUxPage::Downloads) return 13;
+    if (ProductionShellIntegration::ToProductionPage(ShellPage::Profile) != ProductionUxPage::Profile) return 14;
+    if (ProductionShellIntegration::ToProductionPage(ShellPage::Devices) != ProductionUxPage::Devices) return 15;
 
-    // Destinations that do not yet have a production renderer must remain
-    // explicitly unavailable. The V5 shell must never silently route them to
-    // another page or present a fabricated implementation.
     const auto before = shell.Snapshot().activePage;
     error.clear();
-    ShellCommand command;
-    command.type = ShellCommandType::Activate;
-    command.target = ShellPage::Discover;
-    // There is intentionally no public raw kernel dispatch path in the bridge;
-    // verify the availability state directly from the immutable snapshot.
+    if (shell.Navigate(ProductionUxPage::Discover, error)) return 16;
+    if (error.empty()) return 17;
+    if (shell.Snapshot().activePage != before) return 18;
+
     bool discoverUnavailable = false;
     for (const auto& page : shell.Snapshot().pages) {
         if (page.page == ShellPage::Discover) {
@@ -47,12 +46,18 @@ int main() {
             break;
         }
     }
-    if (!discoverUnavailable) return 12;
-    if (shell.Snapshot().activePage != before) return 13;
+    if (!discoverUnavailable) return 19;
 
-    if (ProductionShellIntegration::ToShellPage(ProductionUxPage::Captures) != ShellPage::Capture) return 14;
-    if (ProductionShellIntegration::ToShellPage(ProductionUxPage::Import) != ShellPage::Import) return 15;
-    if (ProductionShellIntegration::ToLegacyPage(ShellPage::Settings) != ProductionUxPage::Settings) return 16;
+    if (ProductionShellIntegration::ToShellPage(ProductionUxPage::Captures) != ShellPage::Capture) return 20;
+    if (ProductionShellIntegration::ToShellPage(ProductionUxPage::Import) != ShellPage::Import) return 21;
+    if (ProductionShellIntegration::ToShellPage(ProductionUxPage::Notifications) != ShellPage::Notifications) return 22;
+    if (ProductionShellIntegration::ToProductionPage(ShellPage::Settings) != ProductionUxPage::Settings) return 23;
+
+    if (ProductionUxNavCount() != std::size(kTopLevelPages)) return 24;
+    for (std::size_t i = 0; i < ProductionUxNavCount(); ++i) {
+        const auto shellPage = ProductionShellIntegration::ToShellPage(ProductionUxPageAt(i));
+        if (!shellPage || *shellPage != kTopLevelPages[i]) return 25;
+    }
 
     std::cout << "ZERO V5 production UX shell integration acceptance: PASS\n";
     return 0;
