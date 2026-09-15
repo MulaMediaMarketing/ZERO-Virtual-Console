@@ -62,12 +62,7 @@ private:
         explicit AuthoritativeNavProjection(v5::ProductionShellIntegration& shell) noexcept : shell_(&shell) {}
 
         operator size_t() const noexcept {
-            if (!shell_) return ProductionUxIndex(ProductionUxDestination::Home);
-            const auto snapshot = shell_->Snapshot();
-            const auto shellPage = snapshot.contextualParent.value_or(snapshot.activePage);
-            const auto productionPage = v5::ProductionShellIntegration::ToProductionPage(shellPage);
-            return productionPage ? ProductionUxNavIndexForPage(*productionPage)
-                                  : ProductionUxIndex(ProductionUxDestination::Home);
+            return shell_ ? shell_->ActiveTopLevelIndex() : ProductionUxIndex(ProductionUxDestination::Home);
         }
 
         AuthoritativeNavProjection& operator=(size_t index) noexcept {
@@ -76,25 +71,9 @@ private:
             std::string ignored;
             if (shell_->Navigate(ProductionUxPageAt(index), ignored)) return *this;
 
-            // Shoulder/left/right navigation must not become trapped behind a
-            // truthful fail-closed destination. If the requested adjacent page
-            // is unavailable, continue in the same direction until the next
-            // available V5 destination. Direct jumps to available pages still
-            // resolve immediately through the authoritative ShellKernel.
-            const auto current = static_cast<size_t>(*this);
-            if (index > current) {
-                for (size_t candidate = index + 1; candidate < ProductionUxNavCount(); ++candidate) {
-                    ignored.clear();
-                    if (shell_->Navigate(ProductionUxPageAt(candidate), ignored)) break;
-                }
-            } else if (index < current) {
-                size_t candidate = index;
-                while (candidate > 0) {
-                    --candidate;
-                    ignored.clear();
-                    if (shell_->Navigate(ProductionUxPageAt(candidate), ignored)) break;
-                }
-            }
+            const auto current = shell_->ActiveTopLevelIndex();
+            if (index > current) shell_->MoveTopLevel(1, ignored);
+            else if (index < current) shell_->MoveTopLevel(-1, ignored);
             return *this;
         }
 
