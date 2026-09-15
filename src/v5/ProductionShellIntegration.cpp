@@ -39,28 +39,24 @@ void ProductionShellPageController::SetAvailable(bool available, std::string sta
     ++revision_;
 }
 
-namespace {
-constexpr const char* kNotIntegrated = "This ZERO Player destination is not integrated into the production renderer yet.";
-}
-
 ProductionShellIntegration::ProductionShellIntegration()
     : controllers_{{
           {ShellPage::Home, true},
-          {ShellPage::Discover, false, kNotIntegrated},
+          {ShellPage::Discover, true, "Discover service disconnected"},
           {ShellPage::Store, true},
           {ShellPage::Library, true},
-          {ShellPage::CloudPlay, false, kNotIntegrated},
-          {ShellPage::Downloads, false, kNotIntegrated},
+          {ShellPage::CloudPlay, true, "ZERO Cloud service disconnected"},
+          {ShellPage::Downloads, true, "No authoritative download jobs"},
           {ShellPage::Friends, true},
           {ShellPage::Achievements, true},
           {ShellPage::Capture, true},
-          {ShellPage::Profile, false, kNotIntegrated},
-          {ShellPage::Devices, false, kNotIntegrated},
+          {ShellPage::Profile, true, "Online ZERO identity disconnected"},
+          {ShellPage::Devices, true, "No authoritative devices connected"},
           {ShellPage::Settings, true},
           {ShellPage::GameDetail, true},
-          {ShellPage::Wishlist, false, kNotIntegrated},
-          {ShellPage::Checkout, false, kNotIntegrated},
-          {ShellPage::Notifications, false, kNotIntegrated},
+          {ShellPage::Wishlist, true, "ZERO commerce service disconnected"},
+          {ShellPage::Checkout, true, "ZERO checkout service disconnected"},
+          {ShellPage::Notifications, true, "No authoritative notifications"},
           {ShellPage::Import, true},
       }},
       controllerRefs_{{
