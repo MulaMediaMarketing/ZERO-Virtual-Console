@@ -30,6 +30,15 @@ struct AchievementUnlock {
     AuthoritySource authority{AuthoritySource::None};
 };
 
+struct AchievementProgress {
+    std::string achievementId;
+    std::string contentId;
+    std::string accountId;
+    std::uint32_t currentProgress{0};
+    std::uint64_t updatedEpochSeconds{0};
+    AuthoritySource authority{AuthoritySource::None};
+};
+
 struct ProfileSnapshot {
     std::string accountId;
     std::string displayName;
@@ -49,17 +58,23 @@ class AchievementAuthority {
 public:
     bool ApplyDefinition(AchievementDefinition definition, std::string& error);
     bool ApplyUnlock(AchievementUnlock unlock, std::string& error);
+    bool ApplyProgress(AchievementProgress progress, std::string& error);
     std::optional<AchievementDefinition> Definition(const std::string& contentId,
                                                     const std::string& achievementId) const;
     std::vector<AchievementDefinition> DefinitionsFor(const std::string& contentId) const;
     std::vector<AchievementUnlock> UnlocksFor(const std::string& accountId,
                                               const std::string& contentId = {}) const;
+    std::optional<AchievementProgress> ProgressFor(const std::string& accountId,
+                                                   const std::string& contentId,
+                                                   const std::string& achievementId) const;
     std::uint64_t ScoreFor(const std::string& accountId) const;
 
 private:
     std::unordered_map<std::string, AchievementDefinition> definitions_;
     std::unordered_map<std::string, AchievementUnlock> unlocks_;
+    std::unordered_map<std::string, AchievementProgress> progress_;
     static std::string UnlockKey(const AchievementUnlock& unlock);
+    static std::string ProgressKey(const AchievementProgress& progress);
 };
 
 class ProfileAuthority {
