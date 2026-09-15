@@ -21,8 +21,27 @@ RequirePresent "include/App.h" 'v5::ProductionShellIntegration\s+productionShell
 RequireAbsent "include/App.h" '(?m)^\s*Page\s+page_\s*\{' "Raw App page authority is forbidden"
 RequireAbsent "include/App.h" '(?m)^\s*size_t\s+navIndex_\s*\{' "Raw App nav authority is forbidden"
 RequirePresent "cmake/ZeroV5.cmake" 'src/v5/ImportCoordinator\.cpp' "V5 ImportCoordinator must be in production target"
-RequireAbsent "src/v5/ProductionRuntime.cpp" 'return\s+resumeStore_\.Load\(' "ProductionRuntime may not fall back to legacy resume persistence"
-RequireAbsent "src/v5/ProductionRuntime.cpp" 'stateStore_\.RecordSession\(' "ProductionRuntime may not mirror canonical sessions to legacy storage"
+
+RequireAbsent "include/v5/ProductionRuntime.h" '#include\s+"ResumeStore\.h"' "ProductionRuntime may not include legacy ResumeStore"
+RequireAbsent "include/v5/ProductionRuntime.h" '#include\s+"PlatformStateStore\.h"' "ProductionRuntime may not include legacy PlatformStateStore"
+RequireAbsent "include/v5/ProductionRuntime.h" '#include\s+"AchievementStore\.h"' "ProductionRuntime may not include legacy AchievementStore directly"
+RequirePresent "include/v5/ProductionRuntime.h" 'LocalResumeRepository\s+resumes_' "Runtime Resume persistence must use V5 repository"
+RequirePresent "include/v5/ProductionRuntime.h" 'LocalAchievementRepository\s+achievements_' "Runtime achievement persistence must use V5 repository"
+RequirePresent "include/v5/ProductionRuntime.h" 'LocalSessionRepository\s+sessions_' "Runtime session persistence must use V5 repository"
+RequireAbsent "src/v5/ProductionRuntime.cpp" 'resumeStore_\.' "ProductionRuntime may not use legacy ResumeStore"
+RequireAbsent "src/v5/ProductionRuntime.cpp" 'stateStore_\.' "ProductionRuntime may not mirror/fall back to legacy platform state"
+RequireAbsent "src/v5/ProductionRuntime.cpp" 'achievements_\.Unlock\(' "ProductionRuntime achievements must use repository Save contract"
+RequirePresent "src/v5/ProductionRuntime.cpp" 'resumes_\.Save\(' "Runtime Resume writes must use V5 repository"
+RequirePresent "src/v5/ProductionRuntime.cpp" 'sessions_\.Record\(' "Runtime sessions must use V5 repository"
+RequirePresent "src/v5/ProductionRuntime.cpp" 'achievements_\.Save\(' "Runtime achievements must use V5 repository"
+
+RequirePresent "src/AppPages.cpp" 'constexpr\s+float\s+sidebarWidth\s*=\s*230\.0f' "Locked UI requires permanent left sidebar"
+RequirePresent "src/AppPages.cpp" 'target_->Clear\(D2D1::ColorF\(0x060A11\)\)' "Locked UI requires dark cinematic base"
+RequirePresent "src/AppPages.cpp" '0x20CFFF|0x087DFF' "Locked UI requires blue/cyan focus/accent treatment"
+foreach($page in @('Discover','CloudPlay','Downloads','Profile','Devices','Wishlist','Checkout','Notifications')) {
+  RequirePresent "src/v5/ProductionShellIntegration.cpp" "ShellPage::$page, true" "$page must be reachable through production shell"
+}
+RequireAbsent "src/v5/ProductionShellIntegration.cpp" 'not integrated into the production renderer yet' "No production destination may remain renderer-unintegrated"
 
 if ($violations.Count -gt 0) {
   Write-Host "ZERO production closure gate: FAIL"
