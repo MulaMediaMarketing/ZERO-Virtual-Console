@@ -127,32 +127,11 @@ bool ProductionShellIntegration::Navigate(ProductionUxPage page, std::string& er
 }
 
 std::size_t ProductionShellIntegration::ActiveTopLevelIndex() const noexcept {
-    const auto snapshot = kernel_.Snapshot();
-    const auto shellPage = snapshot.contextualParent.value_or(snapshot.activePage);
-    const auto page = ToProductionPage(shellPage);
-    return page ? ProductionUxNavIndexForPage(*page) : ProductionUxIndex(ProductionUxDestination::Home);
+    return kernel_.ActiveTopLevelIndex();
 }
 
 bool ProductionShellIntegration::MoveTopLevel(int direction, std::string& error) {
-    if (direction == 0) return true;
-
-    const auto current = ActiveTopLevelIndex();
-    if (direction > 0) {
-        for (std::size_t candidate = current + 1; candidate < ProductionUxNavCount(); ++candidate) {
-            error.clear();
-            if (Navigate(ProductionUxPageAt(candidate), error)) return true;
-        }
-    } else {
-        std::size_t candidate = current;
-        while (candidate > 0) {
-            --candidate;
-            error.clear();
-            if (Navigate(ProductionUxPageAt(candidate), error)) return true;
-        }
-    }
-
-    error.clear();
-    return true;
+    return kernel_.MoveTopLevel(direction, error);
 }
 
 bool ProductionShellIntegration::Back(std::string& error) {
