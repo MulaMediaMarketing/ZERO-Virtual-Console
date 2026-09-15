@@ -7,6 +7,9 @@ struct UserSettings {
     std::string profileName{"Player"};
     bool reducedMotion{false};
     int volume{80};
+    bool shareActivity{false};
+    bool shareAchievements{false};
+    bool sharePlaytime{false};
 };
 
 class SettingsStore {
