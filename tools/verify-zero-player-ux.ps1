@@ -20,6 +20,7 @@ Need "src/AppPages.cpp" 'LOCAL ZERO ID|ZERO ID ONLINE' "account/system identity 
 Need "src/AppUx.cpp" '0x20CFFF' "cyan keyboard/controller focus ring missing"
 Forbid "src/AppPages.cpp" '0xFBFAF7' "legacy light shell background is forbidden"
 Forbid "src/AppPages.cpp" 'const\s+float\s+navStart' "legacy top-navigation renderer is forbidden"
+Forbid "src/AppSettings.cpp" 'Runtime V4\.1' "stale pre-cutover runtime identity is forbidden"
 
 foreach($name in @('Discover','CloudPlay','Downloads','Profile','Devices','Wishlist','Checkout','Notifications')) {
   Need "src/v5/ProductionShellIntegration.cpp" "ShellPage::$name, true" "$name is not reachable in production shell"
@@ -35,8 +36,20 @@ Need "src/AppNextLevelPages.cpp" 'void App::DrawDownloads' "Downloads renderer i
 Need "src/AppNextLevelPages.cpp" 'void App::DrawDevices' "Devices renderer implementation missing"
 Need "src/AppNextLevelPages.cpp" 'void App::DrawNotifications' "Notifications renderer implementation missing"
 Need "src/AppNextLevelPages.cpp" 'void App::DrawDiscover' "Discover renderer implementation missing"
-Need "src/AppAchievements.cpp" 'YOUR VERIFIED LOCAL ACHIEVEMENT HISTORY' "top-level Achievements dashboard missing"
+Need "src/AppAchievements.cpp" 'YOUR VERIFIED ACHIEVEMENT HISTORY' "top-level Achievements dashboard missing"
+Need "src/AppAchievements.cpp" 'AchievementDefinitions' "Achievements must consume authoritative definitions when available"
+Need "src/AppAchievements.cpp" 'Secret achievement' "secret-achievement presentation missing"
+Need "src/AppAchievements.cpp" 'ZERO SCORE' "authoritative ZERO Score presentation missing"
 Need "CMakeLists.txt" 'src/AppNextLevelPages\.cpp' "next-level page renderer must be linked into ZERO Player"
+
+Need "include/Settings.h" 'shareActivity\{false\}' "activity privacy must default private"
+Need "include/Settings.h" 'shareAchievements\{false\}' "achievement privacy must default private"
+Need "include/Settings.h" 'sharePlaytime\{false\}' "playtime privacy must default private"
+Need "src/Settings.cpp" 'share_activity' "activity privacy persistence missing"
+Need "src/Settings.cpp" 'share_achievements' "achievement privacy persistence missing"
+Need "src/Settings.cpp" 'share_playtime' "playtime privacy persistence missing"
+Need "src/AppSettings.cpp" 'SettingsExperienceRow::Privacy' "privacy controls missing from live Settings"
+Need "src/AppSettings.cpp" 'ZERO Core V5' "live About state must identify the V5 platform"
 
 Need "src/Input.cpp" 'XInputGetState' "controller input path missing"
 Need "src/Input.cpp" 'VK_UP' "keyboard directional input path missing"
