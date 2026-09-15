@@ -5,9 +5,8 @@
 #include "CoreShellExperience.h"
 #include "StoreSettingsFirstBootExperience.h"
 #include "GameRegistry.h"
-#include "GameImportService.h"
 #include "IdentityProvider.h"
-#include "ResumeStore.h"
+#include "v5/ImportCoordinator.h"
 #include "v5/ProductionRuntime.h"
 #include "v5/ProductionShellIntegration.h"
 #include "Settings.h"
@@ -108,12 +107,11 @@ private:
     std::filesystem::path cachedCapturePath_;
 
     GameRegistry registry_;
-    GameImportService importer_;
+    v5::ImportCoordinator importCoordinator_;
     CaptureLibrary captures_;
     LocalIdentityProvider identity_;
     DisconnectedFriendsProvider friends_;
     DisconnectedStoreProvider store_;
-    ResumeStore resumeStore_;
     ProductionRuntime runtime_;
     SettingsStore settingsStore_;
     UserSettings settings_;
