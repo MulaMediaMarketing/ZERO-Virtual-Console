@@ -27,6 +27,14 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Stage removable UI preview assets
+        shell: pwsh
+        run: |
+          $destination = './build/Release/assets/placeholders'
+          if (Test-Path $destination) { Remove-Item -Recurse -Force $destination }
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+          Copy-Item -Recurse -Force './assets/placeholders' $destination
+
       - name: Validate strict JSON hostile-input contract
         shell: pwsh
         run: ./build/Release/ZeroStrictJsonAcceptance.exe
@@ -128,6 +136,7 @@ jobs:
           if-no-files-found: error
           path: |
             build/Release/ZeroVirtualConsole.exe
+            build/Release/assets/placeholders/**
             build/Release/ZeroTestGame.exe
             build/Release/ZeroReferenceGame.exe
             build/Release/ZeroAcceptance.exe
