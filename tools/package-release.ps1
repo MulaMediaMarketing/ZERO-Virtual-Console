@@ -25,6 +25,23 @@ foreach($relative in $files){
  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination)|Out-Null;Copy-Item -Force $source $destination
  $manifestEntries.Add([pscustomobject]@{path=$relative.Replace('\\','/');sha256=(Get-FileHash -Algorithm SHA256 $destination).Hash.ToLowerInvariant();bytes=(Get-Item $destination).Length})
 }
+
+# UI preview fixtures are removable, test-only content activated exclusively by
+# --ui-preview. Keep them beside the executable in RC/dev bundles so visual QA
+# exercises the exact packaged layout, while production packaging remains free to
+# omit them entirely.
+$previewRoot=Join-Path $BuildRoot "Release/assets/placeholders"
+if(Test-Path $previewRoot -PathType Container){
+ $previewFiles=Get-ChildItem -LiteralPath $previewRoot -Recurse -File
+ foreach($file in $previewFiles){
+  $relativePreview=$file.FullName.Substring((Resolve-Path $BuildRoot).Path.Length).TrimStart('\\','/')
+  $destination=Join-Path $OutputDir $relativePreview
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination)|Out-Null
+  Copy-Item -Force $file.FullName $destination
+  $manifestEntries.Add([pscustomobject]@{path=$relativePreview.Replace('\\','/');sha256=(Get-FileHash -Algorithm SHA256 $destination).Hash.ToLowerInvariant();bytes=(Get-Item $destination).Length})
+ }
+}
+
 $dependency=Get-Content (Join-Path $BuildRoot "DependencyReports/dependency-surface.json") -Raw|ConvertFrom-Json
 $architecture=Get-Content (Join-Path $BuildRoot "ArchitectureReports/production-architecture.json") -Raw|ConvertFrom-Json
 $acceptance=Get-Content (Join-Path $BuildRoot "AcceptanceReports/m1-automated-acceptance.json") -Raw|ConvertFrom-Json
