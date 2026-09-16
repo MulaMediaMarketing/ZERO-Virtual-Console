@@ -15,7 +15,7 @@ target_compile_definitions(ZeroSdk PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN 
 target_link_libraries(ZeroSdk PUBLIC dbghelp)
 
 add_executable(ZeroVirtualConsole WIN32
-  src/main.cpp src/App.cpp src/AppPages.cpp src/AppNextLevelPages.cpp src/AppAchievements.cpp src/AppLaunchRecovery.cpp src/AppSettings.cpp src/AppUx.cpp
+  src/main.cpp src/ApplicationServices.cpp src/App.cpp src/AppPages.cpp src/AppNextLevelPages.cpp src/AppAchievements.cpp src/AppLaunchRecovery.cpp src/AppSettings.cpp src/AppUx.cpp
   src/CaptureLibrary.cpp src/LocalIdentityProvider.cpp src/GameRegistry.cpp src/GameImportService.cpp src/PackageManifestParser.cpp
   src/ManifestValidator.cpp src/PackageSecurity.cpp src/PackageIntegrityVerifier.cpp src/PackageTrust.cpp src/PackageTrustPresentation.cpp
   src/CngPublisherTrustProvider.cpp src/RuntimeSession.cpp src/RuntimeSessionLifecycle.cpp src/RuntimeSessionDiagnostics.cpp src/RuntimeIpcServer.cpp
