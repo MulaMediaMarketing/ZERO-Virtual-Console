@@ -1,0 +1,4 @@
+add_executable(ZeroV5LibraryExperienceAcceptance
+  tools/LibraryExperienceAcceptance.cpp)
+target_include_directories(ZeroV5LibraryExperienceAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5LibraryExperienceAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
