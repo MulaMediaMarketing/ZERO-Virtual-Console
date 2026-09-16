@@ -33,8 +33,9 @@ foreach($relative in $files){
 $previewRoot=Join-Path $BuildRoot "Release/assets/placeholders"
 if(Test-Path $previewRoot -PathType Container){
  $previewFiles=Get-ChildItem -LiteralPath $previewRoot -Recurse -File
+ $resolvedBuildRoot=(Resolve-Path $BuildRoot).Path
  foreach($file in $previewFiles){
-  $relativePreview=$file.FullName.Substring((Resolve-Path $BuildRoot).Path.Length).TrimStart('\\','/')
+  $relativePreview=$file.FullName.Substring($resolvedBuildRoot.Length).TrimStart([char]'\',[char]'/')
   $destination=Join-Path $OutputDir $relativePreview
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination)|Out-Null
   Copy-Item -Force $file.FullName $destination
