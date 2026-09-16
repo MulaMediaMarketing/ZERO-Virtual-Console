@@ -4,6 +4,7 @@
 #include "PlatformPaths.h"
 #include "Settings.h"
 #include <windows.h>
+#include <windowsx.h>
 #include <chrono>
 #include <string>
 #include <thread>
