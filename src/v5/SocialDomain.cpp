@@ -43,6 +43,27 @@ std::vector<FriendRecord> SocialAuthority::Friends() const {
     return result;
 }
 
+FriendRecord SocialAuthority::ProjectForViewer(FriendRecord authoritativeRecord,
+                                               const SocialPrivacyPolicy& privacy) noexcept {
+    if (authoritativeRecord.relationship != FriendshipState::Friends ||
+        authoritativeRecord.authority != AuthoritySource::ZeroService) {
+        authoritativeRecord.presence = PresenceState::Offline;
+        authoritativeRecord.contentId.clear();
+        authoritativeRecord.joinable = false;
+        return authoritativeRecord;
+    }
+
+    if (!privacy.shareOnlineStatus) {
+        authoritativeRecord.presence = PresenceState::Offline;
+        authoritativeRecord.contentId.clear();
+        authoritativeRecord.joinable = false;
+        return authoritativeRecord;
+    }
+    if (!privacy.shareCurrentGame) authoritativeRecord.contentId.clear();
+    if (!privacy.allowJoin || authoritativeRecord.contentId.empty()) authoritativeRecord.joinable = false;
+    return authoritativeRecord;
+}
+
 bool SocialAuthority::ApplyParty(PartySnapshot party, const std::string& localAccountId, std::string& error) {
     if (party.authority != AuthoritySource::ZeroService || party.partyId.empty() || localAccountId.empty()) {
         error = "party snapshot is not authoritative or identity is missing";
