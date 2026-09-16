@@ -1,0 +1,9 @@
+{
+  "id": "ui_test_wild_signal",
+  "title": "Wild Signal",
+  "developer": "Emberline Games",
+  "genre": "Adventure",
+  "description": "Follow a mysterious broadcast into an abandoned wilderness where lost technology, dangerous wildlife, and hidden structures reshape the journey.",
+  "version": "1.0.0-test",
+  "uiTestOnly": true
+}
