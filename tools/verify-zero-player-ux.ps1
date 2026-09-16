@@ -22,6 +22,19 @@ Forbid "src/AppPages.cpp" '0xFBFAF7' "legacy light shell background is forbidden
 Forbid "src/AppPages.cpp" 'const\s+float\s+navStart' "legacy top-navigation renderer is forbidden"
 Forbid "src/AppSettings.cpp" 'Runtime V4\.1' "stale pre-cutover runtime identity is forbidden"
 
+# The production shell is custom-rendered, so explicit Windows chrome and a safe quit path
+# are mandatory. These checks prevent a regression to an unclosable borderless shell.
+Need "src/main.cpp" 'WS_OVERLAPPEDWINDOW' "production window must expose standard Minimize/Maximize/Close controls"
+Need "src/main.cpp" 'WM_GETMINMAXINFO' "minimum supported shell size handling is missing"
+Need "src/main.cpp" 'ptMinTrackSize\.x\s*=\s*1280' "minimum shell width must remain 1280 pixels"
+Need "src/main.cpp" 'ptMinTrackSize\.y\s*=\s*720' "minimum shell height must remain 720 pixels"
+Need "src/main.cpp" 'ZeroProductionHeaderOverlay' "responsive production header overlay is missing"
+Need "src/main.cpp" 'DT_SINGLELINE' "top-bar labels must be explicitly single-line"
+Need "src/main.cpp" 'DT_END_ELLIPSIS' "bounded header text must use ellipsis instead of wrapping or colliding"
+Need "src/main.cpp" 'Quit ZERO Player' "account menu must expose a visible quit command"
+Need "src/main.cpp" 'WM_CLOSE' "visible quit command must route through normal Windows close handling"
+Need "src/main.cpp" 'ShowWindow\(hwnd, IsZoomed\(hwnd\) \? SW_RESTORE : SW_MAXIMIZE\)' "F11 must preserve recoverable window chrome"
+
 foreach($name in @('Discover','CloudPlay','Downloads','Profile','Devices','Wishlist','Checkout','Notifications')) {
   Need "src/v5/ProductionShellIntegration.cpp" "ShellPage::$name, true" "$name is not reachable in production shell"
 }
