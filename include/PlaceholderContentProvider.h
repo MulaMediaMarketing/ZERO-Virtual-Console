@@ -37,24 +37,24 @@ public:
 
     static const std::array<PlaceholderGameInfo, 12>& Games() noexcept {
         static const std::array<PlaceholderGameInfo, 12> games{{
-            {L"echoes-of-tomorrow", L"Echoes of Tomorrow", L"ZERO Originals", L"Sci-Fi Action RPG", L"A fractured world. A second chance.", L"Last played: 2 hours ago", L"covers/echoes-of-tomorrow.png"},
-            {L"nexus-rising", L"Nexus Rising", L"Vector Arc Studios", L"Cyberpunk Story Action", L"A city of signals, secrets, and shifting loyalties.", L"Last played: 1 day ago", L"covers/nexus-rising.png"},
-            {L"voidrunner", L"Voidrunner", L"Helix Forge", L"Space Combat", L"Cross unstable systems at impossible speed.", L"Last played: 3 days ago", L"covers/voidrunner.png"},
-            {L"ashen-realms", L"Ashen Realms", L"Obsidian Crest", L"Dark Fantasy Adventure", L"Kingdoms burn. Legends remain.", L"Last played: 5 days ago", L"covers/ashen-realms.png"},
-            {L"starfall-protocol", L"Starfall Protocol", L"Northstar Labs", L"Tactical Sci-Fi", L"A distant signal becomes humanity's most dangerous mission.", L"Last played: 1 week ago", L"covers/starfall-protocol.png"},
-            {L"the-last-light", L"The Last Light", L"Emberline Games", L"Narrative Adventure", L"Keep the final beacon alive across a collapsing frontier.", L"Recently played", L"covers/the-last-light.png"},
-            {L"drift-legends", L"Drift Legends", L"Apex Streetworks", L"Arcade Racing", L"Build speed, style, and reputation across night-city circuits.", L"Recently played", L"covers/drift-legends.png"},
-            {L"silent-reach", L"Silent Reach", L"Black Harbor", L"Stealth Adventure", L"Enter the ruins where every sound changes the hunt.", L"Recently played", L"covers/silent-reach.png"},
-            {L"boundless", L"Boundless", L"Wildsignal Studio", L"Exploration", L"A vast world without walls, routes, or a single correct path.", L"Recently played", L"covers/boundless.png"},
-            {L"karma-dark-within", L"Karma: The Dark Within", L"Nightglass", L"Psychological Action", L"What follows you home may have always been there.", L"Recently played", L"covers/karma-dark-within.png"},
-            {L"project-orion", L"Project Orion", L"Orbital House", L"Sci-Fi Adventure", L"A deep-space expedition uncovers a machine older than history.", L"Recently played", L"covers/project-orion.png"},
-            {L"the-infinite-within", L"The Infinite Within", L"ZERO Originals", L"Cinematic Adventure", L"The largest worlds can hide inside a single memory.", L"ZERO Original", L"covers/the-infinite-within.png"}
+            {L"echoes-of-tomorrow", L"Echoes of Tomorrow", L"ZERO Originals", L"Sci-Fi Action RPG", L"A fractured world. A second chance.", L"Last played: 2 hours ago", L"covers/echoes-of-tomorrow.svg"},
+            {L"nexus-rising", L"Nexus Rising", L"Vector Arc Studios", L"Cyberpunk Story Action", L"A city of signals, secrets, and shifting loyalties.", L"Last played: 1 day ago", L"covers/nexus-rising.svg"},
+            {L"voidrunner", L"Voidrunner", L"Helix Forge", L"Space Combat", L"Cross unstable systems at impossible speed.", L"Last played: 3 days ago", L"covers/voidrunner.svg"},
+            {L"ashen-realms", L"Ashen Realms", L"Obsidian Crest", L"Dark Fantasy Adventure", L"Kingdoms burn. Legends remain.", L"Last played: 5 days ago", L"covers/ashen-realms.svg"},
+            {L"starfall-protocol", L"Starfall Protocol", L"Northstar Labs", L"Tactical Sci-Fi", L"A distant signal becomes humanity's most dangerous mission.", L"Last played: 1 week ago", L"covers/starfall-protocol.svg"},
+            {L"the-last-light", L"The Last Light", L"Emberline Games", L"Narrative Adventure", L"Keep the final beacon alive across a collapsing frontier.", L"Recently played", L"covers/the-last-light.svg"},
+            {L"drift-legends", L"Drift Legends", L"Apex Streetworks", L"Arcade Racing", L"Build speed, style, and reputation across night-city circuits.", L"Recently played", L"covers/drift-legends.svg"},
+            {L"silent-reach", L"Silent Reach", L"Black Harbor", L"Stealth Adventure", L"Enter the ruins where every sound changes the hunt.", L"Recently played", L"covers/silent-reach.svg"},
+            {L"boundless", L"Boundless", L"Wildsignal Studio", L"Exploration", L"A vast world without walls, routes, or a single correct path.", L"Recently played", L"covers/boundless.svg"},
+            {L"karma-dark-within", L"Karma: The Dark Within", L"Nightglass", L"Psychological Action", L"What follows you home may have always been there.", L"Recently played", L"covers/karma-dark-within.svg"},
+            {L"project-orion", L"Project Orion", L"Orbital House", L"Sci-Fi Adventure", L"A deep-space expedition uncovers a machine older than history.", L"Recently played", L"covers/project-orion.svg"},
+            {L"the-infinite-within", L"The Infinite Within", L"ZERO Originals", L"Cinematic Adventure", L"The largest worlds can hide inside a single memory.", L"ZERO Original", L"covers/the-infinite-within.svg"}
         }};
         return games;
     }
 
     static std::filesystem::path HeroImage() {
-        return AssetRoot() / L"heroes" / L"hero-echoes-of-tomorrow.png";
+        return AssetRoot() / L"heroes" / L"hero-echoes-of-tomorrow.svg";
     }
 };
 
