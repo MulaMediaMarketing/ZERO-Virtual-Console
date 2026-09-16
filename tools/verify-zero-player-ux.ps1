@@ -22,21 +22,28 @@ Forbid "src/AppPages.cpp" '0xFBFAF7' "legacy light shell background is forbidden
 Forbid "src/AppPages.cpp" 'const\s+float\s+navStart' "legacy top-navigation renderer is forbidden"
 Forbid "src/AppSettings.cpp" 'Runtime V4\.1' "stale pre-cutover runtime identity is forbidden"
 
-# The production shell is custom-rendered, so explicit Windows chrome and a safe quit path
-# are mandatory. These checks prevent a regression to an unclosable borderless shell.
-Need "src/main.cpp" 'WS_OVERLAPPEDWINDOW' "production window must expose standard Minimize/Maximize/Close controls"
-Need "src/main.cpp" 'WM_GETMINMAXINFO' "minimum supported shell size handling is missing"
-Need "src/main.cpp" 'ptMinTrackSize\.x\s*=\s*1280' "minimum shell width must remain 1280 pixels"
-Need "src/main.cpp" 'ptMinTrackSize\.y\s*=\s*720' "minimum shell height must remain 720 pixels"
+# The window must be a native, recoverable desktop window before any overlay is installed.
+Need "src/App.cpp" 'WS_OVERLAPPEDWINDOW\s*\|\s*WS_CLIPCHILDREN\s*\|\s*WS_CLIPSIBLINGS' "App must create standard Windows chrome natively"
+Need "src/App.cpp" 'ShowWindow\(hwnd_,\s*SW_MAXIMIZE\)' "initial presentation must maximize a standard window without converting to popup fullscreen"
+Need "src/App.cpp" 'WM_GETMINMAXINFO' "native App window must own minimum-size enforcement"
+Need "src/App.cpp" 'ptMinTrackSize\.x\s*=\s*1280' "native App minimum width must remain 1280 pixels"
+Need "src/App.cpp" 'ptMinTrackSize\.y\s*=\s*720' "native App minimum height must remain 720 pixels"
+Need "src/App.cpp" 'ShowWindow\(hwnd_,\s*IsZoomed\(hwnd_\)\s*\?\s*SW_RESTORE\s*:\s*SW_MAXIMIZE\)' "F11 helper must toggle maximize/restore while preserving standard chrome"
+Forbid "src/App.cpp" 'CreateWindowExW[\s\S]{0,240}WS_POPUP' "App must not create the production shell as a popup window"
+Forbid "src/AppUx.cpp" 'EnterBorderlessFullscreen\(\)' "foreground restoration must preserve the user window state instead of forcing fullscreen"
+Need "src/AppUx.cpp" 'IsIconic\(hwnd_\)' "foreground restoration must recover a minimized window safely"
+Need "src/App.cpp" 'x\s*>=\s*8\s*&&\s*x\s*<=\s*214' "native sidebar mouse hitbox must include the complete icon lane"
+
+# The production header overlay remains a bounded accessory layer. It must not be
+# the authority that turns a popup into a desktop window.
 Need "src/main.cpp" 'ZeroProductionHeaderOverlay' "responsive production header overlay is missing"
 Need "src/main.cpp" 'DT_SINGLELINE' "top-bar labels must be explicitly single-line"
 Need "src/main.cpp" 'DT_END_ELLIPSIS' "bounded header text must use ellipsis instead of wrapping or colliding"
 Need "src/main.cpp" 'Quit ZERO Player' "account menu must expose a visible quit command"
 Need "src/main.cpp" 'WM_CLOSE' "visible quit command must route through normal Windows close handling"
-Need "src/main.cpp" 'ShowWindow\(hwnd, IsZoomed\(hwnd\) \? SW_RESTORE : SW_MAXIMIZE\)' "F11 must preserve recoverable window chrome"
 Need "src/main.cpp" 'if\s*\(!gZeroPreviewModeAvailable\)\s*return\s+0' "F9 preview toggle must be unavailable unless --ui-preview was present at launch"
 Need "src/main.cpp" 'gZeroPreviewModeAvailable\s*=\s*zero::PlaceholderContentProvider::Enabled\(\)' "preview availability must be launch-gated by PlaceholderContentProvider"
-Need "src/main.cpp" 'x\s*>=\s*8\s*&&\s*x\s*<=\s*214' "sidebar mouse hitbox must include the complete icon lane"
+Need "src/main.cpp" 'x\s*>=\s*8\s*&&\s*x\s*<=\s*214' "overlay sidebar hitbox must include the complete icon lane"
 Need "include/PlaceholderContentProvider.h" 'covers/echoes-of-tomorrow\.svg' "preview provider asset extension must match committed artwork"
 Need "include/PlaceholderContentProvider.h" 'hero-echoes-of-tomorrow\.svg' "preview hero extension must match committed artwork"
 Need ".github/workflows/windows-build.yml" 'build/Release/assets/placeholders/\*\*' "Windows artifact must package removable preview fixtures beside the executable"
