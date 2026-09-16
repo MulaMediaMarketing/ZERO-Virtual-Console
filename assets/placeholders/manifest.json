@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "uiTestOnly": true,
+  "removable": true,
+  "doNotShipAsAuthoritative": true,
+  "activation": "--ui-preview",
+  "assetRoot": "assets/placeholders",
+  "hero": "heroes/hero-echoes-of-tomorrow.svg",
+  "games": [
+    {"id":"echoes-of-tomorrow","title":"Echoes of Tomorrow","developer":"ZERO Originals","genre":"Sci-Fi Action RPG","description":"A fractured world. A second chance.","cover":"covers/echoes-of-tomorrow.svg"},
+    {"id":"nexus-rising","title":"Nexus Rising","developer":"Vector Arc Studios","genre":"Cyberpunk Story Action","description":"A city of signals, secrets, and shifting loyalties.","cover":"covers/nexus-rising.svg"},
+    {"id":"voidrunner","title":"Voidrunner","developer":"Helix Forge","genre":"Space Combat","description":"Cross unstable systems at impossible speed.","cover":"covers/voidrunner.svg"},
+    {"id":"ashen-realms","title":"Ashen Realms","developer":"Obsidian Crest","genre":"Dark Fantasy Adventure","description":"Kingdoms burn. Legends remain.","cover":"covers/ashen-realms.svg"},
+    {"id":"starfall-protocol","title":"Starfall Protocol","developer":"Northstar Labs","genre":"Tactical Sci-Fi","description":"A distant signal becomes humanity's most dangerous mission.","cover":"covers/starfall-protocol.svg"},
+    {"id":"the-last-light","title":"The Last Light","developer":"Emberline Games","genre":"Narrative Adventure","description":"Keep the final beacon alive across a collapsing frontier.","cover":"covers/the-last-light.svg"},
+    {"id":"drift-legends","title":"Drift Legends","developer":"Apex Streetworks","genre":"Arcade Racing","description":"Build speed, style, and reputation across night-city circuits.","cover":"covers/drift-legends.svg"},
+    {"id":"silent-reach","title":"Silent Reach","developer":"Black Harbor","genre":"Stealth Adventure","description":"Enter the ruins where every sound changes the hunt.","cover":"covers/silent-reach.svg"},
+    {"id":"boundless","title":"Boundless","developer":"Wildsignal Studio","genre":"Exploration","description":"A vast world without walls, routes, or a single correct path.","cover":"covers/boundless.svg"},
+    {"id":"karma-dark-within","title":"Karma: The Dark Within","developer":"Nightglass","genre":"Psychological Action","description":"What follows you home may have always been there.","cover":"covers/karma-dark-within.svg"},
+    {"id":"project-orion","title":"Project Orion","developer":"Orbital House","genre":"Sci-Fi Adventure","description":"A deep-space expedition uncovers a machine older than history.","cover":"covers/project-orion.svg"},
+    {"id":"the-infinite-within","title":"The Infinite Within","developer":"ZERO Originals","genre":"Cinematic Adventure","description":"The largest worlds can hide inside a single memory.","cover":"covers/the-infinite-within.svg"}
+  ]
+}
