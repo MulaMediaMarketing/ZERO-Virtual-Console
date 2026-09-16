@@ -66,10 +66,11 @@ foreach ($item in $payload) {
 }
 
 $manifest = [ordered]@{
-  schema = 1
-  product = "ZERO Virtual Console"
+  schema = 2
+  product = "ZERO Player"
+  platform = "ZERO Core V5"
   release_class = "production"
-  runtime = "V4.1"
+  runtime = "V5"
   commit = $commit
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
   architecture_result = $architecture.result
