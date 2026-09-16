@@ -24,6 +24,12 @@ struct FriendRecord {
     AuthoritySource authority{AuthoritySource::None};
 };
 
+struct SocialPrivacyPolicy {
+    bool shareOnlineStatus{true};
+    bool shareCurrentGame{true};
+    bool allowJoin{true};
+};
+
 struct PartyMember {
     std::string accountId;
     bool leader{false};
@@ -53,6 +59,8 @@ public:
     std::vector<FriendRecord> Friends() const;
     bool ApplyParty(PartySnapshot party, const std::string& localAccountId, std::string& error);
     std::optional<PartySnapshot> Party() const { return party_; }
+    static FriendRecord ProjectForViewer(FriendRecord authoritativeRecord,
+                                         const SocialPrivacyPolicy& privacy) noexcept;
     static bool ValidateJoin(const JoinAuthorization& authorization,
                              const PartySnapshot& party,
                              std::uint64_t nowEpochSeconds,
