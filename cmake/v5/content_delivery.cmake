@@ -1,0 +1,8 @@
+target_sources(ZeroVirtualConsole PRIVATE
+  src/v5/ContentDeliveryDomain.cpp)
+
+add_executable(ZeroV5ContentDeliveryAcceptance
+  tools/V5ContentDeliveryAcceptance.cpp
+  src/v5/ContentDeliveryDomain.cpp)
+target_include_directories(ZeroV5ContentDeliveryAcceptance PRIVATE include)
+target_compile_definitions(ZeroV5ContentDeliveryAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
