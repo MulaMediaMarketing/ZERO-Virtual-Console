@@ -18,10 +18,10 @@ bool App::ShellContentOwnsFocus() const noexcept {
 
 void App::RestoreShellForeground() {
     if (!hwnd_) return;
-    EnterBorderlessFullscreen();
+    if (IsIconic(hwnd_)) ShowWindow(hwnd_, SW_RESTORE);
+    else ShowWindow(hwnd_, SW_SHOW);
     SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-    ShowWindow(hwnd_, SW_SHOW);
     SetForegroundWindow(hwnd_);
 }
 
