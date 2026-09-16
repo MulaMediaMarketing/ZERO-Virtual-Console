@@ -34,6 +34,12 @@ Need "src/main.cpp" 'DT_END_ELLIPSIS' "bounded header text must use ellipsis ins
 Need "src/main.cpp" 'Quit ZERO Player' "account menu must expose a visible quit command"
 Need "src/main.cpp" 'WM_CLOSE' "visible quit command must route through normal Windows close handling"
 Need "src/main.cpp" 'ShowWindow\(hwnd, IsZoomed\(hwnd\) \? SW_RESTORE : SW_MAXIMIZE\)' "F11 must preserve recoverable window chrome"
+Need "src/main.cpp" 'if\s*\(!gZeroPreviewModeAvailable\)\s*return\s+0' "F9 preview toggle must be unavailable unless --ui-preview was present at launch"
+Need "src/main.cpp" 'gZeroPreviewModeAvailable\s*=\s*zero::PlaceholderContentProvider::Enabled\(\)' "preview availability must be launch-gated by PlaceholderContentProvider"
+Need "src/main.cpp" 'x\s*>=\s*8\s*&&\s*x\s*<=\s*214' "sidebar mouse hitbox must include the complete icon lane"
+Need "include/PlaceholderContentProvider.h" 'covers/echoes-of-tomorrow\.svg' "preview provider asset extension must match committed artwork"
+Need "include/PlaceholderContentProvider.h" 'hero-echoes-of-tomorrow\.svg' "preview hero extension must match committed artwork"
+Need ".github/workflows/windows-build.yml" 'build/Release/assets/placeholders/\*\*' "Windows artifact must package removable preview fixtures beside the executable"
 
 foreach($name in @('Discover','CloudPlay','Downloads','Profile','Devices','Wishlist','Checkout','Notifications')) {
   Need "src/v5/ProductionShellIntegration.cpp" "ShellPage::$name, true" "$name is not reachable in production shell"
