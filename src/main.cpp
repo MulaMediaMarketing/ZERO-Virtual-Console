@@ -55,58 +55,58 @@ void drawSidebarIcon(HDC dc, size_t index, int x, int y, COLORREF color) {
     const int cy = y + 9;
 
     switch (index) {
-        case 0: // Home
+        case 0:
             MoveToEx(dc, l + 1, t + 8, nullptr); LineTo(dc, cx, t + 1); LineTo(dc, r - 1, t + 8);
             Rectangle(dc, l + 4, t + 8, r - 3, b - 1);
             break;
-        case 1: // Discover / compass
+        case 1:
             Ellipse(dc, l + 1, t + 1, r - 1, b - 1);
             MoveToEx(dc, cx - 3, cy + 4, nullptr); LineTo(dc, cx + 4, cy - 4); LineTo(dc, cx + 1, cy + 2); LineTo(dc, cx - 3, cy + 4);
             break;
-        case 2: // Store bag
+        case 2:
             Rectangle(dc, l + 2, t + 6, r - 2, b - 1);
             Arc(dc, l + 5, t, r - 5, t + 11, 0, 0, 0, 0);
             break;
-        case 3: // Library grid
+        case 3:
             Rectangle(dc, l + 1, t + 1, l + 7, t + 7); Rectangle(dc, l + 11, t + 1, r - 1, t + 7);
             Rectangle(dc, l + 1, t + 11, l + 7, b - 1); Rectangle(dc, l + 11, t + 11, r - 1, b - 1);
             break;
-        case 4: // Cloud
+        case 4:
             Arc(dc, l + 1, t + 6, l + 11, b - 1, 0, 0, 0, 0);
             Arc(dc, l + 6, t + 1, r - 2, b - 2, 0, 0, 0, 0);
             MoveToEx(dc, l + 4, b - 2, nullptr); LineTo(dc, r - 3, b - 2);
             break;
-        case 5: // Download
+        case 5:
             MoveToEx(dc, cx, t + 1, nullptr); LineTo(dc, cx, t + 12);
             MoveToEx(dc, cx - 5, t + 8, nullptr); LineTo(dc, cx, t + 13); LineTo(dc, cx + 5, t + 8);
             MoveToEx(dc, l + 2, b - 1, nullptr); LineTo(dc, r - 2, b - 1);
             break;
-        case 6: // Friends
+        case 6:
             Ellipse(dc, l + 2, t + 2, l + 9, t + 9); Ellipse(dc, l + 10, t + 4, r - 1, t + 11);
             Arc(dc, l, t + 7, l + 12, b + 4, 0, 0, 0, 0); Arc(dc, l + 7, t + 9, r + 2, b + 4, 0, 0, 0, 0);
             break;
-        case 7: // Achievement trophy
+        case 7:
             Rectangle(dc, l + 5, t + 2, r - 5, t + 10);
             Arc(dc, l, t + 2, l + 8, t + 11, 0, 0, 0, 0); Arc(dc, r - 8, t + 2, r, t + 11, 0, 0, 0, 0);
             MoveToEx(dc, cx, t + 10, nullptr); LineTo(dc, cx, b - 3); MoveToEx(dc, l + 5, b - 2, nullptr); LineTo(dc, r - 5, b - 2);
             break;
-        case 8: // Capture
+        case 8:
             MoveToEx(dc, l + 1, t + 6, nullptr); LineTo(dc, l + 1, t + 1); LineTo(dc, l + 6, t + 1);
             MoveToEx(dc, r - 1, t + 6, nullptr); LineTo(dc, r - 1, t + 1); LineTo(dc, r - 6, t + 1);
             MoveToEx(dc, l + 1, b - 6, nullptr); LineTo(dc, l + 1, b - 1); LineTo(dc, l + 6, b - 1);
             MoveToEx(dc, r - 1, b - 6, nullptr); LineTo(dc, r - 1, b - 1); LineTo(dc, r - 6, b - 1);
             Ellipse(dc, cx - 3, cy - 3, cx + 4, cy + 4);
             break;
-        case 9: // Profile
+        case 9:
             Ellipse(dc, cx - 4, t + 1, cx + 4, t + 9);
             Arc(dc, l + 2, t + 8, r - 2, b + 4, 0, 0, 0, 0);
             break;
-        case 10: // Devices
+        case 10:
             Rectangle(dc, l + 1, t + 2, r - 1, t + 13);
             MoveToEx(dc, cx, t + 13, nullptr); LineTo(dc, cx, b - 2);
             MoveToEx(dc, l + 5, b - 2, nullptr); LineTo(dc, r - 5, b - 2);
             break;
-        default: // Settings
+        default:
             Ellipse(dc, cx - 5, cy - 5, cx + 6, cy + 6); Ellipse(dc, cx - 2, cy - 2, cx + 3, cy + 3);
             MoveToEx(dc, cx, t, nullptr); LineTo(dc, cx, t + 4); MoveToEx(dc, cx, b - 4, nullptr); LineTo(dc, cx, b);
             MoveToEx(dc, l, cy, nullptr); LineTo(dc, l + 4, cy); MoveToEx(dc, r - 4, cy, nullptr); LineTo(dc, r, cy);
@@ -124,7 +124,9 @@ void drawSidebarIcons(HWND hwnd) {
     for (size_t i = 0; i < 12; ++i) {
         const int y = 126 + static_cast<int>(i) * 52 + 12;
         const COLORREF color = (i == gZeroCurrentNavIndex) ? RGB(240, 248, 255) : RGB(140, 154, 175);
-        drawSidebarIcon(dc, i, 18, y, color);
+        // Navigation labels begin at x=34. Keep the 18px icon in a dedicated
+        // x=8..26 lane so there is always an 8px gap and no icon/text collision.
+        drawSidebarIcon(dc, i, 8, y, color);
     }
     ReleaseDC(hwnd, dc);
 }
@@ -427,7 +429,6 @@ LRESULT CALLBACK ZeroProductionWindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM
         return 0;
     }
 
-    // Keep F11 useful without dropping back into an unclosable WS_POPUP shell.
     if (msg == WM_KEYDOWN && wp == VK_F11) {
         ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
         return 0;
@@ -449,9 +450,6 @@ void InstallProductionWindowChromeAsync() {
         }
         if (!hwnd) return;
 
-        // App::Run initially enters the cinematic borderless shell. Once startup has
-        // completed, restore standard Windows chrome so Minimize / Maximize / Close,
-        // Alt+F4, task switching, and ordinary window management always work.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
         style &= ~static_cast<LONG_PTR>(WS_POPUP);
