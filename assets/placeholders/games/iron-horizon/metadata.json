@@ -1,0 +1,9 @@
+{
+  "id": "ui_test_iron_horizon",
+  "title": "Iron Horizon: Black Meridian",
+  "developer": "Atlas Vanguard Interactive",
+  "genre": "Cinematic Tactical Action",
+  "description": "Command an elite expedition across fractured territories, shifting battlefields, and massive industrial strongholds in a cinematic tactical campaign built around squad coordination.",
+  "version": "1.0.0-test",
+  "uiTestOnly": true
+}
