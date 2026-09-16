@@ -1,0 +1,9 @@
+{
+  "id": "ui_test_neon_district",
+  "title": "Neon District",
+  "developer": "Northstar Forge",
+  "genre": "Open-World Action",
+  "description": "Explore a dense coastal metropolis where rival crews, corporate security, and underground networks compete for control of an evolving urban world.",
+  "version": "1.0.0-test",
+  "uiTestOnly": true
+}
