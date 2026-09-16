@@ -25,6 +25,26 @@ int main() {
     const auto blockedView = social.Friend("blocked-1");
     if (!blockedView || blockedView->joinable || blockedView->presence != PresenceState::Offline) return 14;
 
+    SocialPrivacyPolicy privatePresence{};
+    privatePresence.shareOnlineStatus = false;
+    auto projected = SocialAuthority::ProjectForViewer(friendRecord, privatePresence);
+    if (projected.presence != PresenceState::Offline || projected.joinable || !projected.contentId.empty()) return 15;
+
+    SocialPrivacyPolicy hideGame{};
+    hideGame.shareCurrentGame = false;
+    projected = SocialAuthority::ProjectForViewer(friendRecord, hideGame);
+    if (projected.presence != PresenceState::InGame || projected.joinable || !projected.contentId.empty()) return 16;
+
+    SocialPrivacyPolicy noJoin{};
+    noJoin.allowJoin = false;
+    projected = SocialAuthority::ProjectForViewer(friendRecord, noJoin);
+    if (projected.presence != PresenceState::InGame || projected.joinable || projected.contentId != "content-1") return 17;
+
+    auto nonFriend = friendRecord;
+    nonFriend.relationship = FriendshipState::PendingOutgoing;
+    projected = SocialAuthority::ProjectForViewer(nonFriend, SocialPrivacyPolicy{});
+    if (projected.presence != PresenceState::Offline || projected.joinable || !projected.contentId.empty()) return 18;
+
     PartySnapshot party{"party-1", {{"acct-1", true, true}, {"friend-1", false, true}},
                         "content-1", AuthoritySource::ZeroService};
     if (!social.ApplyParty(party, "acct-1", error)) return 20;
