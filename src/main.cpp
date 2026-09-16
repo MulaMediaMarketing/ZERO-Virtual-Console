@@ -20,6 +20,7 @@ constexpr int ZERO_MENU_QUIT = 7103;
 WNDPROC gZeroOriginalWindowProc = nullptr;
 HWND gZeroHeader = nullptr;
 std::wstring gZeroProfileName = L"Player";
+bool gZeroPreviewModeAvailable = false;
 bool gZeroPreviewEnabled = false;
 bool gZeroPreviewHomeVisible = false;
 size_t gZeroCurrentNavIndex = 0;
@@ -124,8 +125,6 @@ void drawSidebarIcons(HWND hwnd) {
     for (size_t i = 0; i < 12; ++i) {
         const int y = 126 + static_cast<int>(i) * 52 + 12;
         const COLORREF color = (i == gZeroCurrentNavIndex) ? RGB(240, 248, 255) : RGB(140, 154, 175);
-        // Navigation labels begin at x=34. Keep the 18px icon in a dedicated
-        // x=8..26 lane so there is always an 8px gap and no icon/text collision.
         drawSidebarIcon(dc, i, 8, y, color);
     }
     ReleaseDC(hwnd, dc);
@@ -251,96 +250,103 @@ void drawPreviewHome(HWND hwnd) {
     ReleaseDC(hwnd, dc);
 }
 
+void paintHeader(HWND hwnd) {
+    PAINTSTRUCT ps{};
+    HDC dc = BeginPaint(hwnd, &ps);
+    RECT rc{};
+    GetClientRect(hwnd, &rc);
+
+    HBRUSH background = CreateSolidBrush(RGB(10, 16, 26));
+    FillRect(dc, &rc, background);
+    DeleteObject(background);
+
+    SetBkMode(dc, TRANSPARENT);
+    HFONT font = CreateFontW(-17, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI Variable Text");
+    HFONT oldFont = static_cast<HFONT>(SelectObject(dc, font));
+
+    const int width = rc.right - rc.left;
+    const int accountWidth = 220;
+    const int downloadWidth = 130;
+    const int notificationWidth = 165;
+    const int gap = 20;
+    const int accountLeft = width - accountWidth - 18;
+    const int downloadLeft = accountLeft - gap - downloadWidth;
+    const int notificationLeft = downloadLeft - gap - notificationWidth;
+
+    SetTextColor(dc, RGB(140, 154, 175));
+    RECT notificationRect{notificationLeft, 27, notificationLeft + notificationWidth, 60};
+    DrawTextW(dc, L"NOTIFICATIONS", -1, &notificationRect,
+        DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+    RECT downloadRect{downloadLeft, 27, downloadLeft + downloadWidth, 60};
+    DrawTextW(dc, L"DOWNLOADS", -1, &downloadRect,
+        DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+    HBRUSH chip = CreateSolidBrush(RGB(18, 26, 39));
+    RECT chipRect{accountLeft, 13, width - 18, 78};
+    FillRect(dc, &chipRect, chip);
+    DeleteObject(chip);
+
+    SetTextColor(dc, RGB(244, 248, 255));
+    RECT nameRect{accountLeft + 16, 17, width - 40, 45};
+    DrawTextW(dc, gZeroProfileName.c_str(), -1, &nameRect,
+        DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+    SetTextColor(dc, RGB(140, 154, 175));
+    RECT stateRect{accountLeft + 16, 43, width - 40, 71};
+    DrawTextW(dc, L"LOCAL", -1, &stateRect,
+        DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+    SelectObject(dc, oldFont);
+    DeleteObject(font);
+    EndPaint(hwnd, &ps);
+}
+
+void openAccountMenu(HWND hwnd, int x, int y) {
+    HMENU menu = CreatePopupMenu();
+    if (!menu) return;
+    AppendMenuW(menu, MF_STRING, ZERO_MENU_PROFILE, L"Profile");
+    AppendMenuW(menu, MF_STRING, ZERO_MENU_SETTINGS, L"Settings");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING, ZERO_MENU_QUIT, L"Quit ZERO Player");
+
+    POINT pt{x, y};
+    ClientToScreen(hwnd, &pt);
+    const int command = TrackPopupMenu(menu,
+        TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_TOPALIGN,
+        pt.x, pt.y, 0, hwnd, nullptr);
+    DestroyMenu(menu);
+
+    HWND parent = GetParent(hwnd);
+    if (command == ZERO_MENU_PROFILE) sendSidebarClick(parent, 9);
+    else if (command == ZERO_MENU_SETTINGS) sendSidebarClick(parent, 11);
+    else if (command == ZERO_MENU_QUIT) PostMessageW(parent, WM_CLOSE, 0, 0);
+}
+
+void handleHeaderClick(HWND hwnd, LPARAM lp) {
+    RECT rc{};
+    GetClientRect(hwnd, &rc);
+    const int accountLeft = (rc.right - rc.left) - 220 - 18;
+    const int x = GET_X_LPARAM(lp);
+    const int y = GET_Y_LPARAM(lp);
+    if (x >= accountLeft && y >= 10 && y <= 82) openAccountMenu(hwnd, x, y);
+}
+
 LRESULT CALLBACK ZeroHeaderProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
         case WM_ERASEBKGND:
             return 1;
-        case WM_PAINT: {
-            PAINTSTRUCT ps{};
-            HDC dc = BeginPaint(hwnd, &ps);
-            RECT rc{};
-            GetClientRect(hwnd, &rc);
-
-            HBRUSH background = CreateSolidBrush(RGB(10, 16, 26));
-            FillRect(dc, &rc, background);
-            DeleteObject(background);
-
-            SetBkMode(dc, TRANSPARENT);
-            HFONT font = CreateFontW(-17, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI Variable Text");
-            HFONT oldFont = static_cast<HFONT>(SelectObject(dc, font));
-
-            const int width = rc.right - rc.left;
-            const int accountWidth = 220;
-            const int downloadWidth = 130;
-            const int notificationWidth = 165;
-            const int gap = 20;
-            const int accountLeft = width - accountWidth - 18;
-            const int downloadLeft = accountLeft - gap - downloadWidth;
-            const int notificationLeft = downloadLeft - gap - notificationWidth;
-
-            SetTextColor(dc, RGB(140, 154, 175));
-            RECT notificationRect{notificationLeft, 27, notificationLeft + notificationWidth, 60};
-            DrawTextW(dc, L"NOTIFICATIONS", -1, &notificationRect,
-                DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-            RECT downloadRect{downloadLeft, 27, downloadLeft + downloadWidth, 60};
-            DrawTextW(dc, L"DOWNLOADS", -1, &downloadRect,
-                DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-            HBRUSH chip = CreateSolidBrush(RGB(18, 26, 39));
-            RECT chipRect{accountLeft, 13, width - 18, 78};
-            FillRect(dc, &chipRect, chip);
-            DeleteObject(chip);
-
-            SetTextColor(dc, RGB(244, 248, 255));
-            RECT nameRect{accountLeft + 16, 17, width - 40, 45};
-            DrawTextW(dc, gZeroProfileName.c_str(), -1, &nameRect,
-                DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-            SetTextColor(dc, RGB(140, 154, 175));
-            RECT stateRect{accountLeft + 16, 43, width - 40, 71};
-            DrawTextW(dc, L"LOCAL", -1, &stateRect,
-                DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-            SelectObject(dc, oldFont);
-            DeleteObject(font);
-            EndPaint(hwnd, &ps);
+        case WM_PAINT:
+            paintHeader(hwnd);
             return 0;
-        }
-        case WM_LBUTTONDOWN: {
-            RECT rc{};
-            GetClientRect(hwnd, &rc);
-            const int width = rc.right - rc.left;
-            const int accountLeft = width - 220 - 18;
-            const int x = GET_X_LPARAM(lp);
-            const int y = GET_Y_LPARAM(lp);
-
-            if (x >= accountLeft && y >= 10 && y <= 82) {
-                HMENU menu = CreatePopupMenu();
-                AppendMenuW(menu, MF_STRING, ZERO_MENU_PROFILE, L"Profile");
-                AppendMenuW(menu, MF_STRING, ZERO_MENU_SETTINGS, L"Settings");
-                AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-                AppendMenuW(menu, MF_STRING, ZERO_MENU_QUIT, L"Quit ZERO Player");
-
-                POINT pt{x, y};
-                ClientToScreen(hwnd, &pt);
-                const int command = TrackPopupMenu(menu,
-                    TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_TOPALIGN,
-                    pt.x, pt.y, 0, hwnd, nullptr);
-                DestroyMenu(menu);
-
-                HWND parent = GetParent(hwnd);
-                if (command == ZERO_MENU_PROFILE) sendSidebarClick(parent, 9);
-                else if (command == ZERO_MENU_SETTINGS) sendSidebarClick(parent, 11);
-                else if (command == ZERO_MENU_QUIT) PostMessageW(parent, WM_CLOSE, 0, 0);
-                return 0;
-            }
+        case WM_LBUTTONDOWN:
+            handleHeaderClick(hwnd, lp);
             return 0;
-        }
+        default:
+            return DefWindowProcW(hwnd, msg, wp, lp);
     }
-    return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
 void createHeaderOverlay(HWND parent) {
@@ -395,7 +401,7 @@ LRESULT CALLBACK ZeroProductionWindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM
     if (msg == WM_LBUTTONDOWN) {
         const int x = GET_X_LPARAM(lp);
         const int y = GET_Y_LPARAM(lp);
-        if (x >= 16 && x <= 214 && y >= 126) {
+        if (x >= 8 && x <= 214 && y >= 126) {
             const int relative = y - 126;
             const size_t index = static_cast<size_t>(relative / 52);
             if (index < 12 && (relative % 52) <= 42) {
@@ -423,6 +429,7 @@ LRESULT CALLBACK ZeroProductionWindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM
     }
 
     if (msg == WM_KEYDOWN && wp == VK_F9) {
+        if (!gZeroPreviewModeAvailable) return 0;
         gZeroPreviewEnabled = !gZeroPreviewEnabled;
         gZeroPreviewHomeVisible = gZeroPreviewEnabled && gZeroCurrentNavIndex == 0;
         InvalidateRect(hwnd, nullptr, FALSE);
@@ -495,7 +502,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
     const auto settings = settingsStore.Load();
     const auto profileName = settings.profileName.empty() ? std::string("Player") : settings.profileName;
     gZeroProfileName = widenUtf8(profileName);
-    gZeroPreviewEnabled = zero::PlaceholderContentProvider::Enabled();
+    gZeroPreviewModeAvailable = zero::PlaceholderContentProvider::Enabled();
+    gZeroPreviewEnabled = gZeroPreviewModeAvailable;
     gZeroPreviewHomeVisible = gZeroPreviewEnabled;
 
     InstallProductionWindowChromeAsync();
