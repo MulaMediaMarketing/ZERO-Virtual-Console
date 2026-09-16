@@ -1,0 +1,32 @@
+{
+  "uiTestOnly": true,
+  "profileName": "Alexandria Montgomery-Washington",
+  "games": [
+    {
+      "id": "ui_test_neon_district",
+      "title": "Neon District",
+      "developer": "Northstar Forge",
+      "genre": "Open-World Action"
+    },
+    {
+      "id": "ui_test_iron_horizon",
+      "title": "Iron Horizon: Black Meridian — Ultimate Expedition Command Edition",
+      "developer": "Atlas Vanguard Interactive Entertainment and Simulation Group",
+      "genre": "Cinematic Tactical Action"
+    },
+    {
+      "id": "ui_test_wild_signal",
+      "title": "Wild Signal",
+      "developer": "Emberline Games",
+      "genre": "Adventure"
+    }
+  ],
+  "downloads": [
+    {"id": "ui_test_neon_district", "state": "Downloading", "percent": 67},
+    {"id": "ui_test_iron_horizon", "state": "Verifying", "percent": 100},
+    {"id": "ui_test_wild_signal", "state": "Queued", "percent": 0},
+    {"id": "ui_test_failure", "state": "Failed", "percent": 48, "failure": "Package verification failed because the downloaded content did not match the expected package integrity signature."}
+  ],
+  "resolutions": ["1280x720", "1366x768", "1600x900", "1920x1080", "2560x1440", "3840x2160"],
+  "dpiPercent": [100, 125, 150, 175, 200]
+}
