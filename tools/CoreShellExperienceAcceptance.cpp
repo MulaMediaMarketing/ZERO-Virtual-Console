@@ -24,6 +24,28 @@ int main() {
     ok &= expect(state.homeMode == HomeExperienceMode::FeaturedGame, "Home must expose a featured installed game state");
     ok &= expect(state.libraryMode == LibraryExperienceMode::Browsing, "Library must expose browsing when games exist");
 
+    HomeDashboardSummary emptyHome{};
+    ok &= expect(HomeVisibleSectionCount(emptyHome) == 0, "Home must not synthesize sections when no real local data exists");
+    ok &= expect(!HomeSectionVisible(HomeSection::ContinuePlaying, emptyHome), "Continue Playing must remain hidden without an authoritative resume checkpoint");
+    ok &= expect(!HomeSectionVisible(HomeSection::Downloads, emptyHome), "Downloads must remain hidden without real jobs");
+    ok &= expect(!HomeSectionVisible(HomeSection::Captures, emptyHome), "Captures must remain hidden without local captures");
+
+    HomeDashboardSummary populatedHome{};
+    populatedHome.installedGameCount = 4;
+    populatedHome.resumableGameCount = 1;
+    populatedHome.recentGameCount = 3;
+    populatedHome.activeDownloadCount = 2;
+    populatedHome.localCaptureCount = 5;
+    ok &= expect(HomeSectionVisible(HomeSection::Featured, populatedHome), "installed games must expose a featured Home surface");
+    ok &= expect(HomeSectionVisible(HomeSection::ContinuePlaying, populatedHome), "real resume data must expose Continue Playing");
+    ok &= expect(HomeSectionVisible(HomeSection::RecentlyPlayed, populatedHome), "real play history must expose Recently Played");
+    ok &= expect(HomeSectionVisible(HomeSection::InstalledGames, populatedHome), "installed games must expose the installed summary");
+    ok &= expect(HomeSectionVisible(HomeSection::Downloads, populatedHome), "real download jobs must expose download activity");
+    ok &= expect(HomeSectionVisible(HomeSection::Captures, populatedHome), "real local captures must expose capture activity");
+    ok &= expect(HomeVisibleSectionCount(populatedHome) == 6, "all six Home sections must be available when backed by real local state");
+    ok &= expect(HomeDensityFor(720.0f) == HomeLayoutDensity::Compact, "720p must use the compact Home layout");
+    ok &= expect(HomeDensityFor(1080.0f) == HomeLayoutDensity::Comfortable, "1080p must use the comfortable Home layout");
+
     ok &= expect(!MoveGameSelectionUp(state, 4), "selection must clamp at the first game");
     ok &= expect(MoveGameSelectionDown(state, 4), "selection must move down when another game exists");
     ok &= expect(state.selectedGame == 1, "selection must advance deterministically");
