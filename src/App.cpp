@@ -37,8 +37,7 @@ int App::Run() {
     ClampSettingsSelection(settingsUx_);
 
     if (!InitWindow() || !InitGraphics()) return 1;
-    ShowWindow(hwnd_, SW_SHOW);
-    EnterBorderlessFullscreen();
+    ShowWindow(hwnd_, SW_MAXIMIZE);
     UpdateWindow(hwnd_);
     SetTimer(hwnd_, 1, 16, nullptr);
 
@@ -61,22 +60,15 @@ bool App::InitWindow() {
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     RegisterClassW(&wc);
     hwnd_ = CreateWindowExW(WS_EX_APPWINDOW, wc.lpszClassName, L"ZERO Player",
-        WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 0, 0, 1600, 900,
+        WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+        CW_USEDEFAULT, CW_USEDEFAULT, 1600, 900,
         nullptr, nullptr, instance_, this);
     return hwnd_ != nullptr;
 }
 
 void App::EnterBorderlessFullscreen() {
     if (!hwnd_) return;
-    HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTOPRIMARY);
-    MONITORINFO info{};
-    info.cbSize = sizeof(info);
-    if (!GetMonitorInfoW(monitor, &info)) return;
-    SetWindowLongPtrW(hwnd_, GWL_STYLE, WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS);
-    SetWindowPos(hwnd_, HWND_TOP, info.rcMonitor.left, info.rcMonitor.top,
-        info.rcMonitor.right - info.rcMonitor.left,
-        info.rcMonitor.bottom - info.rcMonitor.top,
-        SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    ShowWindow(hwnd_, IsZoomed(hwnd_) ? SW_RESTORE : SW_MAXIMIZE);
 }
 
 bool App::InitGraphics() {
@@ -529,11 +521,19 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
         case WM_SIZE:
             if (target_) target_->Resize(D2D1::SizeU(LOWORD(lp), HIWORD(lp)));
             return 0;
+        case WM_GETMINMAXINFO: {
+            auto* info = reinterpret_cast<MINMAXINFO*>(lp);
+            if (info) {
+                info->ptMinTrackSize.x = 1280;
+                info->ptMinTrackSize.y = 720;
+            }
+            return 0;
+        }
         case WM_LBUTTONDOWN: {
             if (launchUxMode_ != LaunchUxMode::Hidden || overlayVisible_) return 0;
             const int x = GET_X_LPARAM(lp);
             const int y = GET_Y_LPARAM(lp);
-            if (x >= 16 && x <= 214 && y >= 126) {
+            if (x >= 8 && x <= 214 && y >= 126) {
                 const int relative = y - 126;
                 const size_t index = static_cast<size_t>(relative / 52);
                 const int within = relative % 52;
