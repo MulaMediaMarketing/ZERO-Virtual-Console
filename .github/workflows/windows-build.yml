@@ -35,6 +35,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
           Copy-Item -Recurse -Force './assets/placeholders' $destination
 
+      - name: Validate senior feature architecture contract
+        shell: pwsh
+        run: ./build/Release/ZeroFeatureArchitectureAcceptance.exe
+
       - name: Validate strict JSON hostile-input contract
         shell: pwsh
         run: ./build/Release/ZeroStrictJsonAcceptance.exe
@@ -148,6 +152,7 @@ jobs:
             build/Release/ZeroPlatformDatabaseAcceptance.exe
             build/Release/ZeroFaultInjectionAcceptance.exe
             build/Release/ZeroProductionBenchmarkAcceptance.exe
+            build/Release/ZeroFeatureArchitectureAcceptance.exe
             build/Release/ZeroInputAcceptance.exe
             build/Release/ZeroShellUxAcceptance.exe
             build/Release/ZeroProductionUxAcceptance.exe
