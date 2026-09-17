@@ -7,6 +7,7 @@
 #include "Input.h"
 #include "Settings.h"
 #include "StoreProvider.h"
+#include "shell/ShellModule.h"
 #include "v5/ImportCoordinator.h"
 #include "v5/LibraryDownloadAuthority.h"
 #include "v5/ProductionRuntime.h"
@@ -37,6 +38,7 @@ public:
     SettingsStore& Settings() noexcept { return settingsStore_; }
     Input& PlayerInput() noexcept { return input_; }
     v5::ProductionShellIntegration& Shell() noexcept { return shell_; }
+    shell::ShellModule& ShellCoordinator() noexcept { return shellModule_; }
 
 private:
     GameRegistry registry_;
@@ -55,6 +57,7 @@ private:
     SettingsStore settingsStore_;
     Input input_;
     v5::ProductionShellIntegration shell_;
+    shell::ShellModule shellModule_;
 };
 
 } // namespace zero
