@@ -4,4 +4,15 @@
 
 target_sources(ZeroVirtualConsole PRIVATE
   src/shell/ShellModule.cpp
+  src/features/home/HomeFeature.cpp
+  src/features/library/LibraryFeature.cpp
+  src/features/store/StoreFeature.cpp
+  src/features/downloads/DownloadsFeature.cpp
+  src/features/friends/FriendsFeature.cpp
+  src/features/achievements/AchievementsFeature.cpp
+  src/features/capture/CaptureFeature.cpp
+  src/features/profile/ProfileFeature.cpp
+  src/features/devices/DevicesFeature.cpp
+  src/features/notifications/NotificationsFeature.cpp
+  src/features/settings/SettingsFeature.cpp
 )
