@@ -1,9 +1,34 @@
 #include "features/notifications/NotificationsFeature.h"
+#include <windows.h>
 
 namespace zero::features::notifications {
 namespace {
 std::string Narrow(const std::wstring& value) {
-    return std::string(value.begin(), value.end());
+    if (value.empty()) return {};
+
+    const int count = WideCharToMultiByte(
+        CP_UTF8,
+        WC_ERR_INVALID_CHARS,
+        value.data(),
+        static_cast<int>(value.size()),
+        nullptr,
+        0,
+        nullptr,
+        nullptr);
+    if (count <= 0) return {};
+
+    std::string result(static_cast<size_t>(count), '\0');
+    const int written = WideCharToMultiByte(
+        CP_UTF8,
+        WC_ERR_INVALID_CHARS,
+        value.data(),
+        static_cast<int>(value.size()),
+        result.data(),
+        count,
+        nullptr,
+        nullptr);
+    if (written != count) return {};
+    return result;
 }
 }
 
