@@ -1,10 +1,19 @@
 #pragma once
-#include "ApplicationServices.h"
+#include "CaptureLibrary.h"
 #include "CapturesExperience.h"
 #include "FriendsExperience.h"
 #include "CoreShellExperience.h"
 #include "StoreSettingsFirstBootExperience.h"
+#include "GameRegistry.h"
+#include "IdentityProvider.h"
+#include "v5/ImportCoordinator.h"
+#include "v5/LibraryDownloadAuthority.h"
+#include "v5/ProductionRuntime.h"
+#include "v5/ProductionShellIntegration.h"
+#include "Settings.h"
 #include "ShellUxState.h"
+#include "StoreProvider.h"
+#include "Input.h"
 #include "ProductionUxContract.h"
 #include <windows.h>
 #include <windowsx.h>
@@ -23,7 +32,7 @@ public:
     using Page = ProductionUxPage;
     enum class LaunchUxMode { Hidden, Starting, Failed, Ended };
 
-    App(HINSTANCE instance, ApplicationServices& services);
+    App(HINSTANCE instance);
     int Run();
 
 private:
@@ -109,22 +118,20 @@ private:
     std::filesystem::path cachedHeroPath_;
     std::filesystem::path cachedCapturePath_;
 
-    ApplicationServices& services_;
-    GameRegistry& registry_;
-    v5::ImportCoordinator& importer_;
-    v5::DownloadAuthority& downloads_;
-    CaptureLibrary& captures_;
-    IIdentityProvider& identity_;
-    IFriendsProvider& friends_;
-    IStoreProvider& store_;
-    ProductionRuntime& runtime_;
-    SettingsStore& settingsStore_;
-    Input& input_;
-    v5::ProductionShellIntegration& productionShell_;
-
-    AuthoritativeResumeProjection resumeStore_;
+    GameRegistry registry_;
+    v5::ImportCoordinator importer_;
+    v5::DownloadAuthority downloads_;
+    CaptureLibrary captures_;
+    LocalIdentityProvider identity_;
+    DisconnectedFriendsProvider friends_;
+    DisconnectedStoreProvider store_;
+    ProductionRuntime runtime_;
+    AuthoritativeResumeProjection resumeStore_{runtime_};
+    SettingsStore settingsStore_;
     UserSettings settings_;
+    Input input_;
     ShellUxState shellUx_;
+    v5::ProductionShellIntegration productionShell_;
 
     FriendsExperienceState friendsUx_{};
     CaptureExperienceState capturesUx_{};
@@ -132,12 +139,12 @@ private:
     StoreExperienceState storeUx_{};
     SettingsExperienceState settingsUx_{};
 
-    AuthoritativePageProjection page_;
+    AuthoritativePageProjection page_{productionShell_};
     LaunchUxMode launchUxMode_{LaunchUxMode::Hidden};
     RuntimeOutcome lastRuntimeOutcome_{RuntimeOutcome::None};
     size_t selectedAchievement_{0};
     size_t achievementScroll_{0};
-    AuthoritativeNavProjection navIndex_;
+    AuthoritativeNavProjection navIndex_{*this, productionShell_};
     size_t overlayIndex_{0};
     bool overlayVisible_{false};
     bool overlayClosing_{false};

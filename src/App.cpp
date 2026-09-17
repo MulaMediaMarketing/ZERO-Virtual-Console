@@ -1,4 +1,5 @@
 #include "App.h"
+#include "PlatformPaths.h"
 #include <shobjidl.h>
 #include <algorithm>
 #include <filesystem>
@@ -7,23 +8,13 @@ using Microsoft::WRL::ComPtr;
 
 namespace zero {
 
-App::App(HINSTANCE instance, ApplicationServices& services)
+App::App(HINSTANCE instance)
     : instance_(instance),
-      services_(services),
-      registry_(services.Registry()),
-      importer_(services.Importer()),
-      downloads_(services.Downloads()),
-      captures_(services.Captures()),
-      identity_(services.Identity()),
-      friends_(services.Friends()),
-      store_(services.Store()),
-      runtime_(services.Runtime()),
-      settingsStore_(services.Settings()),
-      input_(services.PlayerInput()),
-      productionShell_(services.Shell()),
-      resumeStore_(runtime_),
-      page_(productionShell_),
-      navIndex_(*this, productionShell_) {}
+      registry_(PlatformPaths::LibraryRoot()),
+      importer_(PlatformPaths::LibraryRoot()),
+      captures_(PlatformPaths::CapturesRoot()),
+      identity_(PlatformPaths::DataRoot()),
+      settingsStore_(PlatformPaths::DataRoot()) {}
 
 int App::Run() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -358,19 +349,228 @@ void App::HandleInput(const InputSnapshot& in) {
         return;
     }
     if (in.menu && runtime_.IsActive()) { SetOverlayVisible(true); return; }
-
-    const bool topLevel = ProductionUxIsTopLevelPage(page_);
-    if (topLevel && in.left) navIndex_ = navIndex_ > 0 ? navIndex_ - 1 : ProductionUxNavCount() - 1;
-    if (topLevel && in.right) navIndex_ = (navIndex_ + 1) % ProductionUxNavCount();
-    if (topLevel && (in.left || in.right)) NavigateTo(ProductionUxPageAt(navIndex_));
-
-    if (page_ == Page::Captures) { HandleCaptureInput(in); return; }
     if (page_ == Page::Achievements) { HandleAchievementInput(in); return; }
-    if (page_ == Page::Settings) { HandleSettingsInput(in); return; }
-    if (page_ == Page::Home || page_ == Page::Library || page_ == Page::GameDetail || page_ == Page::Import) {
-        HandleCoreShellInput(in);
+
+    if (page_ == Page::Captures && !(in.shoulderLeft || in.shoulderRight)) {
+        HandleCaptureInput(in);
+        if (in.up || in.down || in.select || in.action || in.right) return;
+    }
+    if (page_ == Page::Friends && !(in.shoulderLeft || in.shoulderRight)) {
+        const auto& list = friends_.Friends();
+        if (in.up && MoveFriendSelectionUp(friendsUx_, friends_.State(), list)) NotifyFocusMoved();
+        if (in.down && MoveFriendSelectionDown(friendsUx_, friends_.State(), list)) NotifyFocusMoved();
+        if (in.select) {
+            const auto* selected = SelectedFriend(friendsUx_, friends_.State(), list);
+            if (selected && FriendCanJoin(*selected)) status_ = L"Joinable presence is available, but the online join transport is not connected in this build.";
+        }
+        if (in.up || in.down || in.select) return;
+    }
+    if (page_ == Page::Store && !(in.shoulderLeft || in.shoulderRight)) {
+        const auto count = store_.Products().size();
+        if (in.up && MoveStoreSelectionUp(storeUx_, store_.State(), count)) NotifyFocusMoved();
+        if (in.down && MoveStoreSelectionDown(storeUx_, store_.State(), count)) NotifyFocusMoved();
+        if (in.select && storeUx_.mode == StoreExperienceMode::Browsing && storeUx_.selectedIndex < count) {
+            const auto& product = store_.Products()[storeUx_.selectedIndex];
+            if (StoreProductIsOwned(product)) status_ = L"This product is already owned.";
+            else if (StoreProductCanLaunchPurchase(product)) status_ = L"Store purchase transport is not connected in this build.";
+            else status_ = L"This product does not expose a valid purchase action.";
+        }
+        if (in.up || in.down || in.select) return;
+    }
+    if (page_ == Page::Settings && !(in.shoulderLeft || in.shoulderRight)) {
+        const bool volumeHorizontal = settingsUx_.selectedRow == static_cast<size_t>(SettingsExperienceRow::Volume) && (in.left || in.right);
+        HandleSettingsInput(in);
+        if (in.up || in.down || in.select || in.action || volumeHorizontal) return;
+    }
+
+    const auto gameCount = registry_.Games().size();
+    ClampCoreShellSelection(coreShellUx_, gameCount);
+    if (page_ == Page::GameDetail && gameCount) {
+        const auto& game = registry_.Games()[coreShellUx_.selectedGame];
+        const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
+        if (hasResume && in.left && preferResume_) { preferResume_ = false; NotifyFocusMoved(); }
+        if (hasResume && in.right && !preferResume_) { preferResume_ = true; NotifyFocusMoved(); }
+        if (in.action) { OpenAchievements(game.packageId, Page::GameDetail, false); return; }
+    } else {
+        if (in.left || in.shoulderLeft) {
+            std::string error;
+            if (productionShell_.MoveTopLevel(-1, error)) {
+                if (const auto active = productionShell_.ActivePage()) NavigateTo(*active);
+            } else status_ = Widen(error);
+        }
+        if (in.right || in.shoulderRight) {
+            std::string error;
+            if (productionShell_.MoveTopLevel(1, error)) {
+                if (const auto active = productionShell_.ActivePage()) NavigateTo(*active);
+            } else status_ = Widen(error);
+        }
+    }
+
+    if (page_ == Page::Library) {
+        if (in.action) NavigateTo(Page::Import);
+        else if (gameCount) {
+            if (in.up && MoveGameSelectionUp(coreShellUx_, gameCount)) NotifyFocusMoved();
+            if (in.down && MoveGameSelectionDown(coreShellUx_, gameCount)) NotifyFocusMoved();
+            if (in.select) { preferResume_ = true; NavigateTo(Page::GameDetail); }
+        }
+    } else if (page_ == Page::Import && in.select) ImportGameFolder();
+    else if (page_ == Page::Home && in.select && gameCount) {
+        const auto& game = registry_.Games()[coreShellUx_.selectedGame];
+        const bool hasResume = game.zeroResume && resumeStore_.Load(game.packageId).has_value();
+        LaunchSelected(hasResume);
+    } else if (page_ == Page::GameDetail && in.select && gameCount) LaunchSelected(preferResume_);
+
+    if (in.back) {
+        std::string error;
+        if (productionShell_.Back(error)) {
+            if (const auto active = productionShell_.ActivePage()) NavigateTo(*active);
+        } else {
+            status_ = Widen(error.empty() ? "ZERO could not navigate back." : error);
+        }
+    }
+}
+
+void App::ImportGameFolder() {
+    ComPtr<IFileOpenDialog> dialog;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(dialog.GetAddressOf())))) {
+        status_ = L"ZERO could not open the folder picker.";
         return;
     }
+    DWORD options = 0;
+    dialog->GetOptions(&options);
+    dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
+    dialog->SetTitle(L"Choose a ZERO-compatible game folder");
+    const HRESULT shown = dialog->Show(hwnd_);
+    if (shown == HRESULT_FROM_WIN32(ERROR_CANCELLED)) return;
+    if (FAILED(shown)) { status_ = L"ZERO could not open the selected folder."; return; }
+
+    ComPtr<IShellItem> item;
+    if (FAILED(dialog->GetResult(item.GetAddressOf()))) { status_ = L"ZERO could not read the selected folder."; return; }
+    PWSTR raw = nullptr;
+    if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw)) || !raw) { status_ = L"ZERO could not resolve the selected folder."; return; }
+    std::filesystem::path source(raw);
+    CoTaskMemFree(raw);
+
+    const auto result = importer_.ImportFolder(source);
+    if (!result.success) { status_ = result.error.empty() ? L"ZERO rejected this game package." : result.error; return; }
+
+    registry_.Refresh();
+    coreShellUx_.selectedGame = registry_.Games().empty() ? 0 : registry_.Games().size() - 1;
+    ClampCoreShellSelection(coreShellUx_, registry_.Games().size());
+    navIndex_ = ProductionUxIndex(ProductionUxDestination::Library);
+    NavigateTo(Page::Library);
+    status_ = L"Game imported successfully.";
+}
+
+void App::LaunchSelected(bool useResume) {
+    const auto& games = registry_.Games();
+    ClampCoreShellSelection(coreShellUx_, games.size());
+    if (games.empty() || coreShellUx_.selectedGame >= games.size()) return;
+    const auto& game = games[coreShellUx_.selectedGame];
+
+    const auto trust = runtime_.PackageTrust(game);
+    if (!trust.launchAllowed) {
+        status_ = trust.detail.empty() ? L"ZERO blocked launch because package trust validation failed." : trust.detail;
+        launchError_.clear();
+        launchUxMode_ = LaunchUxMode::Hidden;
+        NotifyFocusMoved();
+        return;
+    }
+
+    launchPackageId_ = game.packageId;
+    launchTitle_ = Widen(game.title);
+    launchUsedResume_ = false;
+    launchError_.clear();
+    lastRuntimeOutcome_ = RuntimeOutcome::None;
+
+    std::optional<ResumeMetadata> resume;
+    if (useResume && game.zeroResume) resume = resumeStore_.Load(game.packageId);
+    launchUsedResume_ = resume.has_value();
+    launchUxMode_ = LaunchUxMode::Starting;
+    NotifyFocusMoved();
+
+    std::wstring error;
+    if (runtime_.Launch(game, error, resume)) { status_.clear(); return; }
+
+    launchError_ = error.empty() ? L"ZERO could not create the game session." : error;
+    lastRuntimeOutcome_ = runtime_.Outcome();
+    launchUxMode_ = LaunchUxMode::Failed;
+    NotifyFocusMoved();
+}
+
+LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    App* self = reinterpret_cast<App*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (msg == WM_NCCREATE) {
+        auto cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        self = reinterpret_cast<App*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        self->hwnd_ = hwnd;
+    }
+    return self ? self->HandleMessage(msg, wp, lp) : DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
+    switch (msg) {
+        case WM_PAINT: {
+            PAINTSTRUCT ps{};
+            BeginPaint(hwnd_, &ps);
+            Paint();
+            EndPaint(hwnd_, &ps);
+            return 0;
+        }
+        case WM_SIZE:
+            if (target_) target_->Resize(D2D1::SizeU(LOWORD(lp), HIWORD(lp)));
+            return 0;
+        case WM_GETMINMAXINFO: {
+            auto* info = reinterpret_cast<MINMAXINFO*>(lp);
+            if (info) {
+                info->ptMinTrackSize.x = 1280;
+                info->ptMinTrackSize.y = 720;
+            }
+            return 0;
+        }
+        case WM_LBUTTONDOWN: {
+            if (launchUxMode_ != LaunchUxMode::Hidden || overlayVisible_) return 0;
+            const int x = GET_X_LPARAM(lp);
+            const int y = GET_Y_LPARAM(lp);
+            if (x >= 8 && x <= 214 && y >= 126) {
+                const int relative = y - 126;
+                const size_t index = static_cast<size_t>(relative / 52);
+                const int within = relative % 52;
+                if (index < ProductionUxNavCount() && within <= 42) {
+                    navIndex_ = index;
+                    NavigateTo(ProductionUxPageAt(index));
+                    return 0;
+                }
+            }
+            return 0;
+        }
+        case WM_TIMER:
+            Tick();
+            return 0;
+        case WM_KEYDOWN:
+            if (wp == VK_F5) {
+                registry_.Refresh(); captures_.Refresh(); friends_.Refresh(); store_.Refresh();
+                ClampCoreShellSelection(coreShellUx_, registry_.Games().size());
+                ClampCaptureExperience(capturesUx_, captures_.Items());
+                ClampFriendsExperience(friendsUx_, friends_.State(), friends_.Friends());
+                ClampStoreSelection(storeUx_, store_.State(), store_.Products().size());
+                ClampSettingsSelection(settingsUx_); ClampAchievementSelection(); RefreshSettingsTelemetry();
+                cachedHero_.Reset(); cachedHeroPath_.clear(); cachedCapture_.Reset(); cachedCapturePath_.clear();
+                status_ = L"ZERO data refreshed.";
+                return 0;
+            }
+            if (wp == 'I') { NavigateTo(Page::Import); return 0; }
+            if (wp == VK_F11) { EnterBorderlessFullscreen(); return 0; }
+            if (wp == VK_F1 && runtime_.IsActive()) { SetOverlayVisible(!overlayVisible_ || overlayClosing_); return 0; }
+            if (wp == 'Q' && (GetKeyState(VK_CONTROL) & 0x8000)) { DestroyWindow(hwnd_); return 0; }
+            return 0;
+        case WM_DESTROY:
+            runtime_.Terminate();
+            PostQuitMessage(0);
+            return 0;
+    }
+    return DefWindowProcW(hwnd_, msg, wp, lp);
 }
 
 } // namespace zero
