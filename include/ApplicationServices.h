@@ -7,6 +7,7 @@
 #include "Input.h"
 #include "Settings.h"
 #include "StoreProvider.h"
+#include "application/ServiceStateCoordinator.h"
 #include "shell/ShellModule.h"
 #include "v5/ImportCoordinator.h"
 #include "v5/LibraryDownloadAuthority.h"
@@ -16,13 +17,6 @@
 
 namespace zero {
 
-// ApplicationServices is the production composition root for ZERO Player.
-//
-// The shell must never construct feature authorities directly. All long-lived
-// production services are created here, then injected into App. This keeps
-// ownership obvious, prevents duplicate sources of truth, and provides one
-// replacement point when disconnected transports are replaced by real ZERO
-// backend adapters.
 class ApplicationServices final {
 public:
     explicit ApplicationServices(const std::filesystem::path& dataRoot);
@@ -39,6 +33,7 @@ public:
     Input& PlayerInput() noexcept { return input_; }
     v5::ProductionShellIntegration& Shell() noexcept { return shell_; }
     shell::ShellModule& ShellCoordinator() noexcept { return shellModule_; }
+    application::ServiceStateCoordinator& ServiceState() noexcept { return serviceState_; }
 
 private:
     GameRegistry registry_;
@@ -46,9 +41,8 @@ private:
     v5::DownloadAuthority downloads_;
     CaptureLibrary captures_;
 
-    // These are deliberately concrete disconnected/local adapters today.
-    // Replacing them with production network adapters happens here rather than
-    // inside views, renderers, or feature code.
+    // Adapter selection is centralized here. UI code never chooses or creates
+    // production/disconnected providers.
     LocalIdentityProvider identity_;
     DisconnectedFriendsProvider friends_;
     DisconnectedStoreProvider store_;
@@ -58,6 +52,7 @@ private:
     Input input_;
     v5::ProductionShellIntegration shell_;
     shell::ShellModule shellModule_;
+    application::ServiceStateCoordinator serviceState_;
 };
 
 } // namespace zero
