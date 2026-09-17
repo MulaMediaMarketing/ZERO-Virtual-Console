@@ -34,10 +34,7 @@ int App::Run() {
 
     std::wstring identityError;
     if (!identity_.Initialize(settings_.profileName, identityError)) status_ = identityError;
-    friends_.Refresh();
-    store_.Refresh();
-    registry_.Refresh();
-    captures_.Refresh();
+    services_.ServiceState().RefreshAll();
 
     ClampFriendsExperience(friendsUx_, friends_.State(), friends_.Friends());
     ClampStoreSelection(storeUx_, store_.State(), store_.Products().size());
@@ -221,7 +218,7 @@ void App::Tick() {
         SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     }
 
-    runtime_.Poll();
+    services_.ServiceState().PollRuntime();
     UpdateLaunchUx();
     if (!overlayClosing_) HandleInput(input_.Poll());
     else input_.Poll();
@@ -236,15 +233,13 @@ void App::NavigateTo(Page next) {
     }
     status_.clear();
     CancelCaptureModal(capturesUx_, captures_.Items());
+    services_.ShellCoordinator().RefreshForPage(next);
 
     if (next == Page::Captures) {
-        captures_.Refresh();
         ClampCaptureExperience(capturesUx_, captures_.Items());
     } else if (next == Page::Friends) {
-        friends_.Refresh();
         ClampFriendsExperience(friendsUx_, friends_.State(), friends_.Friends());
     } else if (next == Page::Store) {
-        store_.Refresh();
         ClampStoreSelection(storeUx_, store_.State(), store_.Products().size());
     } else if (next == Page::Achievements) {
         ClampAchievementSelection();
@@ -357,7 +352,20 @@ void App::HandleInput(const InputSnapshot& in) {
         }
         return;
     }
-    if (in.menu && runtime_.IsActive()) { SetOverlayVisible(true); return; }
+
+    const auto globalIntent = services_.ShellCoordinator().RouteGlobalInput(in, runtime_.IsActive(), overlayVisible_);
+    if (globalIntent.type == shell::ShellIntentType::ToggleOverlay) {
+        SetOverlayVisible(!overlayVisible_ || overlayClosing_);
+        return;
+    }
+    if (globalIntent.type == shell::ShellIntentType::MoveTopLevel && page_ != Page::GameDetail) {
+        ProductionUxPage next = page_;
+        std::string error;
+        if (services_.ShellCoordinator().MoveTopLevel(globalIntent.direction, next, error)) NavigateTo(next);
+        else status_ = Widen(error);
+        return;
+    }
+
     if (page_ == Page::Achievements) { HandleAchievementInput(in); return; }
 
     if (page_ == Page::Captures && !(in.shoulderLeft || in.shoulderRight)) {
@@ -401,17 +409,17 @@ void App::HandleInput(const InputSnapshot& in) {
         if (hasResume && in.right && !preferResume_) { preferResume_ = true; NotifyFocusMoved(); }
         if (in.action) { OpenAchievements(game.packageId, Page::GameDetail, false); return; }
     } else {
-        if (in.left || in.shoulderLeft) {
+        if (in.left) {
+            ProductionUxPage next = page_;
             std::string error;
-            if (productionShell_.MoveTopLevel(-1, error)) {
-                if (const auto active = productionShell_.ActivePage()) NavigateTo(*active);
-            } else status_ = Widen(error);
+            if (services_.ShellCoordinator().MoveTopLevel(-1, next, error)) NavigateTo(next);
+            else status_ = Widen(error);
         }
-        if (in.right || in.shoulderRight) {
+        if (in.right) {
+            ProductionUxPage next = page_;
             std::string error;
-            if (productionShell_.MoveTopLevel(1, error)) {
-                if (const auto active = productionShell_.ActivePage()) NavigateTo(*active);
-            } else status_ = Widen(error);
+            if (services_.ShellCoordinator().MoveTopLevel(1, next, error)) NavigateTo(next);
+            else status_ = Widen(error);
         }
     }
 
@@ -429,13 +437,11 @@ void App::HandleInput(const InputSnapshot& in) {
         LaunchSelected(hasResume);
     } else if (page_ == Page::GameDetail && in.select && gameCount) LaunchSelected(preferResume_);
 
-    if (in.back) {
+    if (globalIntent.type == shell::ShellIntentType::Back) {
+        ProductionUxPage next = page_;
         std::string error;
-        if (productionShell_.Back(error)) {
-            if (const auto active = productionShell_.ActivePage()) NavigateTo(*active);
-        } else {
-            status_ = Widen(error.empty() ? "ZERO could not navigate back." : error);
-        }
+        if (services_.ShellCoordinator().Back(next, error)) NavigateTo(next);
+        else status_ = Widen(error.empty() ? "ZERO could not navigate back." : error);
     }
 }
 
@@ -559,7 +565,7 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_KEYDOWN:
             if (wp == VK_F5) {
-                registry_.Refresh(); captures_.Refresh(); friends_.Refresh(); store_.Refresh();
+                services_.ServiceState().RefreshAll();
                 ClampCoreShellSelection(coreShellUx_, registry_.Games().size());
                 ClampCaptureExperience(capturesUx_, captures_.Items());
                 ClampFriendsExperience(friendsUx_, friends_.State(), friends_.Friends());
