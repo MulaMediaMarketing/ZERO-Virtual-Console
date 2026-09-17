@@ -47,6 +47,31 @@ foreach($name in @('Discover','CloudPlay','Downloads','Profile','Devices','Wishl
   Need "src/v5/ProductionShellIntegration.cpp" "ShellPage::$name, true" "$name is not reachable in production shell"
 }
 
+# Senior feature architecture must remain explicit and independently testable.
+foreach($feature in @('home','library','store','downloads','friends','achievements','capture','profile','devices','notifications','settings')) {
+  $header = switch($feature) {
+    'home' {'HomeFeature.h'}
+    'library' {'LibraryFeature.h'}
+    'store' {'StoreFeature.h'}
+    'downloads' {'DownloadsFeature.h'}
+    'friends' {'FriendsFeature.h'}
+    'achievements' {'AchievementsFeature.h'}
+    'capture' {'CaptureFeature.h'}
+    'profile' {'ProfileFeature.h'}
+    'devices' {'DevicesFeature.h'}
+    'notifications' {'NotificationsFeature.h'}
+    'settings' {'SettingsFeature.h'}
+  }
+  Need "include/features/$feature/$header" 'Controller\s+final|class\s+\w+Controller\s+final' "$feature feature controller missing"
+  Need "include/features/$feature/$header" 'ViewModel' "$feature feature view model missing"
+  Need "include/features/$feature/$header" 'View\s+final|class\s+\w+View\s+final' "$feature feature view contract missing"
+}
+Need "include/ui/FeatureScene.h" 'struct\s+FeatureScene' "declarative feature scene contract missing"
+Need "include/shell/ShellModule.h" 'class\s+ShellModule\s+final' "explicit Shell module missing"
+Need "include/application/ServiceStateCoordinator.h" 'class\s+ServiceStateCoordinator\s+final' "central service state coordinator missing"
+Need "tools/FeatureArchitectureAcceptance.cpp" 'ZERO feature architecture acceptance: PASS' "feature-level architecture acceptance missing"
+Need "cmake/ZeroProductArchitecture.cmake" 'ZeroFeatureArchitectureAcceptance' "feature-level acceptance target not linked"
+
 Need "src/AppPages.cpp" 'Page::Discover\) DrawDiscover' "Discover must render the local-first production experience"
 Need "src/AppPages.cpp" 'Page::Downloads\) DrawDownloads' "Downloads must render the local-first production experience"
 Need "src/AppPages.cpp" 'Page::Profile\) DrawProfile' "Profile must render the local-first production experience"
@@ -77,8 +102,11 @@ Need "src/AppSettings.cpp" 'ZERO Core V5' "live About state must identify the V5
 Need "src/Input.cpp" 'XInputGetState' "controller input path missing"
 Need "src/Input.cpp" 'VK_UP' "keyboard directional input path missing"
 Need "src/App.cpp" 'WM_LBUTTONDOWN' "mouse sidebar navigation path missing"
-Need "src/App.cpp" 'productionShell_\.MoveTopLevel' "controller/keyboard top-level navigation must route through ShellKernel"
-Need "src/App.cpp" 'productionShell_\.Back' "Back must route through ShellKernel"
+Need "src/App.cpp" 'ShellCoordinator\(\)\.MoveTopLevel' "controller/keyboard top-level navigation must route through the Shell module and ShellKernel"
+Need "src/App.cpp" 'ShellCoordinator\(\)\.Back' "Back must route through the Shell module and ShellKernel"
+Need "src/App.cpp" 'ShellCoordinator\(\)\.RouteGlobalInput' "global input routing must pass through the Shell module"
+Need "src/App.cpp" 'ServiceState\(\)\.RefreshAll' "service refresh must use the centralized service state coordinator"
+Need "src/App.cpp" 'ServiceState\(\)\.PollRuntime' "runtime polling must use the centralized service state coordinator"
 Need "src/App.cpp" 'GET_X_LPARAM' "mouse pointer x coordinate routing missing"
 Need "src/App.cpp" 'GET_Y_LPARAM' "mouse pointer y coordinate routing missing"
 
