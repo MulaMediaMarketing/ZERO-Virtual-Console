@@ -1,5 +1,4 @@
 #include "App.h"
-#include "PlatformPaths.h"
 #include <shobjidl.h>
 #include <algorithm>
 #include <filesystem>
@@ -8,13 +7,23 @@ using Microsoft::WRL::ComPtr;
 
 namespace zero {
 
-App::App(HINSTANCE instance)
+App::App(HINSTANCE instance, ApplicationServices& services)
     : instance_(instance),
-      registry_(PlatformPaths::LibraryRoot()),
-      importer_(PlatformPaths::LibraryRoot()),
-      captures_(PlatformPaths::CapturesRoot()),
-      identity_(PlatformPaths::DataRoot()),
-      settingsStore_(PlatformPaths::DataRoot()) {}
+      services_(services),
+      registry_(services.Registry()),
+      importer_(services.Importer()),
+      downloads_(services.Downloads()),
+      captures_(services.Captures()),
+      identity_(services.Identity()),
+      friends_(services.Friends()),
+      store_(services.Store()),
+      runtime_(services.Runtime()),
+      settingsStore_(services.Settings()),
+      input_(services.PlayerInput()),
+      productionShell_(services.Shell()),
+      resumeStore_(runtime_),
+      page_(productionShell_),
+      navIndex_(*this, productionShell_) {}
 
 int App::Run() {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
