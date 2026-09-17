@@ -3,6 +3,7 @@
 # the root CMakeLists stays readable as ZERO Player grows.
 
 target_sources(ZeroVirtualConsole PRIVATE
+  src/application/ServiceStateCoordinator.cpp
   src/shell/ShellModule.cpp
   src/features/home/HomeFeature.cpp
   src/features/library/LibraryFeature.cpp
