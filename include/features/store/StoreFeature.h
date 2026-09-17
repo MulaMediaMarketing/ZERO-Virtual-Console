@@ -24,6 +24,8 @@ struct StoreViewModel {
     StoreProviderState providerState{StoreProviderState::Disconnected};
     StoreExperienceMode mode{StoreExperienceMode::Disconnected};
     std::size_t selectedIndex{0};
+    std::size_t scrollOffset{0};
+    std::size_t visibleRows{5};
     std::vector<StoreItemViewModel> items;
 };
 
