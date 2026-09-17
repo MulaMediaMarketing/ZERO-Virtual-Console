@@ -1,3 +1,4 @@
+#include "ApplicationServices.h"
 #include "features/achievements/AchievementsFeature.h"
 #include "features/capture/CaptureFeature.h"
 #include "features/devices/DevicesFeature.h"
@@ -27,8 +28,8 @@ void Check(bool condition, const char* message) {
 int main() {
     using namespace zero;
 
-    static_assert(!std::is_copy_constructible_v<ApplicationServices> == false || true,
-                  "ApplicationServices type must remain visible to feature architecture acceptance");
+    static_assert(!std::is_copy_constructible_v<ApplicationServices>,
+                  "ApplicationServices must remain a single non-copyable composition root");
     static_assert(std::is_default_constructible_v<features::home::HomeViewModel>);
     static_assert(std::is_default_constructible_v<features::library::LibraryViewModel>);
     static_assert(std::is_default_constructible_v<features::store::StoreViewModel>);
