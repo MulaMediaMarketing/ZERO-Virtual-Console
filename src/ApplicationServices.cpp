@@ -8,6 +8,7 @@ ApplicationServices::ApplicationServices(const std::filesystem::path& dataRoot)
       importer_(PlatformPaths::LibraryRoot()),
       captures_(PlatformPaths::CapturesRoot()),
       identity_(dataRoot),
-      settingsStore_(dataRoot) {}
+      settingsStore_(dataRoot),
+      shellModule_(shell_, registry_, captures_, friends_, store_) {}
 
 } // namespace zero
