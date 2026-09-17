@@ -33,6 +33,7 @@ $strictJson=Resolve-RequiredFile "Release\ZeroStrictJsonAcceptance.exe"
 $database=Resolve-RequiredFile "Release\ZeroPlatformDatabaseAcceptance.exe"
 $faults=Resolve-RequiredFile "Release\ZeroFaultInjectionAcceptance.exe"
 $benchmark=Resolve-RequiredFile "Release\ZeroProductionBenchmarkAcceptance.exe"
+$featureArchitecture=Resolve-RequiredFile "Release\ZeroFeatureArchitectureAcceptance.exe"
 $input=Resolve-RequiredFile "Release\ZeroInputAcceptance.exe"
 $shellUx=Resolve-RequiredFile "Release\ZeroShellUxAcceptance.exe"
 $productionUx=Resolve-RequiredFile "Release\ZeroProductionUxAcceptance.exe"
@@ -60,6 +61,7 @@ Invoke-AcceptanceStep "strict_json_hostile_input" "security" $strictJson
 Invoke-AcceptanceStep "canonical_platform_database" "persistence" $database
 Invoke-AcceptanceStep "local_storage_fault_injection" "reliability" $faults
 Invoke-AcceptanceStep "production_core_benchmark" "performance" $benchmark
+Invoke-AcceptanceStep "feature_architecture_contract" "architecture" $featureArchitecture
 Invoke-AcceptanceStep "dependency_surface" "supply_chain" "pwsh" @("-NoProfile","-File",$dependencyGate,"-ReportDir",(Join-Path $BuildRoot "DependencyReports"))
 Invoke-AcceptanceStep "controller_input_contract" "input" $input
 Invoke-AcceptanceStep "shell_overlay_ux_contract" "shell" $shellUx
@@ -94,7 +96,7 @@ $hardwareRequirements=@(
  [pscustomobject]@{name="restart_persistence_journey";status="REQUIRED";reason="Final qualification must verify persisted state across a real Windows restart."},
  [pscustomobject]@{name="interactive_first_boot";status="REQUIRED";reason="Controller/display/audio completion remains an interactive hardware acceptance step."}
 )
-$report=[ordered]@{schema=7;generated_at_utc=[DateTime]::UtcNow.ToString("o");zero_milestone="ZERO Core V5 / Production Closure";platform="ZERO Player";commit=$commit;automated_result=$automatedResult;rc_qualified=$false;rc_qualification_note="Automated PASS does not qualify an RC. Real Windows 11 x64 and physical-controller acceptance is still required.";performance_metrics=[ordered]@{total_acceptance_duration_ms=$totalDurationMs;runtime_budget_ms=$automatedRuntimeBudgetMs;runtime_budget_passed=$runtimeBudgetPassed;slowest_gate=$(if($slowest){$slowest.name}else{"none"});slowest_gate_duration_ms=$(if($slowest){$slowest.duration_ms}else{0})};binaries=[ordered]@{shell=$zeroShell;acceptance=$zeroAcceptance;reference_game=$referenceExe};automated_checks=$results.ToArray();physical_qualification_required=$hardwareRequirements}
+$report=[ordered]@{schema=8;generated_at_utc=[DateTime]::UtcNow.ToString("o");zero_milestone="ZERO Core V5 / Production Closure";platform="ZERO Player";commit=$commit;automated_result=$automatedResult;rc_qualified=$false;rc_qualification_note="Automated PASS does not qualify an RC. Real Windows 11 x64 and physical-controller acceptance is still required.";performance_metrics=[ordered]@{total_acceptance_duration_ms=$totalDurationMs;runtime_budget_ms=$automatedRuntimeBudgetMs;runtime_budget_passed=$runtimeBudgetPassed;slowest_gate=$(if($slowest){$slowest.name}else{"none"});slowest_gate_duration_ms=$(if($slowest){$slowest.duration_ms}else{0})};binaries=[ordered]@{shell=$zeroShell;acceptance=$zeroAcceptance;reference_game=$referenceExe};automated_checks=$results.ToArray();physical_qualification_required=$hardwareRequirements}
 $jsonPath=Join-Path $ReportDir "m1-automated-acceptance.json";$markdownPath=Join-Path $ReportDir "m1-automated-acceptance.md";$report|ConvertTo-Json -Depth 8|Set-Content $jsonPath -Encoding UTF8
 $lines=New-Object System.Collections.Generic.List[string];$lines.Add("# ZERO Core V5 Automated Acceptance Report");$lines.Add("");$lines.Add("- Commit: ``$commit``");$lines.Add("- Automated result: **$automatedResult**");$lines.Add("- RC qualified: **NO**");$lines.Add("- Total measured acceptance duration: **$totalDurationMs ms**");$lines.Add("- Acceptance runtime budget: **$automatedRuntimeBudgetMs ms**");$lines.Add("- Slowest gate: **$($report.performance_metrics.slowest_gate)** ($($report.performance_metrics.slowest_gate_duration_ms) ms)");$lines.Add("");$lines.Add("| Gate | Category | Result | Duration (ms) |");$lines.Add("| --- | --- | --- | ---: |")
 foreach($item in $results){$lines.Add("| $($item.name) | $($item.category) | $($item.status) | $($item.duration_ms) |")};$lines.Add("");$lines.Add("## Physical qualification still required");foreach($item in $hardwareRequirements){$lines.Add("- **$($item.name)** — $($item.reason)")};$lines|Set-Content $markdownPath -Encoding UTF8
