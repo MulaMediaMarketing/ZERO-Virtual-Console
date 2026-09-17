@@ -16,3 +16,9 @@ target_sources(ZeroVirtualConsole PRIVATE
   src/features/notifications/NotificationsFeature.cpp
   src/features/settings/SettingsFeature.cpp
 )
+
+add_executable(ZeroFeatureArchitectureAcceptance
+  tools/FeatureArchitectureAcceptance.cpp
+)
+target_include_directories(ZeroFeatureArchitectureAcceptance PRIVATE include)
+target_compile_definitions(ZeroFeatureArchitectureAcceptance PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
