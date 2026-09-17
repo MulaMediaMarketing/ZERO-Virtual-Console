@@ -1,11 +1,12 @@
 #include "features/settings/SettingsFeature.h"
+#include <algorithm>
 
 namespace zero::features::settings {
 
 SettingsViewModel SettingsController::Build(const UserSettings& settings) {
     return SettingsViewModel{
         settings.profileName,
-        ClampVolume(settings.volume),
+        std::clamp(settings.volume, 0, 100),
         settings.reducedMotion,
         settings.shareActivity,
         settings.shareAchievements,
