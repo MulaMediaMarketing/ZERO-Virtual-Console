@@ -69,14 +69,26 @@ if($registryText -match 'jsonString\s*\(' -or $importText -match 'jsonString\s*\
 $app=Get-Content (Join-Path $SourceRoot "src/App.cpp") -Raw
 $pages=Get-Content (Join-Path $SourceRoot "src/AppPages.cpp") -Raw
 $appHeader=Get-Content (Join-Path $SourceRoot "include/App.h") -Raw
+$appServicesHeader=Get-Content (Join-Path $SourceRoot "include/ApplicationServices.h") -Raw
+$appSource=Get-Content (Join-Path $SourceRoot "src/App.cpp") -Raw
 $shellBridge=Get-Content (Join-Path $SourceRoot "include/v5/ProductionShellIntegration.h") -Raw
 $shellKernel=Get-Content (Join-Path $SourceRoot "include/v5/ShellKernel.h") -Raw
 $shellKernelSource=Get-Content (Join-Path $SourceRoot "src/v5/ShellKernel.cpp") -Raw
 $navContract=Get-Content (Join-Path $SourceRoot "include/ProductionUxContract.h") -Raw
 if($app -match 'App::Page pageForNavIndex' -or $app -match 'navIndex_\s*=\s*[34]\s*;'){Violate "single_navigation_authority" "src/App.cpp" "Live navigation must route through the V5 ShellKernel authority."}
-if($appHeader -notmatch 'v5::ProductionShellIntegration\s+productionShell_'){Violate "v5_shell_composition" "include/App.h" "App must compose ProductionShellIntegration as the live shell authority."}
-if($appHeader -notmatch 'AuthoritativePageProjection\s+page_\{productionShell_\}'){Violate "v5_active_page_authority" "include/App.h" "Live active-page state must project from ProductionShellIntegration/ShellKernel."}
-if($appHeader -notmatch 'AuthoritativeNavProjection\s+navIndex_\{\*this,\s*productionShell_\}'){Violate "v5_navigation_selection_authority" "include/App.h" "Live navigation selection and transition feedback must project from ProductionShellIntegration/ShellKernel."}
+if($appServicesHeader -notmatch 'v5::ProductionShellIntegration\s+shell_' -or
+   $appHeader -notmatch 'v5::ProductionShellIntegration&\s+productionShell_' -or
+   $appSource -notmatch 'productionShell_\(services\.Shell\(\)\)'){
+  Violate "v5_shell_composition" "include/ApplicationServices.h/include/App.h/src/App.cpp" "ApplicationServices must own the single ProductionShellIntegration and App must reference that authority."
+}
+if($appHeader -notmatch 'AuthoritativePageProjection\s+page_\s*;' -or
+   $appSource -notmatch 'page_\(productionShell_\)'){
+  Violate "v5_active_page_authority" "include/App.h/src/App.cpp" "Live active-page state must project from the injected ProductionShellIntegration/ShellKernel authority."
+}
+if($appHeader -notmatch 'AuthoritativeNavProjection\s+navIndex_\s*;' -or
+   $appSource -notmatch 'navIndex_\(\*this,\s*productionShell_\)'){
+  Violate "v5_navigation_selection_authority" "include/App.h/src/App.cpp" "Live navigation selection and transition feedback must project from the injected ProductionShellIntegration/ShellKernel authority."
+}
 if($appHeader -match '(?m)^\s*Page\s+page_\s*\{' -or $appHeader -match '(?m)^\s*size_t\s+navIndex_\s*\{'){Violate "parallel_legacy_navigation_state" "include/App.h" "Raw page/nav state may not coexist with the V5 ShellKernel authority."}
 if($shellBridge -match 'NavigateLegacy|ActiveLegacyPage|ToLegacyPage'){Violate "legacy_shell_bridge_api" "include/v5/ProductionShellIntegration.h" "Legacy shell bridge APIs are forbidden after live V5 cutover."}
 if($shellKernel -notmatch 'MoveTopLevel\s*\(int\s+direction' -or $shellKernel -notmatch 'ActiveTopLevelIndex\s*\(\)\s+const'){Violate "v5_navigation_traversal_authority" "include/v5/ShellKernel.h" "Top-level movement and selection must be owned by ShellKernel."}
