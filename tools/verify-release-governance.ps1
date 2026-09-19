@@ -35,6 +35,14 @@ foreach ($workflow in $workflowFiles) {
 }
 
 $production = Get-Content (Join-Path $SourceRoot ".github/workflows/production-release.yml") -Raw
+$signatureGateIndex = $production.IndexOf("Verify Authenticode signature")
+$signedSbomIndex = $production.IndexOf("Generate signed-artifact SPDX SBOM")
+$packageIndex = $production.IndexOf("Build production release bundle")
+if ($signatureGateIndex -lt 0 -or $signedSbomIndex -lt 0 -or $packageIndex -lt 0 -or
+    $signedSbomIndex -le $signatureGateIndex -or $packageIndex -le $signedSbomIndex) {
+  Violate "signed_artifact_sbom_order" ".github/workflows/production-release.yml" "Production SBOM must be generated after Authenticode verification and before packaging."
+}
+
 foreach ($required in @(
   "environment: production",
   "Verify repository governance",
