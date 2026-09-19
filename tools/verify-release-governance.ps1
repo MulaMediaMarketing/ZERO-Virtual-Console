@@ -47,6 +47,8 @@ foreach ($required in @(
   "Validate Store Settings and First Boot contract",
   "Validate persisted First Boot recovery",
   "ZERO_PHYSICAL_QUALIFICATION_B64",
+  "candidate.shell_sha256",
+  "Production shell bytes do not match the exact physically qualified shell artifact.",
   "ZERO_SIGNING_PFX_BASE64",
   "verify-authenticode.ps1",
   "generate-sbom.ps1",
