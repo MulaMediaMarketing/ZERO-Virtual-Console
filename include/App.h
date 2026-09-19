@@ -37,14 +37,6 @@ private:
             return active.value_or(Page::Home);
         }
 
-        AuthoritativePageProjection& operator=(Page page) noexcept {
-            if (shell_) {
-                std::string ignored;
-                shell_->Navigate(page, ignored);
-            }
-            return *this;
-        }
-
     private:
         v5::ProductionShellIntegration* shell_{nullptr};
     };
