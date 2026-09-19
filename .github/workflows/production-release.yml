@@ -137,6 +137,13 @@ jobs:
           if ($q.rc_qualified -ne $true) { throw "Physical qualification evidence is not qualified." }
           $qualifiedCommit = if ($q.PSObject.Properties.Name -contains 'commit') { [string]$q.commit } elseif ($q.PSObject.Properties.Name -contains 'candidate_commit') { [string]$q.candidate_commit } else { '' }
           if ($qualifiedCommit -ne "${{ github.sha }}") { throw "Physical qualification evidence is not for exact candidate SHA." }
+          if (-not $q.candidate -or [string]::IsNullOrWhiteSpace([string]$q.candidate.shell_sha256)) { throw "Physical qualification evidence is missing the qualified shell SHA-256." }
+          $rebuiltShellHash = (Get-FileHash -Algorithm SHA256 ./build/Release/ZeroVirtualConsole.exe).Hash.ToLowerInvariant()
+          $qualifiedShellHash = ([string]$q.candidate.shell_sha256).ToLowerInvariant()
+          if ($qualifiedShellHash -ne $rebuiltShellHash) {
+            throw "Production shell bytes do not match the exact physically qualified shell artifact."
+          }
+          "ZERO_QUALIFIED_UNSIGNED_SHELL_SHA256=$rebuiltShellHash" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Generate SPDX SBOM
         shell: pwsh
