@@ -48,7 +48,8 @@ $readme=Get-Content (Join-Path $SourceRoot "README.md") -Raw
 $architecture=Get-Content (Join-Path $SourceRoot "docs/ARCHITECTURE.md") -Raw
 $trustDoc=Get-Content (Join-Path $SourceRoot "docs/PACKAGE_TRUST.md") -Raw
 $standard=Get-Content (Join-Path $SourceRoot "docs/PRODUCTION_ARCHITECTURE_STANDARD.md") -Raw
-if($readme -match 'Runtime V2 architecture' -or $architecture -match 'RuntimeSession V2'){Violate "current_docs_runtime_version" "README.md/docs/ARCHITECTURE.md" "Current docs must describe Runtime V4.1."}
+if($readme -match 'Runtime V2 architecture' -or $architecture -match 'RuntimeSession V2'){Violate "current_docs_runtime_version" "README.md/docs/ARCHITECTURE.md" "Current docs may not describe legacy Runtime V2 authority."}
+if($readme -notmatch 'ZERO Core V5' -or $standard -notmatch 'ZERO Core V5'){Violate "current_docs_runtime_version" "README.md/docs/PRODUCTION_ARCHITECTURE_STANDARD.md" "Current production docs must identify ZERO Core V5."}
 if($trustDoc -notmatch 'ecdsa-p256-sha256'){Violate "publisher_crypto_documentation" "docs/PACKAGE_TRUST.md" "Docs must match ECDSA P-256/SHA-256."}
 if($standard -notmatch 'Single authority per concern' -or $standard -notmatch 'Measurable release benchmarks'){Violate "production_standard_present" "docs/PRODUCTION_ARCHITECTURE_STANDARD.md" "Production standard incomplete."}
 
