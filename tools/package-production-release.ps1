@@ -85,7 +85,7 @@ $manifest = [ordered]@{
 $manifestPath = Join-Path $OutputDir "production-release-manifest.json"
 $manifest | ConvertTo-Json -Depth 12 | Set-Content -Encoding UTF8 -Path $manifestPath
 
-$zipPath = Join-Path (Split-Path -Parent $OutputDir) "ZERO-Virtual-Console-Windows-x64-Production.zip"
+$zipPath = Join-Path (Split-Path -Parent $OutputDir) "ZERO-Player-Windows-x64-Production.zip"
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
 Compress-Archive -Path (Join-Path $OutputDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
 Require-File $zipPath
