@@ -33,6 +33,11 @@ RequirePresent "include/ApplicationServices.h" 'v5::ImportCoordinator\s+importer
 RequirePresent "include/ApplicationServices.h" 'v5::DownloadAuthority\s+downloads_' "composition root must own the V5 download authority"
 RequirePresent "include/ApplicationServices.h" 'ProductionRuntime\s+runtime_' "composition root must own the production runtime"
 RequirePresent "include/ApplicationServices.h" 'v5::ProductionShellIntegration\s+shell_' "composition root must own the production shell integration"
+RequirePresent "include/application/ServiceStateCoordinator.h" 'void\s+RefreshForPage\s*\(ProductionUxPage\s+page\)' "ServiceStateCoordinator must own per-page refresh policy"
+RequireAbsent "include/shell/ShellModule.h" 'RefreshForPage|RefreshAll' "ShellModule must remain navigation-only and may not own service refresh policy"
+RequireAbsent "src/shell/ShellModule.cpp" 'registry_\.Refresh|captures_\.Refresh|friends_\.Refresh|store_\.Refresh' "ShellModule may not directly refresh service providers"
+RequirePresent "src/App.cpp" 'productionShell_\.Navigate\(next,\s*error\)' "App navigation must commit through ProductionShellIntegration"
+RequirePresent "src/App.cpp" 'ActivePage\(\)' "App navigation must verify the committed authoritative page"
 
 # Legacy ownership must remain cut over.
 RequireAbsent "include/App.h" '#include\s+"ResumeStore\.h"' "App may not include legacy ResumeStore"
