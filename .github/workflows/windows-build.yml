@@ -136,7 +136,7 @@ jobs:
       - name: Upload ZERO binaries and acceptance evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ZERO-Virtual-Console-Windows-x64
+          name: ZERO-Player-Windows-x64
           if-no-files-found: error
           path: |
             build/Release/ZeroVirtualConsole.exe
@@ -174,7 +174,7 @@ jobs:
             build/QualificationEvidence/**
             build/SBOM/**
             build/ReleaseBundle/**
-            build/ZERO-Virtual-Console-Windows-x64-RC.zip
+            build/ZERO-Player-Windows-x64-RC.zip
             tools/run-v5-acceptance.ps1
             tools/verify-v5-cutover.ps1
             tools/verify-production-closure.ps1
