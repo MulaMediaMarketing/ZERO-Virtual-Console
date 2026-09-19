@@ -41,7 +41,7 @@ $document = [ordered]@{
   }
   packages = @([ordered]@{
     name = "ZERO Player"
-    SPDXID = "SPDXRef-Package-ZERO-Virtual-Console"
+    SPDXID = "SPDXRef-Package-ZERO-Player"
     versionInfo = "ZERO Core V5"
     downloadLocation = "NOASSERTION"
     filesAnalyzed = $true
@@ -56,7 +56,7 @@ $document = [ordered]@{
   })
   files = $files.ToArray()
   relationships = @($files | ForEach-Object { [ordered]@{
-    spdxElementId = "SPDXRef-Package-ZERO-Virtual-Console"
+    spdxElementId = "SPDXRef-Package-ZERO-Player"
     relationshipType = "CONTAINS"
     relatedSpdxElement = $_.SPDXID
   }})
