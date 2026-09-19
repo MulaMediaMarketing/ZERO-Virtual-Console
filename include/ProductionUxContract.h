@@ -9,24 +9,38 @@ namespace zero {
 
 enum class ProductionUxDestination : std::size_t {
     Home = 0,
-    Library,
+    Discover,
     Store,
+    Library,
+    CloudPlay,
+    Downloads,
     Friends,
+    Achievements,
     Captures,
+    Profile,
+    Devices,
     Settings,
     Count
 };
 
 enum class ProductionUxPage : std::size_t {
     Home = static_cast<std::size_t>(ProductionUxDestination::Home),
-    Library = static_cast<std::size_t>(ProductionUxDestination::Library),
+    Discover = static_cast<std::size_t>(ProductionUxDestination::Discover),
     Store = static_cast<std::size_t>(ProductionUxDestination::Store),
+    Library = static_cast<std::size_t>(ProductionUxDestination::Library),
+    CloudPlay = static_cast<std::size_t>(ProductionUxDestination::CloudPlay),
+    Downloads = static_cast<std::size_t>(ProductionUxDestination::Downloads),
     Friends = static_cast<std::size_t>(ProductionUxDestination::Friends),
+    Achievements = static_cast<std::size_t>(ProductionUxDestination::Achievements),
     Captures = static_cast<std::size_t>(ProductionUxDestination::Captures),
+    Profile = static_cast<std::size_t>(ProductionUxDestination::Profile),
+    Devices = static_cast<std::size_t>(ProductionUxDestination::Devices),
     Settings = static_cast<std::size_t>(ProductionUxDestination::Settings),
     GameDetail = static_cast<std::size_t>(ProductionUxDestination::Count),
-    Import,
-    Achievements
+    Wishlist,
+    Checkout,
+    Notifications,
+    Import
 };
 
 struct ProductionUxNavItem {
@@ -37,10 +51,16 @@ struct ProductionUxNavItem {
 
 inline constexpr std::array<ProductionUxNavItem, static_cast<std::size_t>(ProductionUxDestination::Count)> kProductionUxNavigation{{
     {ProductionUxDestination::Home, ProductionUxPage::Home, L"Home"},
-    {ProductionUxDestination::Library, ProductionUxPage::Library, L"Library"},
+    {ProductionUxDestination::Discover, ProductionUxPage::Discover, L"Discover"},
     {ProductionUxDestination::Store, ProductionUxPage::Store, L"Store"},
+    {ProductionUxDestination::Library, ProductionUxPage::Library, L"Library"},
+    {ProductionUxDestination::CloudPlay, ProductionUxPage::CloudPlay, L"Cloud Play"},
+    {ProductionUxDestination::Downloads, ProductionUxPage::Downloads, L"Downloads"},
     {ProductionUxDestination::Friends, ProductionUxPage::Friends, L"Friends"},
-    {ProductionUxDestination::Captures, ProductionUxPage::Captures, L"Captures"},
+    {ProductionUxDestination::Achievements, ProductionUxPage::Achievements, L"Achievements"},
+    {ProductionUxDestination::Captures, ProductionUxPage::Captures, L"Capture"},
+    {ProductionUxDestination::Profile, ProductionUxPage::Profile, L"Profile"},
+    {ProductionUxDestination::Devices, ProductionUxPage::Devices, L"Devices"},
     {ProductionUxDestination::Settings, ProductionUxPage::Settings, L"Settings"},
 }};
 
@@ -88,27 +108,21 @@ inline constexpr std::size_t ProductionUxMoveRight(std::size_t index) noexcept {
 }
 
 inline constexpr bool ProductionUxIsPermanentDestination(ProductionUxDestination destination) noexcept {
-    switch (destination) {
-        case ProductionUxDestination::Home:
-        case ProductionUxDestination::Library:
-        case ProductionUxDestination::Store:
-        case ProductionUxDestination::Friends:
-        case ProductionUxDestination::Captures:
-        case ProductionUxDestination::Settings:
-            return true;
-        default:
-            return false;
-    }
+    return static_cast<std::size_t>(destination) < static_cast<std::size_t>(ProductionUxDestination::Count);
 }
 
-static_assert(ProductionUxNavCount() == 6, "ZERO production shell must expose six permanent top-level destinations.");
-static_assert(ProductionUxIndex(ProductionUxDestination::Friends) == 3, "Friends must remain a first-class top-level destination.");
-static_assert(ProductionUxIndex(ProductionUxDestination::Captures) == 4, "Captures must remain a first-class top-level destination.");
-static_assert(ProductionUxPageForDestination(ProductionUxDestination::Home) == ProductionUxPage::Home);
-static_assert(ProductionUxPageForDestination(ProductionUxDestination::Friends) == ProductionUxPage::Friends);
-static_assert(ProductionUxPageForDestination(ProductionUxDestination::Captures) == ProductionUxPage::Captures);
+static_assert(ProductionUxNavCount() == 12, "ZERO production shell must expose all twelve permanent V5 destinations.");
+static_assert(ProductionUxIndex(ProductionUxDestination::Discover) == 1);
+static_assert(ProductionUxIndex(ProductionUxDestination::Library) == 3);
+static_assert(ProductionUxIndex(ProductionUxDestination::Friends) == 6);
+static_assert(ProductionUxIndex(ProductionUxDestination::Achievements) == 7);
+static_assert(ProductionUxIndex(ProductionUxDestination::Captures) == 8);
+static_assert(ProductionUxIndex(ProductionUxDestination::Settings) == 11);
+static_assert(ProductionUxIsTopLevelPage(ProductionUxPage::Achievements));
 static_assert(!ProductionUxIsTopLevelPage(ProductionUxPage::GameDetail));
+static_assert(!ProductionUxIsTopLevelPage(ProductionUxPage::Wishlist));
+static_assert(!ProductionUxIsTopLevelPage(ProductionUxPage::Checkout));
+static_assert(!ProductionUxIsTopLevelPage(ProductionUxPage::Notifications));
 static_assert(!ProductionUxIsTopLevelPage(ProductionUxPage::Import));
-static_assert(!ProductionUxIsTopLevelPage(ProductionUxPage::Achievements));
 
 } // namespace zero

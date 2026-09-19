@@ -68,6 +68,54 @@ jobs:
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
 
+      - name: Validate production closure ownership
+        shell: pwsh
+        run: ./tools/verify-production-closure.ps1 -SourceRoot .
+
+      - name: Validate locked ZERO Player UX and input parity
+        shell: pwsh
+        run: ./tools/verify-zero-player-ux.ps1 -SourceRoot .
+
+      - name: Validate release governance and supply-chain controls
+        shell: pwsh
+        run: ./tools/verify-release-governance.ps1 -SourceRoot . -ReportDir ./build/GovernanceReports
+
+      - name: Validate server-authority fail-closed contract
+        shell: pwsh
+        run: ./build/Release/ZeroServerAuthorityAcceptance.exe
+
+      - name: Validate production shell navigation contract
+        shell: pwsh
+        run: ./build/Release/ZeroProductionUxAcceptance.exe
+
+      - name: Validate Friends experience contract
+        shell: pwsh
+        run: ./build/Release/ZeroFriendsExperienceAcceptance.exe
+
+      - name: Validate Captures experience contract
+        shell: pwsh
+        run: ./build/Release/ZeroCapturesExperienceAcceptance.exe
+
+      - name: Validate Home Library and Game Detail contract
+        shell: pwsh
+        run: ./build/Release/ZeroCoreShellExperienceAcceptance.exe
+
+      - name: Validate Store Settings and First Boot contract
+        shell: pwsh
+        run: ./build/Release/ZeroStoreSettingsFirstBootAcceptance.exe
+
+      - name: Validate persisted First Boot recovery
+        shell: pwsh
+        run: ./build/Release/ZeroFirstBootPersistenceAcceptance.exe
+
+      - name: Validate all ZERO Core Architecture V5 migrations
+        shell: pwsh
+        run: ./tools/run-v5-acceptance.ps1 -BuildRoot ./build
+
+      - name: Validate final V5 runtime cutover
+        shell: pwsh
+        run: ./tools/verify-v5-cutover.ps1 -SourceRoot . -ReportDir ./build/V5CutoverReports
+
       - name: Build ZERO reference package
         shell: pwsh
         run: ./sample_game/reference/build-reference-package.ps1 -ReferenceExe ./build/Release/ZeroReferenceGame.exe -Output ./build/ReferencePackage
@@ -89,10 +137,13 @@ jobs:
           if ($q.rc_qualified -ne $true) { throw "Physical qualification evidence is not qualified." }
           $qualifiedCommit = if ($q.PSObject.Properties.Name -contains 'commit') { [string]$q.commit } elseif ($q.PSObject.Properties.Name -contains 'candidate_commit') { [string]$q.candidate_commit } else { '' }
           if ($qualifiedCommit -ne "${{ github.sha }}") { throw "Physical qualification evidence is not for exact candidate SHA." }
-
-      - name: Generate SPDX SBOM
-        shell: pwsh
-        run: ./tools/generate-sbom.ps1 -BuildRoot ./build -OutputPath ./build/SBOM/zero-virtual-console.spdx.json
+          if (-not $q.candidate -or [string]::IsNullOrWhiteSpace([string]$q.candidate.shell_sha256)) { throw "Physical qualification evidence is missing the qualified shell SHA-256." }
+          $rebuiltShellHash = (Get-FileHash -Algorithm SHA256 ./build/Release/ZeroVirtualConsole.exe).Hash.ToLowerInvariant()
+          $qualifiedShellHash = ([string]$q.candidate.shell_sha256).ToLowerInvariant()
+          if ($qualifiedShellHash -ne $rebuiltShellHash) {
+            throw "Production shell bytes do not match the exact physically qualified shell artifact."
+          }
+          "ZERO_QUALIFIED_UNSIGNED_SHELL_SHA256=$rebuiltShellHash" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Import production code-signing certificate
         shell: pwsh
@@ -126,6 +177,10 @@ jobs:
         shell: pwsh
         run: ./tools/verify-authenticode.ps1 -Paths ./build/Release/ZeroVirtualConsole.exe -ReportPath ./build/SigningReports/authenticode.json
 
+      - name: Generate signed-artifact SPDX SBOM
+        shell: pwsh
+        run: ./tools/generate-sbom.ps1 -BuildRoot ./build -OutputPath ./build/SBOM/zero-virtual-console.spdx.json
+
       - name: Build production release bundle
         shell: pwsh
         run: ./tools/package-production-release.ps1 -BuildRoot ./build -OutputDir ./build/ProductionRelease -QualificationEvidence ./build/QualificationEvidence/rc-qualification.json -SbomPath ./build/SBOM/zero-virtual-console.spdx.json -SigningReport ./build/SigningReports/authenticode.json
@@ -141,8 +196,8 @@ jobs:
       - name: Upload signed production release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ZERO-Virtual-Console-Windows-x64-Production-${{ github.sha }}
+          name: ZERO-Player-Windows-x64-Production-${{ github.sha }}
           if-no-files-found: error
           path: |
-            build/ZERO-Virtual-Console-Windows-x64-Production.zip
+            build/ZERO-Player-Windows-x64-Production.zip
             build/ProductionRelease/**

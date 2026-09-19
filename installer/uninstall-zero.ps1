@@ -1,7 +1,7 @@
 param(
   [string]$InstallDir = "$env:LOCALAPPDATA\Programs\ZERO Virtual Console",
   [string]$DataRoot = "$env:LOCALAPPDATA\ZERO",
-  [string]$StartMenuPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\ZERO Virtual Console.lnk",
+  [string]$StartMenuPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\ZERO Player.lnk",
   [switch]$RemovePlayerData,
   [switch]$SkipRegistration,
   [switch]$SkipShortcut
@@ -21,8 +21,12 @@ if (-not $SkipShortcut -and (Test-Path $StartMenuPath -PathType Leaf)) {
 }
 
 if (-not $SkipRegistration) {
-  $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ZERO Virtual Console"
-  if (Test-Path $uninstallKey) { Remove-Item $uninstallKey -Recurse -Force }
+  foreach ($uninstallKey in @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ZERO Player",
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ZERO Virtual Console"
+  )) {
+    if (Test-Path $uninstallKey) { Remove-Item $uninstallKey -Recurse -Force }
+  }
 }
 
 # Player-owned and platform state live outside the program directory. Never touch
@@ -42,9 +46,9 @@ if (Test-Path $InstallDir) {
 }
 
 if ($RemovePlayerData) {
-  Write-Host "ZERO Virtual Console and explicitly requested player data removed."
+  Write-Host "ZERO Player and explicitly requested player data removed."
 } else {
-  Write-Host "ZERO Virtual Console removed. Player saves, Library, Resume data, achievements, settings, trust data, captures, and diagnostics were preserved."
+  Write-Host "ZERO Player removed. Player saves, Library, Resume data, achievements, settings, trust data, captures, and diagnostics were preserved."
 }
 
 if (Test-Path $InstallDir) {

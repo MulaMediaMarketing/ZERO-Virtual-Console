@@ -1,5 +1,6 @@
 target_sources(ZeroVirtualConsole PRIVATE
-  src/v5/AchievementProfileDomain.cpp)
+  src/v5/AchievementProfileDomain.cpp
+  src/v5/ProductionRuntimeAchievementProgress.cpp)
 
 add_executable(ZeroV5AchievementProfileAcceptance
   tools/V5AchievementProfileAcceptance.cpp

@@ -39,28 +39,24 @@ void ProductionShellPageController::SetAvailable(bool available, std::string sta
     ++revision_;
 }
 
-namespace {
-constexpr const char* kNotIntegrated = "This ZERO Player destination is not integrated into the production renderer yet.";
-}
-
 ProductionShellIntegration::ProductionShellIntegration()
     : controllers_{{
           {ShellPage::Home, true},
-          {ShellPage::Discover, false, kNotIntegrated},
+          {ShellPage::Discover, true, "Local discovery available; online ZERO catalog disconnected"},
           {ShellPage::Store, true},
           {ShellPage::Library, true},
-          {ShellPage::CloudPlay, false, kNotIntegrated},
-          {ShellPage::Downloads, false, kNotIntegrated},
+          {ShellPage::CloudPlay, true, "ZERO Cloud service disconnected"},
+          {ShellPage::Downloads, true, "Local installs available; no authoritative remote transfer jobs"},
           {ShellPage::Friends, true},
           {ShellPage::Achievements, true},
           {ShellPage::Capture, true},
-          {ShellPage::Profile, false, kNotIntegrated},
-          {ShellPage::Devices, false, kNotIntegrated},
+          {ShellPage::Profile, true, "Local ZERO identity available; online identity disconnected"},
+          {ShellPage::Devices, true, "Local PC/controller state available; no authoritative paired ZERO devices"},
           {ShellPage::Settings, true},
           {ShellPage::GameDetail, true},
-          {ShellPage::Wishlist, false, kNotIntegrated},
-          {ShellPage::Checkout, false, kNotIntegrated},
-          {ShellPage::Notifications, false, kNotIntegrated},
+          {ShellPage::Wishlist, true, "ZERO commerce service disconnected"},
+          {ShellPage::Checkout, true, "ZERO checkout service disconnected"},
+          {ShellPage::Notifications, true, "Local system/game activity available; online notification services disconnected"},
           {ShellPage::Import, true},
       }},
       controllerRefs_{{
@@ -74,34 +70,50 @@ ProductionShellIntegration::ProductionShellIntegration()
 std::optional<ShellPage> ProductionShellIntegration::ToShellPage(ProductionUxPage page) noexcept {
     switch (page) {
         case ProductionUxPage::Home: return ShellPage::Home;
-        case ProductionUxPage::Library: return ShellPage::Library;
+        case ProductionUxPage::Discover: return ShellPage::Discover;
         case ProductionUxPage::Store: return ShellPage::Store;
+        case ProductionUxPage::Library: return ShellPage::Library;
+        case ProductionUxPage::CloudPlay: return ShellPage::CloudPlay;
+        case ProductionUxPage::Downloads: return ShellPage::Downloads;
         case ProductionUxPage::Friends: return ShellPage::Friends;
+        case ProductionUxPage::Achievements: return ShellPage::Achievements;
         case ProductionUxPage::Captures: return ShellPage::Capture;
+        case ProductionUxPage::Profile: return ShellPage::Profile;
+        case ProductionUxPage::Devices: return ShellPage::Devices;
         case ProductionUxPage::Settings: return ShellPage::Settings;
         case ProductionUxPage::GameDetail: return ShellPage::GameDetail;
+        case ProductionUxPage::Wishlist: return ShellPage::Wishlist;
+        case ProductionUxPage::Checkout: return ShellPage::Checkout;
+        case ProductionUxPage::Notifications: return ShellPage::Notifications;
         case ProductionUxPage::Import: return ShellPage::Import;
-        case ProductionUxPage::Achievements: return ShellPage::Achievements;
     }
     return std::nullopt;
 }
 
-std::optional<ProductionUxPage> ProductionShellIntegration::ToLegacyPage(ShellPage page) noexcept {
+std::optional<ProductionUxPage> ProductionShellIntegration::ToProductionPage(ShellPage page) noexcept {
     switch (page) {
         case ShellPage::Home: return ProductionUxPage::Home;
-        case ShellPage::Library: return ProductionUxPage::Library;
+        case ShellPage::Discover: return ProductionUxPage::Discover;
         case ShellPage::Store: return ProductionUxPage::Store;
+        case ShellPage::Library: return ProductionUxPage::Library;
+        case ShellPage::CloudPlay: return ProductionUxPage::CloudPlay;
+        case ShellPage::Downloads: return ProductionUxPage::Downloads;
         case ShellPage::Friends: return ProductionUxPage::Friends;
+        case ShellPage::Achievements: return ProductionUxPage::Achievements;
         case ShellPage::Capture: return ProductionUxPage::Captures;
+        case ShellPage::Profile: return ProductionUxPage::Profile;
+        case ShellPage::Devices: return ProductionUxPage::Devices;
         case ShellPage::Settings: return ProductionUxPage::Settings;
         case ShellPage::GameDetail: return ProductionUxPage::GameDetail;
+        case ShellPage::Wishlist: return ProductionUxPage::Wishlist;
+        case ShellPage::Checkout: return ProductionUxPage::Checkout;
+        case ShellPage::Notifications: return ProductionUxPage::Notifications;
         case ShellPage::Import: return ProductionUxPage::Import;
-        case ShellPage::Achievements: return ProductionUxPage::Achievements;
-        default: return std::nullopt;
     }
+    return std::nullopt;
 }
 
-bool ProductionShellIntegration::NavigateLegacy(ProductionUxPage page, std::string& error) {
+bool ProductionShellIntegration::Navigate(ProductionUxPage page, std::string& error) {
     const auto shellPage = ToShellPage(page);
     if (!shellPage) {
         error = "production UX page has no V5 shell mapping";
@@ -110,12 +122,29 @@ bool ProductionShellIntegration::NavigateLegacy(ProductionUxPage page, std::stri
     return kernel_.Navigate(*shellPage, error);
 }
 
+bool ProductionShellIntegration::NavigateContextual(ProductionUxPage page, std::string& error) {
+    const auto shellPage = ToShellPage(page);
+    if (!shellPage) {
+        error = "production UX page has no V5 shell mapping";
+        return false;
+    }
+    return kernel_.NavigateContextual(*shellPage, error);
+}
+
+std::size_t ProductionShellIntegration::ActiveTopLevelIndex() const noexcept {
+    return kernel_.ActiveTopLevelIndex();
+}
+
+bool ProductionShellIntegration::MoveTopLevel(int direction, std::string& error) {
+    return kernel_.MoveTopLevel(direction, error);
+}
+
 bool ProductionShellIntegration::Back(std::string& error) {
     return kernel_.Back(error);
 }
 
-std::optional<ProductionUxPage> ProductionShellIntegration::ActiveLegacyPage() const noexcept {
-    return ToLegacyPage(kernel_.Snapshot().activePage);
+std::optional<ProductionUxPage> ProductionShellIntegration::ActivePage() const noexcept {
+    return ToProductionPage(kernel_.Snapshot().activePage);
 }
 
 } // namespace zero::v5

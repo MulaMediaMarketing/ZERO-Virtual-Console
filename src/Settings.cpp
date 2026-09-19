@@ -23,16 +23,25 @@ UserSettings SettingsStore::Load() const {
     const auto reducedMotion = database.GetSetting("reduced_motion", error);
     error.clear();
     const auto volume = database.GetSetting("volume", error);
+    error.clear();
+    const auto shareActivity = database.GetSetting("share_activity", error);
+    error.clear();
+    const auto shareAchievements = database.GetSetting("share_achievements", error);
+    error.clear();
+    const auto sharePlaytime = database.GetSetting("share_playtime", error);
 
-    const bool hasCanonicalState = profile.has_value() || reducedMotion.has_value() || volume.has_value();
+    const bool hasCanonicalState = profile.has_value() || reducedMotion.has_value() || volume.has_value() ||
+                                   shareActivity.has_value() || shareAchievements.has_value() || sharePlaytime.has_value();
     if (hasCanonicalState) {
         if (profile && !profile->empty()) settings.profileName = *profile;
         if (reducedMotion) settings.reducedMotion = *reducedMotion == "1";
         if (volume) settings.volume = parseVolume(*volume, settings.volume);
+        if (shareActivity) settings.shareActivity = *shareActivity == "1";
+        if (shareAchievements) settings.shareAchievements = *shareAchievements == "1";
+        if (sharePlaytime) settings.sharePlaytime = *sharePlaytime == "1";
         return settings;
     }
 
-    // One-way migration fallback for installations that predate canonical SQLite settings.
     const auto legacyPath = root_ / "settings.ini";
     std::ifstream legacy(legacyPath);
     if (!legacy) return settings;
@@ -46,10 +55,15 @@ UserSettings SettingsStore::Load() const {
             settings.reducedMotion = line.substr(15) == "1";
         } else if (line.rfind("volume=", 0) == 0) {
             settings.volume = parseVolume(line.substr(7), settings.volume);
+        } else if (line.rfind("share_activity=", 0) == 0) {
+            settings.shareActivity = line.substr(15) == "1";
+        } else if (line.rfind("share_achievements=", 0) == 0) {
+            settings.shareAchievements = line.substr(19) == "1";
+        } else if (line.rfind("share_playtime=", 0) == 0) {
+            settings.sharePlaytime = line.substr(15) == "1";
         }
     }
 
-    // Best-effort migration. The legacy mirror remains available if the canonical write fails.
     Save(settings);
     return settings;
 }
@@ -64,8 +78,10 @@ bool SettingsStore::Save(const UserSettings& input) const {
     if (!database.SetSetting("profile", settings.profileName, error)) return false;
     if (!database.SetSetting("reduced_motion", settings.reducedMotion ? "1" : "0", error)) return false;
     if (!database.SetSetting("volume", std::to_string(settings.volume), error)) return false;
+    if (!database.SetSetting("share_activity", settings.shareActivity ? "1" : "0", error)) return false;
+    if (!database.SetSetting("share_achievements", settings.shareAchievements ? "1" : "0", error)) return false;
+    if (!database.SetSetting("share_playtime", settings.sharePlaytime ? "1" : "0", error)) return false;
 
-    // Compatibility mirror only. SQLite above is the canonical source of truth.
     std::error_code ec;
     std::filesystem::create_directories(root_, ec);
     if (ec) return false;
@@ -76,6 +92,9 @@ bool SettingsStore::Save(const UserSettings& input) const {
     f << "profile=" << settings.profileName << "\n";
     f << "reduced_motion=" << (settings.reducedMotion ? 1 : 0) << "\n";
     f << "volume=" << settings.volume << "\n";
+    f << "share_activity=" << (settings.shareActivity ? 1 : 0) << "\n";
+    f << "share_achievements=" << (settings.shareAchievements ? 1 : 0) << "\n";
+    f << "share_playtime=" << (settings.sharePlaytime ? 1 : 0) << "\n";
     f.close();
     std::filesystem::rename(tmp, dst, ec);
     if (ec) {

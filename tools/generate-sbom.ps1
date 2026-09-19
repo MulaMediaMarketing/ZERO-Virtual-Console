@@ -33,16 +33,16 @@ $document = [ordered]@{
   spdxVersion = "SPDX-2.3"
   dataLicense = "CC0-1.0"
   SPDXID = "SPDXRef-DOCUMENT"
-  name = "ZERO-Virtual-Console-$commit"
+  name = "ZERO-Player-$commit"
   documentNamespace = $namespace
   creationInfo = [ordered]@{
     created = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
     creators = @("Tool: ZERO-generate-sbom.ps1")
   }
   packages = @([ordered]@{
-    name = "ZERO Virtual Console"
-    SPDXID = "SPDXRef-Package-ZERO-Virtual-Console"
-    versionInfo = "Runtime V4.1"
+    name = "ZERO Player"
+    SPDXID = "SPDXRef-Package-ZERO-Player"
+    versionInfo = "ZERO Core V5"
     downloadLocation = "NOASSERTION"
     filesAnalyzed = $true
     licenseConcluded = "NOASSERTION"
@@ -56,7 +56,7 @@ $document = [ordered]@{
   })
   files = $files.ToArray()
   relationships = @($files | ForEach-Object { [ordered]@{
-    spdxElementId = "SPDXRef-Package-ZERO-Virtual-Console"
+    spdxElementId = "SPDXRef-Package-ZERO-Player"
     relationshipType = "CONTAINS"
     relatedSpdxElement = $_.SPDXID
   }})

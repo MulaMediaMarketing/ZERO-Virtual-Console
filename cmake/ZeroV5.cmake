@@ -14,6 +14,7 @@ target_sources(ZeroVirtualConsole PRIVATE
   src/v5/NativeRuntimeProcessHost.cpp
   src/v5/CrashSupervisor.cpp
   src/v5/ResumeCoordinator.cpp
+  src/v5/ImportCoordinator.cpp
   src/v5/ShellKernel.cpp
   src/v5/DiscoverDomain.cpp
   src/v5/ProductionRuntime.cpp)

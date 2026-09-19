@@ -1,34 +1,53 @@
-# ZERO Virtual Console
+# ZERO Player
 
-Native Windows foundation for **ZERO Virtual Console**, a standalone, game-agnostic software-defined game console platform for PC.
+Native Windows foundation for **ZERO Player**, a standalone, game-agnostic software-defined gaming platform for PC.
 
 > The PC is the hardware. ZERO is the console layer.
 
 ZERO is designed to host many current and future games. No individual title owns, defines, or is hardcoded into the platform architecture.
 
-## Runtime V4.1 architecture
+## ZERO Core V5
 
-`Windows 11 x64 -> ZERO Shell -> Game Manifest -> Runtime V4.1 -> native Game.exe`
+The production architecture is **ZERO Core V5**.
 
-Runtime V4.1 provides:
+At a high level:
 
+`Windows 11 x64 -> ZERO Player Shell -> V5 Platform Authorities -> Package/Runtime Core -> Game`
+
+ZERO Core V5 provides or coordinates:
+
+- authoritative ShellKernel navigation and contextual Back history;
 - manifest-driven game discovery and strict package validation;
-- native Windows `.exe` launch through suspended creation and Windows Job Object containment;
-- authenticated local Runtime/SDK session plumbing and READY lifecycle;
-- per-game Saves/Cache/Temp isolation;
-- canonical local game/session statistics, Resume, achievements, and diagnostics;
+- a single package lifecycle for import/install/update/repair;
+- native Windows game launch with process/session supervision;
+- authenticated Runtime/SDK IPC and READY lifecycle;
+- isolated per-game Saves/Cache/Temp data;
+- canonical local session statistics, Resume, achievements, and diagnostics;
 - SHA-256 package integrity verification before launch;
-- local trusted-publisher verification using ECDSA P-256/SHA-256 through Windows CNG;
-- safe package repair/re-import and transactional installer/update rollback;
-- four-slot XInput arbitration plus keyboard fallback;
-- production shell navigation, overlay lifecycle, launch recovery, First Boot, Settings, Friends, Captures, Store provider boundaries, and accessibility state;
-- automated M1 acceptance, architecture-policy measurement, deterministic release packaging, and physical RC qualification tooling.
+- trusted-publisher verification using ECDSA P-256/SHA-256 through Windows CNG;
+- crash/hang supervision and recovery;
+- XInput controller support plus keyboard/mouse parity;
+- local-first Home, Discover, Library, Downloads, Capture, Profile, Devices and Settings experiences;
+- explicit fail-closed boundaries for Store, ZERO ID, ZERO Link/social, cloud and other server-authoritative systems;
+- automated acceptance, architecture-policy measurement, deterministic release packaging, SBOM generation, and physical RC qualification tooling.
 
 Games are discovered under:
 
 `%LOCALAPPDATA%\\ZERO\\Library\\<GameName>\\zero.manifest.json`
 
 Player/runtime data remains under `%LOCALAPPDATA%\\ZERO` and is separated from replaceable program files.
+
+## Engineering entrypoint
+
+New engineers should start with:
+
+- `docs/ENGINEERING_START_HERE.md`
+- `docs/PRODUCT_ARCHITECTURE.md`
+- `docs/ZERO_CORE_ARCHITECTURE_V5.md`
+- `docs/ZERO_PLAYER_UI_LOCK.md`
+- `docs/PRODUCTION_CLOSURE_POLICY.md`
+
+The codebase follows one-authority-per-concern. UI/rendering code is presentation; business truth belongs in domain/service authorities. Long-lived production services are centralized through the application composition root rather than instantiated independently by pages.
 
 ## Build
 
@@ -55,24 +74,43 @@ A candidate is not accepted because it compiles. Production verification is evid
 ./tools/package-release.ps1 -BuildRoot ./build -OutputDir ./build/ReleaseBundle
 ```
 
-The architecture report measures source size, acceptance coverage, binary hashes, documentation alignment, and policy violations. CI may produce an automated PASS, but **CI can never qualify the RC**. Final qualification requires the documented real Windows 11 x64 + physical XInput controller journey for the exact candidate commit.
+CI may produce an automated PASS, but CI can never qualify a production RC. Final qualification requires the documented real Windows 11 x64 + physical XInput controller journey for the exact candidate commit, followed by production signing and signed-artifact validation.
 
-See:
+## Permanent ZERO Player destinations
 
-- `docs/ARCHITECTURE.md`
-- `docs/PRODUCTION_ARCHITECTURE_STANDARD.md`
-- `docs/RUNTIME_V4_1_RC_GATE.md`
-- `docs/PACKAGE_SECURITY.md`
-- `docs/PACKAGE_TRUST.md`
+The production shell exposes exactly twelve permanent top-level destinations:
 
-## Permanent shell destinations
+1. Home
+2. Discover
+3. Store
+4. Library
+5. Cloud Play
+6. Downloads
+7. Friends
+8. Achievements
+9. Capture
+10. Profile
+11. Devices
+12. Settings
 
-The production shell contract exposes exactly six permanent top-level destinations:
-
-**Home · Library · Store · Friends · Captures · Settings**
-
-Game Detail, Import, and Achievements are secondary pages and do not redefine top-level navigation.
+Game Detail, Import, Wishlist, Checkout and Notifications are contextual/supporting destinations and do not redefine top-level navigation authority.
 
 ## Platform boundary
 
-The Runtime V4.1/local-console foundation does not falsely claim completion of the entire online commercial ecosystem. Production Store commerce, cloud Zero ID, Zero Link backend, DRM, anti-cheat, native video capture/encoding, public publisher PKI/portal, public SDK distribution, ARM64, HDR certification, and non-Windows targets remain separate milestones until implemented.
+ZERO Player never fabricates online or commercial authority.
+
+Production Store commerce, online ZERO ID, ZERO Link/social, ZERO Cloud, remote content/CDN delivery, remote-device services and other network-backed features remain disconnected until their real production providers, credentials and infrastructure are deployed and qualified.
+
+Disconnected services must fail closed while the shell remains fully usable for supported local-first functionality.
+
+## Release rule
+
+ZERO Player is releasable only when one exact commit satisfies all of the following:
+
+- automated acceptance is green;
+- Windows Build is green;
+- CodeQL is green;
+- required review/governance gates pass;
+- physical Windows qualification passes for the exact SHA;
+- the production executable is Authenticode signed;
+- the exact signed artifact passes final E2E acceptance.

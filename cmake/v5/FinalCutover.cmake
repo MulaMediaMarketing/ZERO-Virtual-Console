@@ -1,6 +1,8 @@
 add_executable(ZeroV5FinalCutoverAcceptance
   tools/V5FinalCutoverAcceptance.cpp
   src/v5/ProductionRuntime.cpp
+  src/v5/ProductionRuntimeAchievementProgress.cpp
+  src/v5/AchievementProfileDomain.cpp
   src/v5/RuntimeAuthority.cpp
   src/v5/NativeRuntimeProcessHost.cpp
   src/v5/CrashSupervisor.cpp

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: windows-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -22,6 +26,18 @@ jobs:
 
       - name: Build
         run: cmake --build build --config Release --parallel
+
+      - name: Stage removable UI preview assets
+        shell: pwsh
+        run: |
+          $destination = './build/Release/assets/placeholders'
+          if (Test-Path $destination) { Remove-Item -Recurse -Force $destination }
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+          Copy-Item -Recurse -Force './assets/placeholders' $destination
+
+      - name: Validate senior feature architecture contract
+        shell: pwsh
+        run: ./build/Release/ZeroFeatureArchitectureAcceptance.exe
 
       - name: Validate strict JSON hostile-input contract
         shell: pwsh
@@ -46,6 +62,14 @@ jobs:
       - name: Validate production architecture and collect benchmarks
         shell: pwsh
         run: ./tools/verify-production-architecture.ps1 -BuildRoot ./build -ReportDir ./build/ArchitectureReports
+
+      - name: Validate production closure ownership
+        shell: pwsh
+        run: ./tools/verify-production-closure.ps1 -SourceRoot .
+
+      - name: Validate locked ZERO Player UX and input parity
+        shell: pwsh
+        run: ./tools/verify-zero-player-ux.ps1 -SourceRoot .
 
       - name: Validate release governance and supply-chain controls
         shell: pwsh
@@ -112,10 +136,11 @@ jobs:
       - name: Upload ZERO binaries and acceptance evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ZERO-Virtual-Console-Windows-x64
+          name: ZERO-Player-Windows-x64
           if-no-files-found: error
           path: |
             build/Release/ZeroVirtualConsole.exe
+            build/Release/assets/placeholders/**
             build/Release/ZeroTestGame.exe
             build/Release/ZeroReferenceGame.exe
             build/Release/ZeroAcceptance.exe
@@ -127,6 +152,7 @@ jobs:
             build/Release/ZeroPlatformDatabaseAcceptance.exe
             build/Release/ZeroFaultInjectionAcceptance.exe
             build/Release/ZeroProductionBenchmarkAcceptance.exe
+            build/Release/ZeroFeatureArchitectureAcceptance.exe
             build/Release/ZeroInputAcceptance.exe
             build/Release/ZeroShellUxAcceptance.exe
             build/Release/ZeroProductionUxAcceptance.exe
@@ -148,9 +174,11 @@ jobs:
             build/QualificationEvidence/**
             build/SBOM/**
             build/ReleaseBundle/**
-            build/ZERO-Virtual-Console-Windows-x64-RC.zip
+            build/ZERO-Player-Windows-x64-RC.zip
             tools/run-v5-acceptance.ps1
             tools/verify-v5-cutover.ps1
+            tools/verify-production-closure.ps1
+            tools/verify-zero-player-ux.ps1
             tools/verify-dependency-surface.ps1
             tools/verify-production-architecture.ps1
             tools/verify-release-governance.ps1

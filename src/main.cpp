@@ -1,38 +1,46 @@
 #include "App.h"
+#include "ApplicationServices.h"
 #include "FirstBootService.h"
 #include "FirstBootWizard.h"
 #include "PlatformPaths.h"
-#include "Settings.h"
 #include <windows.h>
 
 namespace {
-bool applyFirstBootSettings(const std::filesystem::path& root, const zero::FirstBootState& state) {
-    zero::SettingsStore settingsStore(root);
+
+bool ApplyFirstBootSettings(zero::SettingsStore& settingsStore, const zero::FirstBootState& state) {
     auto settings = settingsStore.Load();
     settings.profileName = state.profileName.empty() ? "Player" : state.profileName;
     settings.volume = static_cast<int>(state.volume > 100 ? 100 : state.volume);
     return settingsStore.Save(settings);
 }
+
+bool RunFirstBootIfRequired(HINSTANCE instance,
+                            const std::filesystem::path& dataRoot,
+                            zero::SettingsStore& settingsStore) {
+    zero::FirstBootService firstBoot(dataRoot);
+    if (!firstBoot.IsRequired()) return true;
+
+    zero::FirstBootWizard wizard(instance, firstBoot);
+    if (!wizard.Run()) return false;
+
+    if (!ApplyFirstBootSettings(settingsStore, firstBoot.Load())) {
+        MessageBoxW(nullptr,
+            L"ZERO completed setup but could not persist profile and volume settings. Restart ZERO after checking local storage access.",
+            L"ZERO Setup", MB_OK | MB_ICONERROR);
+        return false;
+    }
+    return true;
 }
 
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
-    // ZERO owns its physical-pixel layout and must not be virtualized by Windows when
-    // moving between displays or running at 125/150/200% scale.
+} // namespace
+
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    const auto root = zero::PlatformPaths::DataRoot();
-    zero::FirstBootService firstBoot(root);
-    if (firstBoot.IsRequired()) {
-        zero::FirstBootWizard wizard(hInstance, firstBoot);
-        if (!wizard.Run()) return 0;
-        if (!applyFirstBootSettings(root, firstBoot.Load())) {
-            MessageBoxW(nullptr,
-                L"ZERO completed setup but could not persist the profile and volume settings. Setup will remain saved; restart ZERO after checking local storage access.",
-                L"ZERO Setup", MB_OK | MB_ICONERROR);
-            return 1;
-        }
-    }
+    const auto dataRoot = zero::PlatformPaths::DataRoot();
+    zero::ApplicationServices services(dataRoot);
+    if (!RunFirstBootIfRequired(instance, dataRoot, services.Settings())) return 0;
 
-    zero::App app(hInstance);
+    zero::App app(instance, services);
     return app.Run();
 }

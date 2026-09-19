@@ -125,7 +125,7 @@ $referenceHash = (Get-FileHash -Algorithm SHA256 -Path $referenceExe).Hash.ToLow
 $report = [ordered]@{
   schema = 2
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
-  zero_milestone = "M1 / Runtime V4.1 / Production Architecture"
+  zero_milestone = "M1 / ZERO Core V5 / Production Architecture"
   version = "0.1.0-rc1"
   commit = $commit
   rc_qualified = [bool]$qualified
@@ -172,7 +172,7 @@ $mdPath = Join-Path $EvidenceDir "rc-qualification.md"
 $report | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath -Encoding UTF8
 
 $lines = New-Object System.Collections.Generic.List[string]
-[void]$lines.Add("# ZERO Runtime V4.1 RC Qualification")
+[void]$lines.Add("# ZERO Core V5 RC Qualification")
 [void]$lines.Add("")
 [void]$lines.Add("- Version: **0.1.0-rc1**")
 [void]$lines.Add("- Commit: ``$commit``")

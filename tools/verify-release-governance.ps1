@@ -35,10 +35,28 @@ foreach ($workflow in $workflowFiles) {
 }
 
 $production = Get-Content (Join-Path $SourceRoot ".github/workflows/production-release.yml") -Raw
+$signatureGateIndex = $production.IndexOf("Verify Authenticode signature")
+$signedSbomIndex = $production.IndexOf("Generate signed-artifact SPDX SBOM")
+$packageIndex = $production.IndexOf("Build production release bundle")
+if ($signatureGateIndex -lt 0 -or $signedSbomIndex -lt 0 -or $packageIndex -lt 0 -or
+    $signedSbomIndex -le $signatureGateIndex -or $packageIndex -le $signedSbomIndex) {
+  Violate "signed_artifact_sbom_order" ".github/workflows/production-release.yml" "Production SBOM must be generated after Authenticode verification and before packaging."
+}
+
 foreach ($required in @(
   "environment: production",
   "Verify repository governance",
+  "Validate release governance and supply-chain controls",
+  "Validate server-authority fail-closed contract",
+  "Validate production shell navigation contract",
+  "Validate Friends experience contract",
+  "Validate Captures experience contract",
+  "Validate Home Library and Game Detail contract",
+  "Validate Store Settings and First Boot contract",
+  "Validate persisted First Boot recovery",
   "ZERO_PHYSICAL_QUALIFICATION_B64",
+  "candidate.shell_sha256",
+  "Production shell bytes do not match the exact physically qualified shell artifact.",
   "ZERO_SIGNING_PFX_BASE64",
   "verify-authenticode.ps1",
   "generate-sbom.ps1",

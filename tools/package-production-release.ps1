@@ -66,10 +66,11 @@ foreach ($item in $payload) {
 }
 
 $manifest = [ordered]@{
-  schema = 1
-  product = "ZERO Virtual Console"
+  schema = 2
+  product = "ZERO Player"
+  platform = "ZERO Core V5"
   release_class = "production"
-  runtime = "V4.1"
+  runtime = "V5"
   commit = $commit
   generated_at_utc = [DateTime]::UtcNow.ToString("o")
   architecture_result = $architecture.result
@@ -84,7 +85,7 @@ $manifest = [ordered]@{
 $manifestPath = Join-Path $OutputDir "production-release-manifest.json"
 $manifest | ConvertTo-Json -Depth 12 | Set-Content -Encoding UTF8 -Path $manifestPath
 
-$zipPath = Join-Path (Split-Path -Parent $OutputDir) "ZERO-Virtual-Console-Windows-x64-Production.zip"
+$zipPath = Join-Path (Split-Path -Parent $OutputDir) "ZERO-Player-Windows-x64-Production.zip"
 if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
 Compress-Archive -Path (Join-Path $OutputDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
 Require-File $zipPath

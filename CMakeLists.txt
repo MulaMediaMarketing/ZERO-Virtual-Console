@@ -6,7 +6,8 @@ if(NOT WIN32)
   message(FATAL_ERROR "ZERO Virtual Console currently targets Windows 11 x64 only.")
 endif()
 if(MSVC)
-  add_compile_options(/W4 /WX /permissive- /utf-8)
+  add_compile_options(/W4 /WX /permissive- /utf-8 /Brepro)
+  add_link_options(/Brepro)
 endif()
 
 add_library(ZeroSdk STATIC sdk/ZeroSdk.cpp sdk/ZeroSdkCrash.cpp)
@@ -15,7 +16,7 @@ target_compile_definitions(ZeroSdk PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN 
 target_link_libraries(ZeroSdk PUBLIC dbghelp)
 
 add_executable(ZeroVirtualConsole WIN32
-  src/main.cpp src/App.cpp src/AppPages.cpp src/AppAchievements.cpp src/AppLaunchRecovery.cpp src/AppSettings.cpp src/AppUx.cpp
+  src/main.cpp src/ApplicationServices.cpp src/App.cpp src/AppPages.cpp src/AppNextLevelPages.cpp src/AppAchievements.cpp src/AppLaunchRecovery.cpp src/AppSettings.cpp src/AppUx.cpp
   src/CaptureLibrary.cpp src/LocalIdentityProvider.cpp src/GameRegistry.cpp src/GameImportService.cpp src/PackageManifestParser.cpp
   src/ManifestValidator.cpp src/PackageSecurity.cpp src/PackageIntegrityVerifier.cpp src/PackageTrust.cpp src/PackageTrustPresentation.cpp
   src/CngPublisherTrustProvider.cpp src/RuntimeSession.cpp src/RuntimeSessionLifecycle.cpp src/RuntimeSessionDiagnostics.cpp src/RuntimeIpcServer.cpp
@@ -25,6 +26,7 @@ add_executable(ZeroVirtualConsole WIN32
 target_include_directories(ZeroVirtualConsole PRIVATE include)
 target_compile_definitions(ZeroVirtualConsole PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(ZeroVirtualConsole PRIVATE d2d1 dwrite windowscodecs xinput9_1_0 shlwapi shell32 ole32 bcrypt advapi32 dbghelp winsqlite3)
+include(cmake/ZeroProductArchitecture.cmake)
 
 add_executable(ZeroTestGame sample_game/TestGame.cpp)
 target_include_directories(ZeroTestGame PRIVATE sdk include)

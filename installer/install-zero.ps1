@@ -3,7 +3,7 @@ param(
   [string]$InstallDir = "$env:LOCALAPPDATA\Programs\ZERO Virtual Console",
   [string]$DataRoot = "$env:LOCALAPPDATA\ZERO",
   [string]$Version = "0.1.0-rc1",
-  [string]$StartMenuPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\ZERO Virtual Console.lnk",
+  [string]$StartMenuPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\ZERO Player.lnk",
   [switch]$SkipRegistration,
   [switch]$SkipShortcut
 )
@@ -139,14 +139,16 @@ try {
     $shortcut = $ws.CreateShortcut($StartMenuPath)
     $shortcut.TargetPath = Join-Path $InstallDir "ZeroVirtualConsole.exe"
     $shortcut.WorkingDirectory = $InstallDir
-    $shortcut.Description = "ZERO Virtual Console"
+    $shortcut.Description = "ZERO Player"
     $shortcut.Save()
   }
 
   if (-not $SkipRegistration) {
-    $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ZERO Virtual Console"
+    $legacyUninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ZERO Virtual Console"
+    if (Test-Path $legacyUninstallKey) { Remove-Item $legacyUninstallKey -Recurse -Force }
+    $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ZERO Player"
     New-Item -Path $uninstallKey -Force | Out-Null
-    New-ItemProperty -Path $uninstallKey -Name DisplayName -Value "ZERO Virtual Console" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $uninstallKey -Name DisplayName -Value "ZERO Player" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name DisplayVersion -Value $Version -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name Publisher -Value "ZERO" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name InstallLocation -Value $InstallDir -PropertyType String -Force | Out-Null
@@ -169,6 +171,6 @@ try {
 }
 
 $mode = if ($previousVersion) { "updated from $previousVersion to $Version" } else { "installed as $Version" }
-Write-Host "ZERO Virtual Console $mode at $InstallDir"
+Write-Host "ZERO Player $mode at $InstallDir"
 Write-Host "Player saves, library packages, settings, identity, captures, diagnostics, and platform state remain under $DataRoot and are not replaced during updates."
 Write-Host "Acceptance tool installed at $(Join-Path $InstallDir 'ZeroAcceptance.exe')"
