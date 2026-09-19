@@ -29,6 +29,32 @@ void ServiceStateCoordinator::RefreshAll() {
     ++revision_;
 }
 
+void ServiceStateCoordinator::RefreshForPage(ProductionUxPage page) {
+    switch (page) {
+        case ProductionUxPage::Captures:
+            captures_.Refresh();
+            break;
+        case ProductionUxPage::Friends:
+            friends_.Refresh();
+            break;
+        case ProductionUxPage::Store:
+        case ProductionUxPage::Wishlist:
+        case ProductionUxPage::Checkout:
+            store_.Refresh();
+            break;
+        case ProductionUxPage::Home:
+        case ProductionUxPage::Discover:
+        case ProductionUxPage::Library:
+        case ProductionUxPage::GameDetail:
+        case ProductionUxPage::Import:
+            registry_.Refresh();
+            break;
+        default:
+            break;
+    }
+    ++revision_;
+}
+
 void ServiceStateCoordinator::PollRuntime() {
     runtime_.Poll();
     ++revision_;
