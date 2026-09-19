@@ -11,7 +11,7 @@ This document defines the production baseline for ZERO Player. It applies to the
 5. **Persistence is transactional and test-isolated.** Program replacement, package installation, First Boot, settings, canonical game state, and release metadata use atomic/rollback behavior. Persistent services support isolated acceptance paths rather than silently touching a developer/player profile.
 6. **No title-specific platform architecture.** Games integrate through manifests, Runtime/SDK contracts, storage namespaces, Resume, achievements, and platform APIs. No commercial title defines ZERO behavior.
 7. **No source file over 1,000 lines.** Files approaching the limit split by responsibility before exceeding it.
-8. **Compiler warnings are release failures.** MSVC production builds use `/W4 /WX /permissive- /utf-8`.
+8. **Compiler warnings are release failures and shipping builds are reproducible.** MSVC production builds use `/W4 /WX /permissive- /utf-8 /Brepro`, with `/Brepro` also enforced at link time.
 9. **No unresolved production debt markers.** TODO/FIXME/HACK and explicit prototype/mock/placeholder-data markers fail the architecture gate.
 10. **Every production subsystem requires executable acceptance evidence.** Contract, cross-system, hostile-input, persistence, fault-injection, and performance tests are required; real-hardware gates remain mandatory where CI cannot reproduce the environment.
 11. **Release evidence is immutable for an exact commit.** Any source, shell, runtime, SDK, build, installer, manifest, workflow, or packaging change invalidates prior physical RC qualification.
@@ -53,7 +53,7 @@ Every candidate produces `build/ArchitectureReports/production-architecture.json
 - manifest Registry and Import use the shared typed `PackageManifestParser`;
 - signature and trusted-key metadata use `StrictJson`;
 - duplicate JSON keys, malformed Unicode, excessive nesting, and trailing JSON data are rejected;
-- MSVC production warnings are fatal;
+- MSVC production warnings are fatal and compile/link reproducibility uses `/Brepro`;
 - shell startup opts into Per-Monitor V2 DPI awareness;
 - navigation and storage discovery each have one authority;
 - no legacy parallel shell state remains;
