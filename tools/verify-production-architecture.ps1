@@ -41,7 +41,7 @@ foreach($file in $scanFiles){
 }
 
 $cmake=Get-Content (Join-Path $SourceRoot "CMakeLists.txt") -Raw
-foreach($flag in @('/W4','/WX','/permissive-','/utf-8')){
+foreach($flag in @('/W4','/WX','/permissive-','/utf-8','/Brepro')){
   if($cmake -notmatch [regex]::Escape($flag)){Violate "production_compiler_policy" "CMakeLists.txt" "Missing MSVC flag $flag"}
 }
 $readme=Get-Content (Join-Path $SourceRoot "README.md") -Raw
@@ -134,7 +134,7 @@ $commit=if($env:GITHUB_SHA){$env:GITHUB_SHA}else{try{(& git rev-parse HEAD 2>$nu
 $failed=$violations.Count; $status=if($failed -eq 0){"PASS"}else{"FAIL"}
 $report=[ordered]@{
   schema=7;generated_at_utc=[DateTime]::UtcNow.ToString("o");commit=$commit;result=$status
-  policy=[ordered]@{max_source_lines=1000;minimum_acceptance_contracts=$minimumContracts;shell_binary_max_bytes=67108864;current_runtime="V5 ProductionRuntime";publisher_signature_algorithm="ecdsa-p256-sha256";navigation_authority="V5 ShellKernel via ProductionShellIntegration";navigation_commit_semantics="transactional-after-controller-activation";platform_path_authority="PlatformPaths";compiler_warnings="fatal";package_json_parser="StrictJson/PackageManifestParser"}
+  policy=[ordered]@{max_source_lines=1000;minimum_acceptance_contracts=$minimumContracts;shell_binary_max_bytes=67108864;current_runtime="V5 ProductionRuntime";publisher_signature_algorithm="ecdsa-p256-sha256";navigation_authority="V5 ShellKernel via ProductionShellIntegration";navigation_commit_semantics="transactional-after-controller-activation";platform_path_authority="PlatformPaths";compiler_warnings="fatal";package_json_parser="StrictJson/PackageManifestParser";reproducible_builds="MSVC /Brepro compile+link"}
   source_metrics=[ordered]@{files=$sourceFiles.Count;total_lines=$totalLines;max_file_lines=$maxLines;max_file=$maxFile;files_detail=$fileMetrics.ToArray()}
   shell_metric=$shellMetric
   acceptance_metrics=[ordered]@{source_contracts=$acceptanceSources.Count;built_binaries=$acceptanceBinaries.Count;binaries=$binaryMetrics.ToArray()}
