@@ -189,8 +189,8 @@ jobs:
       - name: Upload signed production release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ZERO-Virtual-Console-Windows-x64-Production-${{ github.sha }}
+          name: ZERO-Player-Windows-x64-Production-${{ github.sha }}
           if-no-files-found: error
           path: |
-            build/ZERO-Virtual-Console-Windows-x64-Production.zip
+            build/ZERO-Player-Windows-x64-Production.zip
             build/ProductionRelease/**
