@@ -2,16 +2,8 @@
 
 namespace zero::shell {
 
-ShellModule::ShellModule(v5::ProductionShellIntegration& navigation,
-                         GameRegistry& registry,
-                         CaptureLibrary& captures,
-                         IFriendsProvider& friends,
-                         IStoreProvider& store) noexcept
-    : navigation_(navigation),
-      registry_(registry),
-      captures_(captures),
-      friends_(friends),
-      store_(store) {}
+ShellModule::ShellModule(v5::ProductionShellIntegration& navigation) noexcept
+    : navigation_(navigation) {}
 
 ShellIntent ShellModule::RouteGlobalInput(const InputSnapshot& input,
                                           bool runtimeActive,
@@ -44,38 +36,6 @@ bool ShellModule::Back(ProductionUxPage& page, std::string& error) {
     }
     page = *active;
     return true;
-}
-
-void ShellModule::RefreshAll() {
-    registry_.Refresh();
-    captures_.Refresh();
-    friends_.Refresh();
-    store_.Refresh();
-}
-
-void ShellModule::RefreshForPage(ProductionUxPage page) {
-    switch (page) {
-        case ProductionUxPage::Captures:
-            captures_.Refresh();
-            break;
-        case ProductionUxPage::Friends:
-            friends_.Refresh();
-            break;
-        case ProductionUxPage::Store:
-        case ProductionUxPage::Wishlist:
-        case ProductionUxPage::Checkout:
-            store_.Refresh();
-            break;
-        case ProductionUxPage::Home:
-        case ProductionUxPage::Discover:
-        case ProductionUxPage::Library:
-        case ProductionUxPage::GameDetail:
-        case ProductionUxPage::Import:
-            registry_.Refresh();
-            break;
-        default:
-            break;
-    }
 }
 
 } // namespace zero::shell
