@@ -4,6 +4,7 @@
 #include "FriendsProvider.h"
 #include "GameRegistry.h"
 #include "StoreProvider.h"
+#include "ProductionUxContract.h"
 #include "v5/ProductionRuntime.h"
 #include <cstdint>
 #include <string>
@@ -32,6 +33,7 @@ public:
     void RefreshLocal();
     void RefreshNetworkAdapters();
     void RefreshAll();
+    void RefreshForPage(ProductionUxPage page);
     void PollRuntime();
 
     ServiceStateSnapshot Snapshot() const noexcept;
