@@ -226,10 +226,23 @@ void App::Tick() {
 }
 
 void App::NavigateTo(Page next) {
-    if (page_ != next) {
-        page_ = next;
-        shellUx_.BeginPageTransition();
-        NotifyFocusMoved();
+    const Page current = page_;
+    if (current != next) {
+        const auto beforeRevision = productionShell_.Snapshot().navigationRevision;
+        std::string error;
+        if (!productionShell_.Navigate(next, error)) {
+            status_ = Widen(error.empty() ? "ZERO could not navigate to the requested page." : error);
+            return;
+        }
+        const auto active = productionShell_.ActivePage();
+        if (!active || *active != next) {
+            status_ = L"ZERO shell navigation did not commit the requested page.";
+            return;
+        }
+        if (productionShell_.Snapshot().navigationRevision != beforeRevision) {
+            shellUx_.BeginPageTransition();
+            NotifyFocusMoved();
+        }
     }
     status_.clear();
     CancelCaptureModal(capturesUx_, captures_.Items());
