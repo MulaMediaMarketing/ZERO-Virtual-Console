@@ -1,6 +1,6 @@
 # ZERO Production Architecture Standard
 
-This document defines the production baseline for ZERO Virtual Console. It applies to the shell, Runtime V4.1, package services, input, persistence, installer/update, social/store providers, captures, SDK integration, diagnostics, CI, release packaging, repository governance, signing, and future authoritative online services.
+This document defines the production baseline for ZERO Player. It applies to the shell, ZERO Core V5 / ProductionRuntime, package services, input, persistence, installer/update, social/store providers, captures, SDK integration, diagnostics, CI, release packaging, repository governance, signing, and future authoritative online services.
 
 ## Production rules
 
@@ -33,7 +33,7 @@ Owns deterministic state for Home/Library/Game Detail, Friends, Captures, Store,
 Owns GameRegistry, GameImportService, CaptureLibrary, identity, Friends/Store providers, ResumeStore, achievement/crash services, settings, and canonical database access. Services expose explicit success/failure results rather than UI side effects.
 
 ### Runtime/security layer
-Owns Runtime V4.1 lifecycle, process containment, authenticated SDK IPC, package integrity, strict package metadata parsing, ECDSA P-256/SHA-256 publisher verification, trust policy, launch blocking, diagnostics, and crash containment.
+Owns ZERO Core V5 ProductionRuntime lifecycle, process containment, authenticated SDK IPC, package integrity, strict package metadata parsing, ECDSA P-256/SHA-256 publisher verification, trust policy, launch blocking, diagnostics, and crash containment.
 
 ### Online authority layer
 Owns server-side authentication, entitlement issuance, commerce mutation, social graph, presence/join authorization, cloud state, publisher enrollment/revocation, rate limiting, abuse/fraud policy, and any future competitive/multiplayer authority. The client can request/display/cache state but cannot mint authoritative state. See `docs/SERVER_AUTHORITY_SECURITY.md`.
@@ -48,7 +48,7 @@ Owns fatal-warning builds, CodeQL analysis, automated acceptance, architecture m
 
 Every candidate produces `build/ArchitectureReports/production-architecture.json` and a Markdown summary. The architecture gate enforces:
 
-- current documentation identifies Runtime V4.1;
+- current documentation identifies ZERO Core V5 / ProductionRuntime;
 - publisher trust documentation matches `ecdsa-p256-sha256`;
 - manifest Registry and Import use the shared typed `PackageManifestParser`;
 - signature and trusted-key metadata use `StrictJson`;
@@ -105,8 +105,8 @@ CI cannot certify real Windows 11 client behavior, real controller enumeration/r
 
 ## Server-authoritative boundary
 
-Runtime V4.1 is a production local-console foundation. Current Store and Friends providers intentionally remain disconnected until a deployed authoritative service exists. A future online service cannot be considered production-ready merely because client UI/provider code exists. It must satisfy `docs/SERVER_AUTHORITY_SECURITY.md`, server-side authorization, replay/idempotency, rate-limit/abuse controls, secret/token handling, hostile-input testing, degraded-network behavior, and production monitoring.
+ZERO Core V5 / ProductionRuntime is the production local-console foundation. Current Store and Friends providers intentionally remain disconnected until a deployed authoritative service exists. A future online service cannot be considered production-ready merely because client UI/provider code exists. It must satisfy `docs/SERVER_AUTHORITY_SECURITY.md`, server-side authorization, replay/idempotency, rate-limit/abuse controls, secret/token handling, hostile-input testing, degraded-network behavior, and production monitoring.
 
 ## Deferred ecosystem capabilities
 
-Production-grade Runtime V4.1 does not imply completion of the online commercial ecosystem. Store commerce, cloud identity, social backend, DRM, anti-cheat, native video capture/encoding, public publisher CA/portal, and public SDK distribution are separate milestones and remain truthful disconnected/not-supported states until implemented and independently qualified.
+Production-grade ZERO Core V5 / ProductionRuntime does not imply completion of the online commercial ecosystem. Store commerce, cloud identity, social backend, DRM, anti-cheat, native video capture/encoding, public publisher CA/portal, and public SDK distribution are separate milestones and remain truthful disconnected/not-supported states until implemented and independently qualified.
