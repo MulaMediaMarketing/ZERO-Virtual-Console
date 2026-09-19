@@ -145,10 +145,6 @@ jobs:
           }
           "ZERO_QUALIFIED_UNSIGNED_SHELL_SHA256=$rebuiltShellHash" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Generate SPDX SBOM
-        shell: pwsh
-        run: ./tools/generate-sbom.ps1 -BuildRoot ./build -OutputPath ./build/SBOM/zero-virtual-console.spdx.json
-
       - name: Import production code-signing certificate
         shell: pwsh
         env:
@@ -180,6 +176,10 @@ jobs:
       - name: Verify Authenticode signature
         shell: pwsh
         run: ./tools/verify-authenticode.ps1 -Paths ./build/Release/ZeroVirtualConsole.exe -ReportPath ./build/SigningReports/authenticode.json
+
+      - name: Generate signed-artifact SPDX SBOM
+        shell: pwsh
+        run: ./tools/generate-sbom.ps1 -BuildRoot ./build -OutputPath ./build/SBOM/zero-virtual-console.spdx.json
 
       - name: Build production release bundle
         shell: pwsh
