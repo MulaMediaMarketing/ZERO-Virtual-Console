@@ -1,11 +1,7 @@
 #pragma once
 
-#include "CaptureLibrary.h"
-#include "FriendsProvider.h"
-#include "GameRegistry.h"
 #include "InputCore.h"
 #include "ProductionUxContract.h"
-#include "StoreProvider.h"
 #include "v5/ProductionShellIntegration.h"
 #include <optional>
 #include <string>
@@ -27,11 +23,7 @@ struct ShellIntent {
 
 class ShellModule final {
 public:
-    ShellModule(v5::ProductionShellIntegration& navigation,
-                GameRegistry& registry,
-                CaptureLibrary& captures,
-                IFriendsProvider& friends,
-                IStoreProvider& store) noexcept;
+    explicit ShellModule(v5::ProductionShellIntegration& navigation) noexcept;
 
     ShellIntent RouteGlobalInput(const InputSnapshot& input,
                                  bool runtimeActive,
@@ -40,15 +32,9 @@ public:
     bool MoveTopLevel(int direction, ProductionUxPage& page, std::string& error);
     bool Back(ProductionUxPage& page, std::string& error);
 
-    void RefreshAll();
-    void RefreshForPage(ProductionUxPage page);
 
 private:
     v5::ProductionShellIntegration& navigation_;
-    GameRegistry& registry_;
-    CaptureLibrary& captures_;
-    IFriendsProvider& friends_;
-    IStoreProvider& store_;
 };
 
 } // namespace zero::shell
