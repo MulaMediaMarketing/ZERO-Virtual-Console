@@ -233,7 +233,7 @@ void App::NavigateTo(Page next) {
     }
     status_.clear();
     CancelCaptureModal(capturesUx_, captures_.Items());
-    services_.ShellCoordinator().RefreshForPage(next);
+    services_.ServiceState().RefreshForPage(next);
 
     if (next == Page::Captures) {
         ClampCaptureExperience(capturesUx_, captures_.Items());
